@@ -5,7 +5,8 @@
 *.cubin
 *.fatbin
 
-
+## By Daniel
+*.dll
 
 
 ##################### Visual Studio ####################

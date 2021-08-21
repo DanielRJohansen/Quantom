@@ -1,0 +1,9 @@
+# Molecule
+# ID	Atom	Dist_from_core	Angle_relation	Angle
+
+#Always do "core" atom first
+
+H2O
+O1	O	NULL		NULL		NULL
+H1	H	95.7		H2		104.5
+H2	H	95.7		H1		104.5
