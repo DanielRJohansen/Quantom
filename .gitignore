@@ -7,7 +7,7 @@
 
 ## By Daniel
 *.dll
-
+*.sln
 
 ##################### Visual Studio ####################
 ## Ignore Visual Studio temporary files, build results, and
