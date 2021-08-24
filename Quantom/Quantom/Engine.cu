@@ -11,7 +11,8 @@ Engine::Engine(Simulation* simulation) : simulation(simulation) {
 
 void Engine::fillBox() {
 	int bodies_per_dim = cbrt(simulation->n_bodies);
-	double dist = simulation->box_size.x / double(bodies_per_dim);	// dist_per_index
+	//double dist = simulation->box_size.x / double(bodies_per_dim);	// dist_per_index
+	double dist = 2;
 	for (int i = 0; i < simulation->n_bodies; i++) {
 		int x_index = i % bodies_per_dim;
 		int y_index = (i / bodies_per_dim) % bodies_per_dim;

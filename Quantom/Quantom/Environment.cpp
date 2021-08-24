@@ -3,7 +3,9 @@
 
 
 Environment::Environment() {
-	display = new Display();
+
+	Simulation simulation;
+	display = new Display(&simulation);
 	interface = new Interface(display->window);
 
 	run();
@@ -21,10 +23,10 @@ void Environment::run() {
 
 
 
-		display->render();
+		//display->render();
 
-		interface->handleEvents();	
-		if (interface->quit)
-			display->terminate();
+		//interface->handleEvents();	
+		//if (interface->quit)
+		//	display->terminate();
 	}
 }

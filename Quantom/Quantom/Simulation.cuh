@@ -3,11 +3,11 @@
 //#include "QuantomTypes.cuh"
 #include "Bodies.cuh"
 
-class Simulation {
+__global__ class Simulation {
 
 
 public:
-	Double3 box_size = Double3(10, 10, 10);
+	double box_size = 10;	//nm
 	int n_steps = 1000000;
 
 

@@ -91,11 +91,14 @@
     <ClInclude Include="Environment.h" />
     <ClInclude Include="Interface.h" />
     <ClInclude Include="QuantomTypes.cuh" />
-    <ClInclude Include="Simulation.h" />
+    <ClInclude Include="Raytracer.cuh" />
+    <ClInclude Include="Simulation.cuh" />
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="Bodies.cu" />
     <CudaCompile Include="Engine.cu" />
+    <CudaCompile Include="QuantomTypes.cu" />
+    <CudaCompile Include="Raytracer.cu" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -3,7 +3,7 @@
 #include <iostream>
 
 #include "Bodies.cuh"
-#include "Simulation.h"
+#include "Simulation.cuh"
 
 
 

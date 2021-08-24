@@ -3,7 +3,7 @@
 
 
 
-Display::Display() {
+Display::Display(Simulation* simulation) {
     window = new sf::RenderWindow(sf::VideoMode(1000, 1000), "Quantom Simulation");
 
     sf::CircleShape shape(100.f);
@@ -13,7 +13,7 @@ Display::Display() {
     window->clear();
     window->draw(shape);
 
-
+    //raytracer = new Raytracer(simulation);
 
 
 }
@@ -30,5 +30,6 @@ void Display::render() {
 
 
 void Display::terminate() {
+    printf("Closing window\n");
     window->close();
 }
