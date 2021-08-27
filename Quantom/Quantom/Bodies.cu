@@ -10,7 +10,6 @@ Molecule::Molecule() {	// Always returns a h2o molecule rn
 
 	// Calc com
 	Double3 CoM(0, 0, 0);
-	std::printf("Center of mass: %f, %f, %f\n", CoM.x, CoM.y, CoM.z);
 	//std::printf("Atom1: %f, %f, %f\n", atoms[, CoM.y, CoM.z);
 
 	double accumulated_mass = 0;
@@ -24,7 +23,7 @@ Molecule::Molecule() {	// Always returns a h2o molecule rn
 	for (int i = 0; i < 3; i++) {
 		atoms[i].pos = atoms[i].pos - CoM;
 	}
-	std::printf("Center of mass: %f, %f, %f\n", CoM.x, CoM.y, CoM.z);
+	//std::printf("Center of mass: %f, %f, %f\n", CoM.x, CoM.y, CoM.z);
 
 }
 

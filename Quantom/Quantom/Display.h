@@ -8,14 +8,15 @@ class Display
 public:
 	Display() {}
 	Display(Simulation* simulation);
-	void render();
+	void render(Simulation* simulation);
 
 	void terminate();
 	sf::RenderWindow* window;
 	Raytracer* raytracer;
 
 private:
-	
+	sf::Texture texture;
+	sf::Sprite sprite;
 
 };
 

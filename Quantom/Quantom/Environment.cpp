@@ -3,11 +3,12 @@
 
 
 Environment::Environment() {
-
-	Simulation simulation;
+	engine = new Engine(&simulation);
+	simulation.moveToDevice();	// Must be done before initiating raytracer!
 	display = new Display(&simulation);
 	interface = new Interface(display->window);
 
+	
 	run();
 }
 
@@ -23,10 +24,10 @@ void Environment::run() {
 
 
 
-		//display->render();
+		display->render(&simulation);
 
-		//interface->handleEvents();	
-		//if (interface->quit)
-		//	display->terminate();
+		interface->handleEvents();	
+		if (interface->quit)
+			display->terminate();
 	}
 }

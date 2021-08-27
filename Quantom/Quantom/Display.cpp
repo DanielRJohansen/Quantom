@@ -6,22 +6,33 @@
 Display::Display(Simulation* simulation) {
     window = new sf::RenderWindow(sf::VideoMode(1000, 1000), "Quantom Simulation");
 
-    sf::CircleShape shape(100.f);
-    shape.setFillColor(sf::Color::Green);
+
+    raytracer = new Raytracer(simulation);
+
+    
+    sf::Image blank_image;
+    blank_image.create(RAYS_PER_DIM, RAYS_PER_DIM, sf::Color(0,100, 200));
+    texture.create(RAYS_PER_DIM, RAYS_PER_DIM);
+    texture.loadFromImage(blank_image);
 
 
-    window->clear();
-    window->draw(shape);
-
-    //raytracer = new Raytracer(simulation);
 
 
 }
 
 
 
-void Display::render() {
+void Display::render(Simulation* simulation) {
     window->clear();
+    uint8_t* image = raytracer->render(simulation);
+    //texture.loadFromImage(image);
+    texture.update(image);
+    //
+
+
+    delete image;
+    sprite.setTexture(texture, true);
+    window->draw(sprite);
     window->display();
 }
 
