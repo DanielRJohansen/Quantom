@@ -16,7 +16,7 @@ void Environment::run() {
 
 
 	Molecule h2o;
-
+	printf("Simulation started\n");
 	while (display->window->isOpen()) {
 
 

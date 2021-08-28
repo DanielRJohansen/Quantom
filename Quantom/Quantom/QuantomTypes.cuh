@@ -4,7 +4,6 @@
 #include "device_launch_parameters.h"
 #include "math.h"
 
-const int BLOCK_LEN = 1; //nm
 
 
 
@@ -45,39 +44,18 @@ struct Double3 {
 
 
 
-class Block {	// All boxes are cubic
-public:
-	__host__ __device__ Block() {}
-	__host__ __device__ Block(Double3 center) : center(center){}
-	__host__ __device__ bool isInBLock(Double3 point);
 
-	Double3 center;
+/*
+struct cudaBody {
+	cudaBody(){}
+	cudaBody(SimBody* simbody) : simbody(simbody) {
 
-private:
+	}
 
+
+	float pos[3];
+	SimBody* simbody;
 };
-
-class Box {
-public:
-	int n_blocks;
-	Block* blocks;
-
-	void moveToDevice() {	// Loses pointer to RAM location!
-		Block* blocks_temp;
-		int blocks_bytesize = n_blocks * sizeof(Block);
-		cudaMallocManaged(&blocks_temp, blocks_bytesize);
-		cudaMemcpy(blocks_temp, blocks, sizeof(Box), cudaMemcpyHostToDevice);
-		delete blocks;
-		blocks = blocks_temp;
-	}	
-};
-
-
-
-
-
-
-
 
 class KdTree {
 	class Node;
@@ -197,3 +175,4 @@ private:
 	};
 };
 
+*/

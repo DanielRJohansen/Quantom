@@ -16,8 +16,8 @@ public:
 
 private:
 	Simulation* simulation;
-	void fillBox();
-	void initBlocks();
+	int fillBox();		// Returns # of bodies placed
+	int initBlocks();	// returns # of blocks created
 
 	void placeBody(SimBody* body);
 

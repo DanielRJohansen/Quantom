@@ -15,22 +15,25 @@ const int THREADS_PER_BLOCK = 1024;
 const int MAX_RAY_BLOCKS = 20;
 
 
-__global__ class Ray {
+class Ray {
 public:
 	Ray(){}
 	Ray(Double3 unit_vector);
 
 	__device__ void findBlockHits(Box* box, Double3 focalpoint);
+	__device__ bool hitsBody(SimBody* body, Double3 focalpoint);
 
 
 	Double3 unit_vector;
 
-private:
-
 	int block_indexes[MAX_RAY_BLOCKS];	// BAD. each ray can only hit 20 boxes, before it fades
 
+
+
+private:
+
+
 	__device__ bool hitsBlock(Block* Block, Double3 focalpoint);
-	__device__ bool hitsBody(RenderBody* body, Double3 focalpoint);
 };
 
 
@@ -48,4 +51,15 @@ private:
 	Double3 focalpoint;
 
 	cudaError_t cuda_status;
+
+
+
+	// HELPER FUNCTIONS;
+	void setGPU() {
+		cuda_status = cudaSetDevice(0);
+		if (cuda_status != cudaSuccess) {
+			fprintf(stderr, "cudaSetDevice failed!");
+			exit(1);
+		}
+	}
 };
