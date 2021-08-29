@@ -52,6 +52,7 @@ public:
 		box = new Box;
 	}
 	void moveToDevice() {
+		printf("box blocks: %d\n", box->n_blocks);
 		box->moveToDevice();
 
 		Box* box_temp;
@@ -60,6 +61,7 @@ public:
 		delete box;
 		box = box_temp;
 		
+		printf("box blocks: %d\n", box->n_blocks);
 		printf("Simulation ready for device\n");
 	}
 

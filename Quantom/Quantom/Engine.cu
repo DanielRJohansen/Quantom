@@ -34,7 +34,8 @@ int Engine::initBlocks() {
 }
 
 int Engine::fillBox() {
-	int bodies_per_dim = cbrt(simulation->n_bodies);
+	int bodies_per_dim = ceil(cbrt((double)simulation->n_bodies));
+	printf("Bodies per dim: %d\n", bodies_per_dim);
 	double dist = simulation->box_size / (double)bodies_per_dim;	// dist_per_index
 	double base = -simulation->box_size / 2. + BLOCK_LEN / 2.;
 
@@ -42,6 +43,8 @@ int Engine::fillBox() {
 	for (int x_index = 0; x_index < bodies_per_dim; x_index++) {
 		for (int y_index = 0; y_index < bodies_per_dim; y_index++) {
 			for (int z_index = 0; z_index < bodies_per_dim; z_index++) {
+				if (index == simulation->n_bodies)
+					break;
 				simulation->bodies[index].pos = Double3(base + dist * (double) x_index, base + dist * double(y_index), base + dist * double(z_index));
 				placeBody(&simulation->bodies[index++]);
 			}
