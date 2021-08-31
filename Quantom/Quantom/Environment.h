@@ -11,16 +11,17 @@ class Environment
 public:
 	Environment();
 
+	void run();
 
 
+
+	Simulation simulation;
 
 
 private:
 	Display* display;
 	Interface* interface;
-	Simulation simulation;
 	Engine* engine;
-	void run();
 
 };
 

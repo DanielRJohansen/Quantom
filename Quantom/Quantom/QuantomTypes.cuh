@@ -24,7 +24,7 @@ struct Double3 {
 	__host__ __device__ inline Double3 operator * (const double a) const { return Double3(x * a, y * a, z * a); }
 	__host__ __device__ inline Double3 operator + (const Double3 a) const { return Double3(x + a.x, y + a.y, z + a.z); }
 	__host__ __device__ inline Double3 operator - (const Double3 a) const { return Double3(x - a.x, y - a.y, z - a.z); }
-
+	__host__ __device__ inline bool operator == (const Double3 a) const { return (a.x == x && a.y == y && a.z == z); }
 
 	__host__ __device__ inline double len() {return (double)sqrtf(x * x + y * y + z * z); }
 	__host__ __device__ Double3 cross(Double3 a) const { return Double3(y * a.z - z * a.y, z * a.x - x * a.z, x * a.y - y * a.x); }

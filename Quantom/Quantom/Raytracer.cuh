@@ -4,16 +4,18 @@
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
 
+#include <chrono>
+
 #include "QuantomTypes.cuh"
 #include "Simulation.cuh"
 
 
-const double FOCAL_LEN_RATIO = 5;
+const double FOCAL_LEN_RATIO = 1;
 const double FOCAL_Y_OFFSET = -1;
 const int RAYS_PER_DIM = 1000;	// Can't launch kernels if above 1024
 const int NUM_RAYS = RAYS_PER_DIM * RAYS_PER_DIM;
 const int THREADS_PER_BLOCK = 1024;
-const int MAX_RAY_BLOCKS = 50;
+const int MAX_RAY_BLOCKS = 20;
 
 
 class Ray {
@@ -22,7 +24,7 @@ public:
 	Ray(Double3 unit_vector, Double3 origin);
 
 	__device__ void findBlockHits(Box* box, Double3 focalpoint);
-	__device__ bool hitsBody(SimBody* body, Double3 focalpoint);
+	__device__ bool hitsBody(SimBody* body);
 	__host__ __device__ double distToPoint(Double3 point) {
 		Double3 far_ray_point = origin + unit_vector * 99999999;	////BAAAAAAAAAAAAAD
 		return (

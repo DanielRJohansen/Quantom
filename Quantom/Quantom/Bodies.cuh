@@ -28,18 +28,18 @@ __global__ struct Molecule {
 
 
 __global__ struct SimBody {
-	RenderBody* renderbody;
+	//RenderBody* renderbody;
 
 
 
 	Double3 pos;	//CoM
 	Double3 vel;
-	double mass;
+	float mass;
 
 
 
 	Double3 charge_unit_vector;
-	double charge_magnitude;
+	float charge_magnitude;
 
 };
 

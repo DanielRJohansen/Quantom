@@ -4,13 +4,19 @@
 #include "Bodies.cuh"
 
 
-const int MAX_BLOCK_BODIES = 1024;
-const double BLOCK_LEN = 1; //nm
-constexpr auto BLOCK_LEN_CUDA = 1.0;
-constexpr auto BOX_LEN_CUDA = 2.0;
+const int MAX_BLOCK_BODIES = 512;
+//const double BLOCK_LEN = 10; //nm
+constexpr auto BLOCK_LEN_CUDA = 1.0; //nm
+constexpr auto BOX_LEN_CUDA = 10.0;
 //#define BLOCK_LEN 1.0;
 
 const int INDEXA = 999;
+const int N_BODIES_START = 10000;
+
+
+
+
+
 
 class Block {	// All boxes are cubic
 public:
@@ -80,7 +86,7 @@ public:
 
 
 	
-	int n_bodies = 1000;
+	int n_bodies = N_BODIES_START;
 	Box* box;
 	SimBody* bodies;	// The bodies of each block is only total copy, not a pointer to its corresponding body here!
 
