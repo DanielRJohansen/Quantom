@@ -32,6 +32,11 @@ void Display::render(Simulation* simulation) {
 
     delete image;
     sprite.setTexture(texture, true);
+
+    //Flip vertically to move (0,0) from upper left corner to lower left corner.
+    sprite.setScale(1.f, -1.f);
+    sprite.setPosition(0,1000);
+
     window->draw(sprite);
     window->display();
 }

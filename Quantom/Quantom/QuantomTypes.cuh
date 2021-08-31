@@ -29,7 +29,19 @@ struct Double3 {
 	__host__ __device__ inline double len() {return (double)sqrtf(x * x + y * y + z * z); }
 	__host__ __device__ Double3 cross(Double3 a) const { return Double3(y * a.z - z * a.y, z * a.x - x * a.z, x * a.y - y * a.x); }
 
-
+	__host__ __device__ double at(int index) {
+		switch (index) {
+		case 0:
+			return x;
+		case 1:
+			return y;
+		case 2:
+			return z;
+		//default:
+			//printf("Double3 error!");
+			//exit(-2);
+		}
+	}
 
 	//Utilities
 	//void print()

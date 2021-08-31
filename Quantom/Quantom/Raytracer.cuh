@@ -8,11 +8,12 @@
 #include "Simulation.cuh"
 
 
-const double FOCAL_LEN_RATIO = 3;
+const double FOCAL_LEN_RATIO = 5;
+const double FOCAL_Y_OFFSET = -1;
 const int RAYS_PER_DIM = 1000;	// Can't launch kernels if above 1024
 const int NUM_RAYS = RAYS_PER_DIM * RAYS_PER_DIM;
 const int THREADS_PER_BLOCK = 1024;
-const int MAX_RAY_BLOCKS = 30;
+const int MAX_RAY_BLOCKS = 50;
 
 
 class Ray {

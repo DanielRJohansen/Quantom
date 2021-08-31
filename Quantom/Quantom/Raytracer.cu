@@ -11,7 +11,7 @@ __device__ void Ray::findBlockHits(Box* box, Double3 focalpoint) {
     int block_index = 0;
 
 
-	// Only works if sorted by y axis first!                        TODOOOOOOO
+	// Only works if sorted by y axis first!                      
 
     
 
@@ -98,9 +98,47 @@ __device__ bool Ray::hitsBlock(Block* block, Double3 focalpoint) {
     Double3 min = block->center - Double3(BLOCK_LEN_CUDA / 2, BLOCK_LEN_CUDA / 2, BLOCK_LEN_CUDA / 2);
     Double3 max = block->center + Double3(BLOCK_LEN_CUDA / 2, BLOCK_LEN_CUDA / 2, BLOCK_LEN_CUDA / 2);
 
-    float near = DBL_MIN;
-    float far = DBL_MAX;
+    float tmin = -DBL_MAX;
+    float tmax = DBL_MAX;
 
+    if (blockIdx.x * 1000 + threadIdx.x == INDEXA) {
+        printf("boxmin: %.2f %.2f %.2f\n", min.x, min.y, min.z);
+        printf("boxmax: %.2f %.2f %.2f\n", max.x, max.y, max.z);
+        printf("Tmin: %f \t tmax: %f \n", tmin, tmax);
+    }
+
+    for (int dim = 0; dim < 3; dim++) {
+        float invD = unit_vector.at(dim) != 0 ? 1.0f / unit_vector.at(dim) : 999999999;
+        //float invD = 1.0f / unit_vector.at(dim);
+        float t0 = (min.at(dim) - focalpoint.at(dim)) * invD;
+        float t1 = (max.at(dim) - focalpoint.at(dim)) * invD;
+        if (blockIdx.x * 1000 + threadIdx.x == INDEXA)
+            printf("t0 = %.4f\t t1 = %.4f\n", t0, t1);
+        if (invD < 0.0f) {
+            float temp = t1;
+            t1 = t0;
+            t0 = temp;
+        }
+
+        tmin = t0 > tmin ? t0 : tmin;
+        tmax = t1 < tmax ? t1 : tmax;
+        if (blockIdx.x * 1000 + threadIdx.x == INDEXA)
+            printf("%f %f\n", tmin, tmax);
+
+
+        if (tmax <= tmin) {    // was <=
+            if (blockIdx.x * 1000 + threadIdx.x == INDEXA) {
+                printf("miss!\n\n");
+            }
+            return false;
+        }
+    }
+    if (blockIdx.x * 1000 + threadIdx.x == INDEXA) {
+        printf("HIT! Block body count: %d. First body pos : %.2f %.2f %.2f\n\n\n", block->n_bodies, block->bodies[0].pos.x, block->bodies[0].pos.y, block->bodies[0].pos.z);
+    }
+        
+    return true;
+    /*
     if (!containedBetweenPlanes(min.x, max.x, unit_vector.x, focalpoint.x))
         return false;
     if (!containedBetweenPlanes(min.y, max.y, unit_vector.y, focalpoint.y))
@@ -109,7 +147,7 @@ __device__ bool Ray::hitsBlock(Block* block, Double3 focalpoint) {
         return false;
 
 
-    return true;
+    return true;*/
 }
 
 
@@ -120,12 +158,12 @@ __device__ bool Ray::hitsBody(SimBody* body, Double3 focalpoint) {
     double dist = distToPoint(body->pos);
 
     if (blockIdx.x * 1000 + threadIdx.x == 80080 && dist < 1) {
-        printf("Pos: %.4f %.4f %.4f\n", body->pos.x, body->pos.y, body->pos.z);
-        printf("Dist: %.6f\n", dist);
+        //printf("Pos: %.4f %.4f %.4f\n", body->pos.x, body->pos.y, body->pos.z);
+        //printf("Dist: %.6f\n", dist);
     }
         
 
-    if (dist < 1)
+    if (dist < 0.005)
         return true;
     return false;
 }
@@ -168,7 +206,7 @@ Raytracer::Raytracer(Simulation* simulation) {
 	double principal_point_increment = box_size / (double)RAYS_PER_DIM;
 
 	Ray* host_rayptr = new Ray[NUM_RAYS];
-	focalpoint = Double3(0, -(box_size / 2.f) * FOCAL_LEN_RATIO, 0);
+	focalpoint = Double3(0, -(box_size / 2.f) * FOCAL_LEN_RATIO + - box_size/2.f, 0);  
 
     printf("Focal point: %.3f %.3f %.3f\n", focalpoint.x, focalpoint.y, focalpoint.z);
 	int index = 0;
@@ -182,7 +220,7 @@ Raytracer::Raytracer(Simulation* simulation) {
            
 
 			Double3 uv = vector * (1.f / vector.len());
-            if (index == 750750) {
+            if (index == INDEXA) {
                 printf("%.2f %.2f %.2f\n", vector.x, vector.y, vector.z);
                 printf("%.2f %.2f %.2f\n", uv.x, uv.y, uv.z);
             }
@@ -207,10 +245,10 @@ Raytracer::Raytracer(Simulation* simulation) {
     cudaDeviceSynchronize();
 
 
-    int indexa = 750750;
+    int indexa = INDEXA;
     printf("Ray %d: %f %f %f\n", indexa, rayptr[indexa].unit_vector.x, rayptr[indexa].unit_vector.y, rayptr[indexa].unit_vector.z);
     printf("block_indexes: ");
-    for (int i = 0; i < 20; i++) {
+    for (int i = 0; i < MAX_RAY_BLOCKS; i++) {
         printf("%d ", rayptr[indexa].block_indexes[i]);
     }
 
@@ -223,10 +261,23 @@ __device__ void colorRay(Ray* ray, uint8_t* image, int index) {
 }
 
 __global__ void renderKernel(Ray* rayptr, uint8_t* image, Box* box, Double3 focalpoint) {
-    int  index = blockIdx.x * 1000 + threadIdx.x;
+    int  index = blockIdx.x * blockDim.x + threadIdx.x;
 
     Ray ray = rayptr[index];
-    Int3 xy_index(index % RAYS_PER_DIM, index / RAYS_PER_DIM, 0);
+    Int3 xy_index(blockIdx.x, threadIdx.x, 0);
+     
+
+
+
+    if (xy_index.x < 20 && xy_index.y < 20) {
+        image[index * 4 + 0] = 0;
+        image[index * 4 + 1] = 250;
+        image[index * 4 + 2] = 0;
+        image[index * 4 + 3] = 255;
+        return;
+    }
+
+
 
     bool hit = false;
     for (int i = 0; i < MAX_RAY_BLOCKS; i++) {
@@ -241,8 +292,8 @@ __global__ void renderKernel(Ray* rayptr, uint8_t* image, Box* box, Double3 foca
 
         Block* block = &box->blocks[ray.block_indexes[i]];
 
-        if (index == 750750)
-            printf("%d\n", block->n_bodies);
+        //if (index == 750750)
+            //printf("%d\n", block->n_bodies);
 
         for (int j = 0; j < block->n_bodies; j++) {
             

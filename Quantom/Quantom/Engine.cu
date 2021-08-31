@@ -7,7 +7,7 @@ Engine::Engine(Simulation* simulation) : simulation(simulation) {
 
 	
 	int n_blocks = initBlocks();
-	printf("%d blocks\n", n_blocks);
+	//printf("%d blocks\n", n_blocks);
 	int n_bodies = fillBox();
 
 	printf("Simulation configured with %d blocks, and %d bodies\n", n_blocks, n_bodies);
