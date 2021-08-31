@@ -5,30 +5,32 @@
 
 
 const int MAX_BLOCK_BODIES = 512;
-//const double BLOCK_LEN = 10; //nm
 constexpr auto BLOCK_LEN_CUDA = 1.0; //nm
 constexpr auto BOX_LEN_CUDA = 10.0;
-//#define BLOCK_LEN 1.0;
 
 const int INDEXA = 999;
-const int N_BODIES_START = 10000;
+const int N_BODIES_START = 2000;
 
 
 
 
 
 
-class Block {	// All boxes are cubic
-public:
+struct Block {	// All boxes are cubic
+
 	__host__ __device__ Block() {}
 	__host__ __device__ Block(Double3 center) : center(center) {}
 	__host__ __device__ bool isInBLock(Double3 point);
 
+
+
 	Double3 center;
+
 	SimBody bodies[MAX_BLOCK_BODIES];
 	int n_bodies = 0;
 
-private:
+	// Following is initiated AFTER being moved to device.
+	int neighbor_indexes[6]; //x- x+ y- y+ z- z+
 
 };
 

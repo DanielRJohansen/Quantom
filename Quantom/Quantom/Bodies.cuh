@@ -34,12 +34,12 @@ __global__ struct SimBody {
 
 	Double3 pos;	//CoM
 	Double3 vel;
-	float mass;
+	double mass;
 
 
 
 	Double3 charge_unit_vector;
-	float charge_magnitude;
+	double charge_magnitude;
 
 };
 

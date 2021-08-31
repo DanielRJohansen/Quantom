@@ -204,10 +204,10 @@ Raytracer::Raytracer(Simulation* simulation) {
            
 
 			Double3 uv = vector * (1.f / vector.len());
-            if (index == INDEXA) {
+            /*if (index == INDEXA) {
                 printf("%.2f %.2f %.2f\n", vector.x, vector.y, vector.z);
                 printf("%.2f %.2f %.2f\n", uv.x, uv.y, uv.z);
-            }
+            }*/
                 
             host_rayptr[index++] = Ray(uv, focalpoint);
 		}
@@ -220,15 +220,15 @@ Raytracer::Raytracer(Simulation* simulation) {
 	printf("Allocating %d MB of ram for Rays... \n", NUM_RAYS * sizeof(Ray) / 1000000);
 
     initRayKernel <<< RAYS_PER_DIM, RAYS_PER_DIM, 0>>> (rayptr, simulation->box, focalpoint);
+    cudaDeviceSynchronize();
 
     cuda_status = cudaGetLastError();
     if (cuda_status != cudaSuccess) {
         fprintf(stderr, "rayptr init kernel failed!");
         exit(1);
     }
-    cudaDeviceSynchronize();
-       
-
+        
+        
     int indexa = INDEXA;
     printf("Ray %d: %f %f %f\n", indexa, rayptr[indexa].unit_vector.x, rayptr[indexa].unit_vector.y, rayptr[indexa].unit_vector.z);
     printf("block_indexes: ");
@@ -239,7 +239,7 @@ Raytracer::Raytracer(Simulation* simulation) {
 
     printf("Rays initiated\n\n");
 }
-
+    
 __device__ void colorRay(Ray* ray, uint8_t* image, int index) {
 
 }
@@ -297,7 +297,7 @@ uint8_t* Raytracer::render(Simulation* simulation) {
 
     auto stop = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
-    printf("Render time: %d\r", duration.count());
+    printf("\rRender time: %d", duration.count());
     // First render: 666 ms
 
     return image;

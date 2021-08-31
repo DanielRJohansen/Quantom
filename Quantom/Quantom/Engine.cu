@@ -7,7 +7,8 @@ Engine::Engine(Simulation* simulation) : simulation(simulation) {
 
 	
 	int n_blocks = initBlocks();
-	//printf("%d blocks\n", n_blocks);
+	linkBlocks();
+	
 	int n_bodies = fillBox();
 
 	printf("Simulation configured with %d blocks, and %d bodies\n", n_blocks, n_bodies);
@@ -56,24 +57,18 @@ int Engine::fillBox() {
 
 	return index;
 }
-
-
+	
+		
 void Engine::placeBody(SimBody* body) {
 	Int3 block_index = posToBlockIndex(&body->pos);
 	
 
-	int block_index_1d = block_index.z + block_index.y * simulation->blocks_per_dim + block_index.x * simulation->blocks_per_dim * simulation->blocks_per_dim;	// NOTICE THAT X IS THE "GRANDPARENT" ITERATOR
+	int block_index_1d = block3dIndexTo1dIndex(block_index);
 	
 
 	Block* block = &simulation->box->blocks[block_index_1d];
 
-	if ((body->pos - Double3(-0.9, -0.9, 0.1)).len() < 0.001) {
-		printf("\n\n\n\nBody pos: %f %f %f\n", body->pos.x, body->pos.y, body->pos.z);
-		printf("block index: %d %d %d\n", block_index.x, block_index.y, block_index.z);
-		printf("1d index: %d\n", block_index_1d);
-		printf("block center: %.2f %.2f %.2f\n", block->center.x, block->center.y, block->center.z);
-		printf(" \n\n\n");
-	}
+
 	if (block->n_bodies == MAX_BLOCK_BODIES) {
 		printf("Too many bodies for this block!");
 		exit(1);
@@ -82,4 +77,67 @@ void Engine::placeBody(SimBody* body) {
 	block->bodies[block->n_bodies] = *body;
 	block->n_bodies++;
 	
+}
+	
+void Engine::linkBlocks() {
+	for (int x_index = 0; x_index < simulation->blocks_per_dim; x_index++) {
+		for (int y_index = 0; y_index < simulation->blocks_per_dim; y_index++) {
+			for (int z_index = 0; z_index < simulation->blocks_per_dim; z_index++) {
+				int block_index = block3dIndexTo1dIndex(Int3(x_index, y_index, z_index));
+				Block* block = &simulation->box->blocks[block_index];
+
+				block->neighbor_indexes[0] = x_index > 0 ? block3dIndexTo1dIndex(Int3(x_index - 1, y_index, z_index)) : NULL;
+				block->neighbor_indexes[1] = (x_index + 1) < simulation->blocks_per_dim ? block3dIndexTo1dIndex(Int3(x_index + 1, y_index, z_index)) : NULL;
+
+				block->neighbor_indexes[2] = y_index > 0 ? block3dIndexTo1dIndex(Int3(x_index, y_index - 1, z_index)) : NULL;
+				block->neighbor_indexes[3] = (y_index + 1) < simulation->blocks_per_dim ? block3dIndexTo1dIndex(Int3(x_index, y_index + 1, z_index)) : NULL;
+
+				block->neighbor_indexes[4] = z_index > 0 ? block3dIndexTo1dIndex(Int3(x_index, y_index, z_index - 1)) : NULL;
+				block->neighbor_indexes[5] = (z_index + 1) < simulation->blocks_per_dim ? block3dIndexTo1dIndex(Int3(x_index, y_index, z_index + 1)) : NULL;
+			}
+		}
+	}
+}
+
+
+
+
+
+
+
+
+
+
+//--------------------------------------------------------------------------	SIMULATION BEGINS HERE --------------------------------------------------------------//
+
+
+void Engine::step() {
+
+	int n_gpublocks = simulation->box->n_blocks;
+	int n_blockthreads = MAX_BLOCK_BODIES;
+	int sharedmem_bytesize = sizeof(Block);
+	stepKernel <<< n_gpublocks, n_blockthreads, sharedmem_bytesize>> > (simulation);
+	cudaDeviceSynchronize();
+
+	cuda_status = cudaGetLastError();
+	if (cuda_status != cudaSuccess) {
+		fprintf(stderr, "rayptr init kernel failed!");
+		exit(1);
+	}
+
+
+}
+
+__global__ void stepKernel(Simulation* simulation) {
+	int blockID = blockIdx.x;
+	int bodyID = threadIdx.x;
+
+	if (bodyID >= simulation->box->blocks[blockID].n_bodies)
+		return;
+
+	__shared__ Block block;
+	if (bodyID == 0)
+		block = simulation->box->blocks[blockID];
+
+	__syncthreads();
 }

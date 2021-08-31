@@ -6,6 +6,7 @@ Environment::Environment() {
 	engine = new Engine(&simulation);
 
 	simulation.moveToDevice();	// Must be done before initiating raytracer!
+	//engine->linkBlocks();
 
 	display = new Display(&simulation);
 	interface = new Interface(display->window);
@@ -22,7 +23,7 @@ void Environment::run() {
 
 
 
-
+		//engine->step();
 
 
 		display->render(&simulation);
