@@ -4,12 +4,12 @@
 #include "Bodies.cuh"
 
 
-const int MAX_BLOCK_BODIES = 512;
+const int MAX_BLOCK_BODIES = 256;
 constexpr auto BLOCK_LEN_CUDA = 1.0; //nm
-constexpr auto BOX_LEN_CUDA = 10.0;
+constexpr auto BOX_LEN_CUDA = 3.0;
 
 const int INDEXA = 999;
-const int N_BODIES_START = 2000;
+const int N_BODIES_START = 321;
 
 
 
@@ -65,9 +65,11 @@ __global__ class Simulation {
 
 
 public:
-	Simulation() {
+	Simulation() {}
+	Simulation(MoleculeLibrary* mol_library) : mol_library(mol_library) {
 		box = new Box;
 	}
+
 	void moveToDevice() {
 		box->moveToDevice();
 
@@ -76,7 +78,13 @@ public:
 		cudaMemcpy(box_temp, box, sizeof(Box), cudaMemcpyHostToDevice);
 		delete box;
 		box = box_temp;
-		
+
+		MoleculeLibrary* lib_temp;
+		cudaMallocManaged(&lib_temp, sizeof(MoleculeLibrary));
+		cudaMemcpy(lib_temp, mol_library, sizeof(MoleculeLibrary), cudaMemcpyHostToDevice);
+		delete mol_library;
+		mol_library = lib_temp;
+
 		
 		printf("Simulation ready for device\n");
 	}
@@ -91,10 +99,11 @@ public:
 	int n_bodies = N_BODIES_START;
 	Box* box;
 	SimBody* bodies;	// The bodies of each block is only total copy, not a pointer to its corresponding body here!
+	MoleculeLibrary* mol_library;
 
 	~Simulation() {
-		delete box->blocks;
-		delete box;
+		//delete box->blocks;
+		//delete box;
 	}
 
 

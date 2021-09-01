@@ -11,7 +11,12 @@ Engine::Engine(Simulation* simulation) : simulation(simulation) {
 	
 	int n_bodies = fillBox();
 
-	printf("Simulation configured with %d blocks, and %d bodies\n", n_blocks, n_bodies);
+
+	printf("Simbody size: %d\n", sizeof(SimBody));
+	printf("Block size: %d calculated size: %d\n", sizeof(Block), sizeof(SimBody) * MAX_BLOCK_BODIES + sizeof(Double3) + 7 * sizeof(int));
+
+	printf("Simulation configured with %d blocks, and %d bodies. \n", n_blocks, n_bodies);
+	printf("Required shared mem for stepKernel: %d\n", sizeof(Block));
 }
 
 int Engine::initBlocks() {
@@ -21,7 +26,7 @@ int Engine::initBlocks() {
 	simulation->box->n_blocks = n_blocks;
 	simulation->box->blocks = new Block[n_blocks];
 	printf("Blocks per dim: %d\n", blocks_per_dim);
-
+	 
 
 	int index = 0;
 	double offset = -simulation->box_size / 2 + 0.5 * BLOCK_LEN_CUDA;
@@ -36,7 +41,7 @@ int Engine::initBlocks() {
 	}
 	return index;
 }
-
+		
 int Engine::fillBox() {
 	int bodies_per_dim = ceil(cbrt((double)simulation->n_bodies));
 	printf("Bodies per dim: %d\n", bodies_per_dim);
@@ -103,15 +108,20 @@ void Engine::linkBlocks() {
 
 
 
+	
 
-
-
+	
 
 
 //--------------------------------------------------------------------------	SIMULATION BEGINS HERE --------------------------------------------------------------//
 
 
 void Engine::step() {
+	cuda_status = cudaGetLastError();
+	if (cuda_status != cudaSuccess) {
+		fprintf(stderr, "Error before step!");
+		exit(1);
+	}
 
 	int n_gpublocks = simulation->box->n_blocks;
 	int n_blockthreads = MAX_BLOCK_BODIES;
@@ -121,7 +131,7 @@ void Engine::step() {
 
 	cuda_status = cudaGetLastError();
 	if (cuda_status != cudaSuccess) {
-		fprintf(stderr, "rayptr init kernel failed!");
+		fprintf(stderr, "step kernel failed!");
 		exit(1);
 	}
 
@@ -140,4 +150,4 @@ __global__ void stepKernel(Simulation* simulation) {
 		block = simulation->box->blocks[blockID];
 
 	__syncthreads();
-}
+} 

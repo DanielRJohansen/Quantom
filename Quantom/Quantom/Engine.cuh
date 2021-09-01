@@ -11,7 +11,7 @@
 #include <device_functions.h>
 #include <cuda_runtime_api.h>
 
-
+	
 
 __global__ void stepKernel(Simulation* simulation);
 

@@ -147,10 +147,45 @@ __device__ bool Ray::hitsBlock(Block* block, Double3 focalpoint) {
 
 
 __device__ bool Ray::hitsBody(SimBody* body) {
-    if (distToPoint(body->pos) < 0.005)
+    if (distToPoint(body->pos) < BODY_RADIUS)
         return true;
     return false;
 }
+
+__device__ bool Ray::moleculeCollisionHandling(SimBody* body, MoleculeLibrary* mol_library) {
+    Molecule* mol = &mol_library->molecules[0];
+    for (int atom_index = 0; atom_index < mol->n_atoms; atom_index++) {
+        Atom atom = mol->atoms[atom_index];
+        Double3 atom_pos_rel_to_mol_CoM = (atom.pos - mol->CoM);// *(1.f / 1000.f);
+
+        Double3 atom_absolute_pos = body->pos + atom_pos_rel_to_mol_CoM;
+
+        if (blockIdx.x * 1000 + threadIdx.x == 500500) {
+            printf("\nBody center: %.4f %.4f %.4f\n", body->pos.x, body->pos.y, body->pos.z);
+            printf("Atom center: %.4f %.4f %.4f\n", atom.pos.x, atom.pos.y, atom.pos.z);
+            printf("Mol CoM: %.4f %.4f %.4f\n", mol->CoM.x, mol->CoM.y, mol->CoM.z);
+            printf("Atom rel center: %.4f %.4f %.4f\n", atom_pos_rel_to_mol_CoM.x, atom_pos_rel_to_mol_CoM.y, atom_pos_rel_to_mol_CoM.z);
+            printf("Atom abs pos: %.4f %.4f %.4f\n", atom_absolute_pos.x, atom_absolute_pos.y, atom_absolute_pos.z);
+
+
+            printf("dist %f\n", distToPoint(atom_absolute_pos));
+        }
+            
+
+        if (distToPoint(atom_absolute_pos) < atom.radius) {
+            
+
+            return true;
+        }
+            
+    }
+    if (blockIdx.x * 1000 + threadIdx.x == 500500) {
+        //printf("\n\n\n");
+    }
+    
+    return false;
+}
+    
 
 __global__ void initRayKernel(Ray* rayptr, Box* box, Double3 focalpoint) {
 	int  index = blockIdx.x * blockDim.x + threadIdx.x;
@@ -162,6 +197,11 @@ __global__ void initRayKernel(Ray* rayptr, Box* box, Double3 focalpoint) {
 }
 
 
+    
+
+        
+        
+        
 
 
 
@@ -170,12 +210,7 @@ __global__ void initRayKernel(Ray* rayptr, Box* box, Double3 focalpoint) {
 
 
 
-
-
-
-
-
-
+    
 
 
 
@@ -219,7 +254,7 @@ Raytracer::Raytracer(Simulation* simulation) {
 
 	printf("Allocating %d MB of ram for Rays... \n", NUM_RAYS * sizeof(Ray) / 1000000);
 
-    initRayKernel <<< RAYS_PER_DIM, RAYS_PER_DIM, 0>>> (rayptr, simulation->box, focalpoint);
+    initRayKernel <<< RAYS_PER_DIM, RAYS_PER_DIM>>> (rayptr, simulation->box, focalpoint);
     cudaDeviceSynchronize();
 
     cuda_status = cudaGetLastError();
@@ -244,12 +279,16 @@ __device__ void colorRay(Ray* ray, uint8_t* image, int index) {
 
 }
 
-__global__ void renderKernel(Ray* rayptr, uint8_t* image, Box* box, Double3 focalpoint) {
+__global__ void renderKernel(Ray* rayptr, uint8_t* image, Box* box, MoleculeLibrary* mol_library) {
     int  index = blockIdx.x * blockDim.x + threadIdx.x;
 
     Ray ray = rayptr[index];
-    //Int3 xy_index(blockIdx.x, threadIdx.x, 0);
-     
+    
+    /*if (index == 0) {
+        printf("N molecules: %d\n", mol_library->n_molecules);
+        printf("Cuda n mol atoms: %d\n", mol_library->molecules[0].n_atoms);
+    }*/
+        
 
 
     for (int i = 0; i < MAX_RAY_BLOCKS; i++) {
@@ -262,11 +301,15 @@ __global__ void renderKernel(Ray* rayptr, uint8_t* image, Box* box, Double3 foca
             
             if (ray.hitsBody(&block->bodies[j])) {
 
-                image[index * 4 + 0] = 220;
-                image[index * 4 + 1] = 0;
-                image[index * 4 + 2] = 0;
-                image[index * 4 + 3] = 255;
-                return;
+                if (ray.moleculeCollisionHandling(&block->bodies[j], mol_library)) {
+                    image[index * 4 + 0] = 220;
+                    image[index * 4 + 1] = 0;
+                    image[index * 4 + 2] = 0;
+                    image[index * 4 + 3] = 255;
+                    return;
+                }
+                
+                
             }
             
         }
@@ -289,7 +332,7 @@ uint8_t* Raytracer::render(Simulation* simulation) {
     cudaMallocManaged(&cuda_image, im_bytesize);
     //printf("Allocating %d KB of ram for image... ", im_bytesize / 1000);
     Double3 a(1, 0, 1);
-    renderKernel << < RAYS_PER_DIM, RAYS_PER_DIM, 0 >> > ( rayptr, cuda_image, simulation->box, focalpoint);
+    renderKernel << < RAYS_PER_DIM, RAYS_PER_DIM, 0 >> > ( rayptr, cuda_image, simulation->box, simulation->mol_library);
     cudaMemcpy(image, cuda_image, im_bytesize, cudaMemcpyDeviceToHost);
 
 
@@ -297,8 +340,8 @@ uint8_t* Raytracer::render(Simulation* simulation) {
 
     auto stop = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
-    printf("\rRender time: %d", duration.count());
+    printf("\rRender time: %d   \t", duration.count());
     // First render: 666 ms
 
     return image;
-}
+}           
