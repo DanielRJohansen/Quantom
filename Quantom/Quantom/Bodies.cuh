@@ -14,7 +14,7 @@ struct Atom {
 			color[i] = c[i];
 		}
 	}
-	Double3 pos;	// Relative		TODO: Fix and make it so the is relative to CoM, not (0,0) before com is calculated!!
+	Double3 pos;	// Relative	to CoM, and (0,0,0) rotation
 	double radius;	// in fm?
 	double mass;
 	uint8_t color[3] = { 0,100,0 };
