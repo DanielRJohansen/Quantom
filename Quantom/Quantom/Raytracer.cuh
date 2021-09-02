@@ -25,7 +25,7 @@ public:
 
 	__device__ void findBlockHits(Box* box, Double3 focalpoint);
 	__device__ bool hitsBody(SimBody* body);
-	__device__ bool moleculeCollisionHandling(SimBody* body, MoleculeLibrary* mol_library);
+	__device__ bool moleculeCollisionHandling(SimBody* body, MoleculeLibrary* mol_library, uint8_t* image);
 	__host__ __device__ double distToPoint(Double3 point) {
 		Double3 far_ray_point = origin + unit_vector * 99999999;	////BAAAAAAAAAAAAAD
 		return (

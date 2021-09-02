@@ -7,11 +7,17 @@
 //enum Atom{Oxygen};
 
 struct Atom {
-	Atom() {}
-	Atom(Double3 pos, double r, double mass) : pos(pos), radius(r), mass(mass) {}
+	__host__ __device__ Atom() {}
+	__host__ Atom(Double3 pos, double r, double mass, uint8_t c[3]) : pos(pos), radius(r), mass(mass) {
+		
+		for (int i = 0; i < 3; i++) {
+			color[i] = c[i];
+		}
+	}
 	Double3 pos;	// Relative		TODO: Fix and make it so the is relative to CoM, not (0,0) before com is calculated!!
 	double radius;	// in fm?
 	double mass;
+	uint8_t color[3] = { 0,100,0 };
 };
 
 struct RenderBody {
@@ -35,20 +41,23 @@ struct Molecule {
 	}
 };
 
-constexpr double BODY_RADIUS = 0.1;
+constexpr double BODY_RADIUS = 0.6;
 
 struct SimBody {
 	//RenderBody* renderbody;
 
 
 
-	Double3 pos;	//CoM
-	Double3 vel;
+	Double3 pos;	//CoM - nm
+	Double3 vel;	// nm/sec
+
+	Double3 rotation;	//radians
+	Double3 rot_vel;	//radians/sec
 	//double mass;
 	//double radius = 0.05;
 	char molecule_type = 0;
 
-	Double3 charge_unit_vector;
+	//Double3 charge_unit_vector;
 	double charge_magnitude;
 
 };

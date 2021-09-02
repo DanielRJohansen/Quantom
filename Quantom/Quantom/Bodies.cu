@@ -4,9 +4,20 @@
 Molecule::Molecule() {	// Always returns a h2o molecule rn
 	n_atoms = 3;
 	atoms = new Atom[3];
-	atoms[0] = Atom(Double3(0, 0, 0), 0.048, 15.999);
-	atoms[1] = Atom(Double3(95.7 / 1000.f, 0, 0), 0.053, 1.008);
-	atoms[2] = Atom(Double3(-23.96 / 1000.f, 92.65/1000, 0), 0.053, 1.008);// was 0.53
+	uint8_t white[3] = { 250, 250, 250 };
+	uint8_t red[3] = { 250, 0, 0 };
+
+	// Using Van der Waals radii.... https://en.m.wikipedia.org/wiki/Van_der_Waals_radius
+
+	atoms[0] = Atom(Double3(0, 0, 0), 0.152, 15.999, red);
+	atoms[1] = Atom(Double3(95.7 / 1000.f, 0, 0), 0.110, 1.008, white);
+	atoms[2] = Atom(Double3(-23.96 / 1000.f, 92.65/1000, 0), 0.110, 1.008, white);// was 0.53
+			
+	for (int i = 0; i < 3; i++) {
+		printf("Color %d:  %d %d %d\n", i, atoms[i].color[0], atoms[i].color[1], atoms[i].color[2]);
+	}
+
+
 
 	// Calc com
 	CoM = Double3(0, 0, 0);
@@ -31,3 +42,4 @@ Molecule::Molecule() {	// Always returns a h2o molecule rn
 
 }
 
+	

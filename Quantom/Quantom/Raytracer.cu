@@ -144,7 +144,7 @@ __device__ bool Ray::hitsBlock(Block* block, Double3 focalpoint) {
 
     return true;*/
 }
-
+    
 
 __device__ bool Ray::hitsBody(SimBody* body) {
     if (distToPoint(body->pos) < BODY_RADIUS)
@@ -152,20 +152,24 @@ __device__ bool Ray::hitsBody(SimBody* body) {
     return false;
 }
 
-__device__ bool Ray::moleculeCollisionHandling(SimBody* body, MoleculeLibrary* mol_library) {
+__device__ bool Ray::moleculeCollisionHandling(SimBody* body, MoleculeLibrary* mol_library, uint8_t* image) {
     Molecule* mol = &mol_library->molecules[0];
+
+    int infinity = 9999999;
+
+    Atom closest_atom;
+    closest_atom.pos = Double3(0, infinity, 0);  // Make sure its infinitely far away in y direction.
+
     for (int atom_index = 0; atom_index < mol->n_atoms; atom_index++) {
         Atom atom = mol->atoms[atom_index];
-        Double3 atom_pos_rel_to_mol_CoM = (atom.pos - mol->CoM);// *(1.f / 1000.f);
 
-        Double3 atom_absolute_pos = body->pos + atom_pos_rel_to_mol_CoM;
+        Double3 atom_absolute_pos = body->pos + atom.pos;
 
         if (blockIdx.x * 1000 + threadIdx.x == 500500) {
-            printf("\nBody center: %.4f %.4f %.4f\n", body->pos.x, body->pos.y, body->pos.z);
-            printf("Atom center: %.4f %.4f %.4f\n", atom.pos.x, atom.pos.y, atom.pos.z);
-            printf("Mol CoM: %.4f %.4f %.4f\n", mol->CoM.x, mol->CoM.y, mol->CoM.z);
-            printf("Atom rel center: %.4f %.4f %.4f\n", atom_pos_rel_to_mol_CoM.x, atom_pos_rel_to_mol_CoM.y, atom_pos_rel_to_mol_CoM.z);
-            printf("Atom abs pos: %.4f %.4f %.4f\n", atom_absolute_pos.x, atom_absolute_pos.y, atom_absolute_pos.z);
+            printf("\nBody center: %.8f %.8f %.8f\n", body->pos.x, body->pos.y, body->pos.z);
+            printf("Atom center: %.8f %.8f %.8f\n", atom.pos.x, atom.pos.y, atom.pos.z);
+            printf("Mol CoM: %.8f %.8f %.8f\n", mol->CoM.x, mol->CoM.y, mol->CoM.z);
+            printf("Atom abs pos: %.8f %.8f %.8f\n", atom_absolute_pos.x, atom_absolute_pos.y, atom_absolute_pos.z);
 
 
             printf("dist %f\n", distToPoint(atom_absolute_pos));
@@ -173,15 +177,23 @@ __device__ bool Ray::moleculeCollisionHandling(SimBody* body, MoleculeLibrary* m
             
 
         if (distToPoint(atom_absolute_pos) < atom.radius) {
-            
+            if (atom.pos.y < closest_atom.pos.y)
+                closest_atom = atom;
 
-            return true;
         }
             
     }
-    if (blockIdx.x * 1000 + threadIdx.x == 500500) {
-        //printf("\n\n\n");
+
+    if (closest_atom.pos.y != infinity) {
+        int index = blockIdx.x * blockDim.x + threadIdx.x;
+
+        image[index * 4 + 0] = closest_atom.color[0];
+        image[index * 4 + 1] = closest_atom.color[1];
+        image[index * 4 + 2] = closest_atom.color[2];
+        image[index * 4 + 3] = 255;
+        return true;
     }
+    
     
     return false;
 }
@@ -301,11 +313,8 @@ __global__ void renderKernel(Ray* rayptr, uint8_t* image, Box* box, MoleculeLibr
             
             if (ray.hitsBody(&block->bodies[j])) {
 
-                if (ray.moleculeCollisionHandling(&block->bodies[j], mol_library)) {
-                    image[index * 4 + 0] = 220;
-                    image[index * 4 + 1] = 0;
-                    image[index * 4 + 2] = 0;
-                    image[index * 4 + 3] = 255;
+                if (ray.moleculeCollisionHandling(&block->bodies[j], mol_library, image)) {
+                    
                     return;
                 }
                 
@@ -315,8 +324,8 @@ __global__ void renderKernel(Ray* rayptr, uint8_t* image, Box* box, MoleculeLibr
         }
     }
 }
-
- 
+    
+    
 uint8_t* Raytracer::render(Simulation* simulation) {
     auto start = std::chrono::high_resolution_clock::now();
 
@@ -334,7 +343,7 @@ uint8_t* Raytracer::render(Simulation* simulation) {
     Double3 a(1, 0, 1);
     renderKernel << < RAYS_PER_DIM, RAYS_PER_DIM, 0 >> > ( rayptr, cuda_image, simulation->box, simulation->mol_library);
     cudaMemcpy(image, cuda_image, im_bytesize, cudaMemcpyDeviceToHost);
-
+    //exit(1);
 
     cudaFree(cuda_image);
 
@@ -344,4 +353,4 @@ uint8_t* Raytracer::render(Simulation* simulation) {
     // First render: 666 ms
 
     return image;
-}           
+}               

@@ -4,12 +4,14 @@
 #include "Bodies.cuh"
 
 
+
+constexpr auto BOX_LEN_CUDA = 20.0;
+constexpr auto BLOCK_LEN_CUDA = 10.0; //nm
+
 const int MAX_BLOCK_BODIES = 256;
-constexpr auto BLOCK_LEN_CUDA = 1.0; //nm
-constexpr auto BOX_LEN_CUDA = 3.0;
 
 const int INDEXA = 999;
-const int N_BODIES_START = 321;
+const int N_BODIES_START = 200;
 
 
 
@@ -55,7 +57,7 @@ public:
 	}
 };
 
-
+	
 
 
 
