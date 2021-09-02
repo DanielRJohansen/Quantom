@@ -1,6 +1,7 @@
 #pragma once
 
 #include <iostream>
+#include <chrono>
 
 #include "Bodies.cuh"
 #include "Simulation.cuh"
@@ -20,7 +21,8 @@ __global__ void stepKernel(Simulation* simulation);
 class Engine {
 public:
 	Engine(){}
-	Engine(Simulation* simulation);
+
+	Simulation* prepSimulation(Simulation* simulation);
 
 
 	void step();
@@ -33,6 +35,8 @@ private:
 	void linkBlocks();
 
 	void placeBody(SimBody* body);
+
+	Simulation* simToDevice();
 
 
 

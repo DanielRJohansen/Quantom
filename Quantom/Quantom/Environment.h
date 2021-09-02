@@ -15,7 +15,7 @@ public:
 
 
 
-	Simulation simulation;
+	Simulation* simulation;
 
 
 private:

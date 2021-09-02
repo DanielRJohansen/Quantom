@@ -2,21 +2,41 @@
 
 
 
-Engine::Engine(Simulation* simulation) : simulation(simulation) {
+
+Simulation* Engine::prepSimulation(Simulation* simulation) {
+	this->simulation = simulation;
 	simulation->bodies = new SimBody[simulation->n_bodies];
 
-	
+
 	int n_blocks = initBlocks();
 	linkBlocks();
-	
+
 	int n_bodies = fillBox();
 
 
-	printf("Simbody size: %d\n", sizeof(SimBody));
+	printf("\n\nSimbody size: %d\n", sizeof(SimBody));
+	printf("Double3 size: %d", sizeof(Double3));
 	printf("Block size: %d calculated size: %d\n", sizeof(Block), sizeof(SimBody) * MAX_BLOCK_BODIES + sizeof(Double3) + 7 * sizeof(int));
 
 	printf("Simulation configured with %d blocks, and %d bodies. \n", n_blocks, n_bodies);
 	printf("Required shared mem for stepKernel: %d\n", sizeof(Block));
+
+
+	return simToDevice();
+}
+
+Simulation* Engine::simToDevice() {
+	simulation->moveToDevice();	// Must be done before initiating raytracer!
+
+	Simulation* temp;
+	int bytesize = sizeof(Simulation);
+	cudaMallocManaged(&temp, bytesize);
+	cudaMemcpy(temp, simulation, bytesize, cudaMemcpyHostToDevice);
+	cudaDeviceSynchronize();
+	delete simulation;
+	simulation = temp;
+
+	return simulation;
 }
 
 int Engine::initBlocks() {
@@ -55,6 +75,8 @@ int Engine::fillBox() {
 				if (index == simulation->n_bodies)
 					break;
 				simulation->bodies[index].pos = Double3(base + dist * (double) x_index, base + dist * double(y_index), base + dist * double(z_index));
+				simulation->bodies[index].rotation = Double3(0, 0, 0);
+				simulation->bodies[index].rot_vel = Double3(0, PI, 0);
 				placeBody(&simulation->bodies[index++]);
 			}
 		}
@@ -123,9 +145,16 @@ void Engine::step() {
 		exit(1);
 	}
 
+	auto start = std::chrono::high_resolution_clock::now();
+
+
 	int n_gpublocks = simulation->box->n_blocks;
 	int n_blockthreads = MAX_BLOCK_BODIES;
 	int sharedmem_bytesize = sizeof(Block);
+
+	//int sharedmem_bytesize = sizeof(Double3);
+
+	//printf("Simulation total steps host = %d\n", simulation->n_steps);
 	stepKernel <<< n_gpublocks, n_blockthreads, sharedmem_bytesize>> > (simulation);
 	cudaDeviceSynchronize();
 
@@ -136,18 +165,67 @@ void Engine::step() {
 	}
 
 
+	auto stop = std::chrono::high_resolution_clock::now();
+	auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
+	printf("Step time: %5.d ys", duration.count());
+
 }
+
+
+
+
 
 __global__ void stepKernel(Simulation* simulation) {
 	int blockID = blockIdx.x;
 	int bodyID = threadIdx.x;
 
+
+	//if (blockID + bodyID == 0) {
+	//	printf("Simulation total steps device = %d\n", box->n_blocks);
+	//}
+		//printf("box block # = ", simulation->box->n_blocks);
+
 	if (bodyID >= simulation->box->blocks[blockID].n_bodies)
 		return;
 
-	__shared__ Block block;
-	if (bodyID == 0)
-		block = simulation->box->blocks[blockID];
+	// transferring the entrire block is too much for 1 thread. Must find alternative.
+	__shared__ Block blockk;
+	//__shared__ Double3 test;
+	
+	if (bodyID == 0) {
+		//printf("RUNNING STEP!");
+		//printf("N blocks: %d\n", simulation->box->n_blocks);
+		//Block blockk = simulation->box->blocks[blockID];
+		blockk = Block(Double3(0, 0, 0));
+		//printf("Block bodies %d\n", blockk.n_bodies);
+		//test = Double3(1, 0, 0);
+		//ns = blockk.bodies[bodyID].pos.x;
+		//ns[0] = blockk.bodies[bodyID].pos.x;
+		//ns[1] = blockk.bodies[bodyID].pos.y;
+		//block = simulation->box->blocks[blockID];
+	}
+	
+	
+	__syncthreads();
+	// BEGIN WORK
+	Block* block = &simulation->box->blocks[blockID];
+
+	SimBody body = block->bodies[bodyID];
+
+	//body.rot_vel = test;
+
+	body.rotation = body.rotation + body.rot_vel * simulation->dt;				// * dt of course!
+
+
+
+	block->bodies[bodyID] = body;
+
+
+
 
 	__syncthreads();
+	//if (bodyID == 0)
+		//simulation->box->blocks[blockID] = block;
+
+	
 } 

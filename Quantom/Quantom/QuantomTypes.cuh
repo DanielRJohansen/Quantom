@@ -6,7 +6,7 @@
 
 
 
-
+constexpr float PI = 3.14159;
 
 
 struct Int3 {
@@ -29,10 +29,40 @@ struct Double3 {
 	__host__ __device__ inline double len() {return (double)sqrtf(x * x + y * y + z * z); }
 	__host__ __device__ Double3 cross(Double3 a) const { return Double3(y * a.z - z * a.y, z * a.x - x * a.z, x * a.y - y * a.x); }
 
-	__host__ __device__ Double3 rotateAroundOrigin(Double3 pitch_yaw_roll) {
+	__host__ __device__ double dot(Double3 a) const { return (x * a.x + y * a.y + z * a.z); }
+
+	__host__ __device__ Double3 rotateAroundOrigin(Double3 pitch_yaw_roll) {	//pitch around x, yaw around z, tilt around y
+		// Pitch around x
+		Double3 v = rodriguesRotatation(*this, Double3(1, 0, 0), pitch_yaw_roll.x);
+
+		// Yaw around y
+		v = rodriguesRotatation(v, Double3(0, 1, 0), pitch_yaw_roll.y);
+
+		// Tilt around itself
+		v = rodriguesRotatation(v, v, pitch_yaw_roll.z);
+		return v;
+
+
+		/*float sin_pitch = sin(pitch_yaw_roll.x);
+		float cos_pitch = cos(pitch_yaw_roll.x);
+
+		float sin_yaw = sin(pitch_yaw_roll.z);
+		float cos_yaw = cos(pitch_yaw_roll.z);
+
+		float sin_tilt = sin(pitch_yaw_roll.y);
+		float cos_tilt = cos(pitch_yaw_roll.y);
+
+		//Rotate around x
+		float y_x = cos_pitch * y + sin_pitch * z;
+		float z_x = -sin_pitch * y + cos_pitch * z;*/
+
+		// Rotate 
 
 	}
 
+	__host__ __device__ Double3 rodriguesRotatation(Double3 v, Double3 k, double theta) {
+		return v * cos(theta) + k.cross(v) * sin(theta) + k * (k.dot(v)) * (1 - cos(theta));
+	}
 
 	__host__ __device__ double at(int index) {
 		switch (index) {

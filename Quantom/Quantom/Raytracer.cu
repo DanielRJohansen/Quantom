@@ -157,14 +157,20 @@ __device__ bool Ray::moleculeCollisionHandling(SimBody* body, MoleculeLibrary* m
 
     int infinity = 9999999;
 
+    //int closest_collision = infinity;
     Atom closest_atom;
     closest_atom.pos = Double3(0, infinity, 0);  // Make sure its infinitely far away in y direction.
 
     for (int atom_index = 0; atom_index < mol->n_atoms; atom_index++) {
         Atom atom = mol->atoms[atom_index];
 
+
+        // Rotate ONLY this copy of the atom!!!
+        atom.pos = atom.pos.rotateAroundOrigin(body->rotation);                                     // DANGEROUS CODE!!!
+
         Double3 atom_absolute_pos = body->pos + atom.pos;
 
+        /*
         if (blockIdx.x * 1000 + threadIdx.x == 500500) {
             printf("\nBody center: %.8f %.8f %.8f\n", body->pos.x, body->pos.y, body->pos.z);
             printf("Atom center: %.8f %.8f %.8f\n", atom.pos.x, atom.pos.y, atom.pos.z);
@@ -174,7 +180,7 @@ __device__ bool Ray::moleculeCollisionHandling(SimBody* body, MoleculeLibrary* m
 
             printf("dist %f\n", distToPoint(atom_absolute_pos));
         }
-            
+          */  
 
         if (distToPoint(atom_absolute_pos) < atom.radius) {
             if (atom.pos.y < closest_atom.pos.y)
@@ -349,7 +355,7 @@ uint8_t* Raytracer::render(Simulation* simulation) {
 
     auto stop = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
-    printf("\rRender time: %d   \t", duration.count());
+    printf("\rRender time: %4d ms  ", duration.count());
     // First render: 666 ms
 
     return image;
