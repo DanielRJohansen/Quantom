@@ -6,12 +6,12 @@
 
 
 constexpr auto BOX_LEN_CUDA = 20.0;
-constexpr auto BLOCK_LEN_CUDA = 10.0; //nm
+constexpr auto BLOCK_LEN_CUDA = 5.0; //nm
 
-const int MAX_BLOCK_BODIES = 2;
+const int MAX_BLOCK_BODIES = 230;
 
 const int INDEXA = 999;
-const int N_BODIES_START = 4;
+const int N_BODIES_START = 10000;
 
 
 

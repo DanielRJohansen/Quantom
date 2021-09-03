@@ -76,7 +76,7 @@ int Engine::fillBox() {
 					break;
 				simulation->bodies[index].pos = Double3(base + dist * (double) x_index, base + dist * double(y_index), base + dist * double(z_index));
 				simulation->bodies[index].rotation = Double3(0, 0, 0);
-				simulation->bodies[index].rot_vel = Double3(0, PI, 0);
+				simulation->bodies[index].rot_vel = Double3(0, 0, PI);
 				placeBody(&simulation->bodies[index++]);
 			}
 		}
@@ -150,8 +150,8 @@ void Engine::step() {
 
 	int n_gpublocks = simulation->box->n_blocks;
 	int n_blockthreads = MAX_BLOCK_BODIES;
-	int sharedmem_bytesize = sizeof(Block);
-
+	//int sharedmem_bytesize = sizeof(SimBody) * MAX_BLOCK_BODIES;
+	int sharedmem_bytesize = sizeof(int);
 	//int sharedmem_bytesize = sizeof(Double3);
 
 	//printf("Simulation total steps host = %d\n", simulation->n_steps);
@@ -178,39 +178,25 @@ void Engine::step() {
 __global__ void stepKernel(Simulation* simulation) {
 	int blockID = blockIdx.x;
 	int bodyID = threadIdx.x;
-
-
-	//if (blockID + bodyID == 0) {
-	//	printf("Simulation total steps device = %d\n", box->n_blocks);
-	//}
-		//printf("box block # = ", simulation->box->n_blocks);
-
+	//return;
+	
 	if (bodyID >= simulation->box->blocks[blockID].n_bodies)
 		return;
 
-	// transferring the entrire block is too much for 1 thread. Must find alternative.
-	__shared__ Block blockk;
-	//__shared__ Double3 test;
 	
-	if (bodyID == 0) {
-		//printf("RUNNING STEP!");
-		//printf("N blocks: %d\n", simulation->box->n_blocks);
-		//Block blockk = simulation->box->blocks[blockID];
-		blockk = Block(Double3(0, 0, 0));
-		//printf("Block bodies %d\n", blockk.n_bodies);
-		//test = Double3(1, 0, 0);
-		//ns = blockk.bodies[bodyID].pos.x;
-		//ns[0] = blockk.bodies[bodyID].pos.x;
-		//ns[1] = blockk.bodies[bodyID].pos.y;
-		//block = simulation->box->blocks[blockID];
-	}
-	
-	
+
+
+	// Load bodies into shared memory
+	__shared__ SimBody bodies[MAX_BLOCK_BODIES];	
+	//bodies[bodyID] = simulation->box->blocks[blockID].bodies[bodyID];	// transferring the entrire block is too much for 1 thread. Must find alternative.
 	__syncthreads();
+
+
+
 	// BEGIN WORK
 	Block* block = &simulation->box->blocks[blockID];
-
 	SimBody body = block->bodies[bodyID];
+	//SimBody body = bodies[bodyID];
 
 	//body.rot_vel = test;
 
