@@ -15,12 +15,14 @@ Simulation* Engine::prepSimulation(Simulation* simulation) {
 
 
 	printf("\n\nSimbody size: %d\n", sizeof(SimBody));
-	printf("Double3 size: %d", sizeof(Double3));
-	printf("Block size: %d calculated size: %d\n", sizeof(Block), sizeof(SimBody) * MAX_BLOCK_BODIES + sizeof(Double3) + 7 * sizeof(int));
+	printf("Float3 size: %d", sizeof(Float3));
+	printf("Block size: %d calculated size: %d\n", sizeof(Block), sizeof(SimBody) * MAX_BLOCK_BODIES + sizeof(Float3) + 7 * sizeof(int));
 
 	printf("Simulation configured with %d blocks, and %d bodies. \n", n_blocks, n_bodies);
 	printf("Required shared mem for stepKernel: %d\n", sizeof(Block));
 
+
+	prepareCudaScheduler();
 
 	return simToDevice();
 }
@@ -49,11 +51,11 @@ int Engine::initBlocks() {
 	 
 
 	int index = 0;
-	double offset = -simulation->box_size / 2 + 0.5 * BLOCK_LEN_CUDA;
+	float offset = -simulation->box_size / 2 + 0.5 * BLOCK_LEN_CUDA;
 	for (int x = 0; x < blocks_per_dim; x++) {
 		for (int y = 0; y < blocks_per_dim; y++) {
 			for (int z = 0; z < blocks_per_dim; z++) {
-				Double3 center(x * BLOCK_LEN_CUDA + offset, y * BLOCK_LEN_CUDA + offset, z * BLOCK_LEN_CUDA + offset);
+				Float3 center(x * BLOCK_LEN_CUDA + offset, y * BLOCK_LEN_CUDA + offset, z * BLOCK_LEN_CUDA + offset);
 				simulation->box->blocks[index++] = Block(center);
 				//printf("%.1f %.1f %.1f\n", center.x, center.y, center.z);
 			}
@@ -63,10 +65,10 @@ int Engine::initBlocks() {
 }
 		
 int Engine::fillBox() {
-	int bodies_per_dim = ceil(cbrt((double)simulation->n_bodies));
+	int bodies_per_dim = ceil(cbrt((float)simulation->n_bodies));
 	printf("Bodies per dim: %d\n", bodies_per_dim);
-	double dist = simulation->box_size / (double)bodies_per_dim;	// dist_per_index
-	double base = -simulation->box_size / 2.f + dist / 2.f;
+	float dist = simulation->box_size / (float)bodies_per_dim;	// dist_per_index
+	float base = -simulation->box_size / 2.f + dist / 2.f;
 
 	int index = 0;
 	for (int x_index = 0; x_index < bodies_per_dim; x_index++) {
@@ -74,9 +76,9 @@ int Engine::fillBox() {
 			for (int z_index = 0; z_index < bodies_per_dim; z_index++) {
 				if (index == simulation->n_bodies)
 					break;
-				simulation->bodies[index].pos = Double3(base + dist * (double) x_index, base + dist * double(y_index), base + dist * double(z_index));
-				simulation->bodies[index].rotation = Double3(0, 0, 0);
-				simulation->bodies[index].rot_vel = Double3(0, 0, PI);
+				simulation->bodies[index].pos = Float3(base + dist * (float) x_index, base + dist * float(y_index), base + dist * float(z_index));
+				simulation->bodies[index].rotation = Float3(0, 0, 0);
+				simulation->bodies[index].rot_vel = Float3(0, 0, PI);
 				placeBody(&simulation->bodies[index++]);
 			}
 		}
@@ -127,7 +129,15 @@ void Engine::linkBlocks() {
 }
 
 
+void Engine::prepareCudaScheduler() {
+	sim_blocks = simulation->box->n_blocks;
 
+	for (int i = 0; i < N_STREAMS; i++)
+		cudaStreamCreate(&stream[i]);
+
+
+	gridblock_size = dim3(GRIDBLOCKS_PER_BODY, BLOCKS_PER_SM, 1);
+}
 
 
 		
@@ -139,23 +149,32 @@ void Engine::linkBlocks() {
 
 
 void Engine::step() {
+	auto start = std::chrono::high_resolution_clock::now();
+
 	cuda_status = cudaGetLastError();
 	if (cuda_status != cudaSuccess) {
 		fprintf(stderr, "Error before step!");
 		exit(1);
 	}
 
-	auto start = std::chrono::high_resolution_clock::now();
 
 
-	int n_gpublocks = simulation->box->n_blocks;
-	int n_blockthreads = MAX_BLOCK_BODIES;
-	//int sharedmem_bytesize = sizeof(SimBody) * MAX_BLOCK_BODIES;
-	int sharedmem_bytesize = sizeof(int);
-	//int sharedmem_bytesize = sizeof(Double3);
 
-	//printf("Simulation total steps host = %d\n", simulation->n_steps);
-	stepKernel <<< n_gpublocks, n_blockthreads, sharedmem_bytesize>> > (simulation);
+
+
+	
+	int blocks_handled = 0; 
+	while (blocks_handled < sim_blocks) {
+		for (int i = 0; i < N_STREAMS; i++) {
+			stepKernel << < gridblock_size, THREADS_PER_GRIDBLOCK, sizeof(int), stream[i] >> > (simulation);
+			blocks_handled += BLOCKS_PER_SM;
+
+			if (blocks_handled >= sim_blocks)
+				break;
+		}
+	}
+
+	stepKernel <<< sim_blocks, MAX_BLOCK_BODIES, sizeof(int) >> > (simulation);
 	cudaDeviceSynchronize();
 
 	cuda_status = cudaGetLastError();
@@ -165,10 +184,13 @@ void Engine::step() {
 	}
 
 
+
+	
+
+
 	auto stop = std::chrono::high_resolution_clock::now();
 	auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
 	printf("Step time: %5.d ys", duration.count());
-
 }
 
 

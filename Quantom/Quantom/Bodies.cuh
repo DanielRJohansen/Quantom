@@ -8,15 +8,15 @@
 
 struct Atom {
 	__host__ __device__ Atom() {}
-	__host__ Atom(Double3 pos, double r, double mass, uint8_t c[3]) : pos(pos), radius(r), mass(mass) {
+	__host__ Atom(Float3 pos, float r, float mass, uint8_t c[3]) : pos(pos), radius(r), mass(mass) {
 		
 		for (int i = 0; i < 3; i++) {
 			color[i] = c[i];
 		}
 	}
-	Double3 pos;	// Relative	to CoM, and (0,0,0) rotation
-	double radius;	// in fm?
-	double mass;
+	Float3 pos;	// Relative	to CoM, and (0,0,0) rotation
+	float radius;	// in fm?
+	float mass;
 	uint8_t color[3] = { 0,100,0 };
 };
 
@@ -28,7 +28,7 @@ struct Molecule {
 	Molecule();
 	int n_atoms;
 	Atom* atoms;
-	Double3 CoM;	// Relative		
+	Float3 CoM;	// Relative		
 
 	void moveToDevice() {
 		Atom* atoms_temp;
@@ -41,24 +41,24 @@ struct Molecule {
 	}
 };
 
-constexpr double BODY_RADIUS = 0.6;
+constexpr float BODY_RADIUS = 0.6;
 
 struct SimBody {
 	//RenderBody* renderbody;
 
 
 
-	Double3 pos;	//CoM - nm
-	Double3 vel;	// nm/sec
+	Float3 pos;	//CoM - nm
+	Float3 vel;	// nm/sec
 
-	Double3 rotation;	//radians
-	Double3 rot_vel;	//radians/sec
-	//double mass;
-	//double radius = 0.05;
+	Float3 rotation;	//radians
+	Float3 rot_vel;	//radians/sec
+	//float mass;
+	//float radius = 0.05;
 	char molecule_type = 0;
 
-	//Double3 charge_unit_vector;
-	double charge_magnitude;
+	//Float3 charge_unit_vector;
+	float charge_magnitude;
 
 };
 

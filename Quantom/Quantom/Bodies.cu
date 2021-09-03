@@ -9,9 +9,9 @@ Molecule::Molecule() {	// Always returns a h2o molecule rn
 
 	// Using Van der Waals radii.... https://en.m.wikipedia.org/wiki/Van_der_Waals_radius
 
-	atoms[0] = Atom(Double3(0, 0, 0), 0.152, 15.999, red);
-	atoms[1] = Atom(Double3(95.7 / 1000.f, 0, 0), 0.110, 1.008, white);
-	atoms[2] = Atom(Double3(-23.96 / 1000.f, 92.65/1000, 0), 0.110, 1.008, white);// was 0.53
+	atoms[0] = Atom(Float3(0, 0, 0), 0.152, 15.999, red);
+	atoms[1] = Atom(Float3(95.7 / 1000.f, 0, 0), 0.110, 1.008, white);
+	atoms[2] = Atom(Float3(-23.96 / 1000.f, 92.65/1000, 0), 0.110, 1.008, white);// was 0.53
 			
 	for (int i = 0; i < 3; i++) {
 		printf("Color %d:  %d %d %d\n", i, atoms[i].color[0], atoms[i].color[1], atoms[i].color[2]);
@@ -20,10 +20,10 @@ Molecule::Molecule() {	// Always returns a h2o molecule rn
 
 
 	// Calc com
-	CoM = Double3(0, 0, 0);
+	CoM = Float3(0, 0, 0);
 	//std::printf("Atom1: %f, %f, %f\n", atoms[, CoM.y, CoM.z);
 
-	double accumulated_mass = 0;
+	float accumulated_mass = 0;
 	for (int i = 0; i < 3; i++) {
 		CoM = CoM + (atoms[i].pos * atoms[i].mass);
 		accumulated_mass += atoms[i].mass;

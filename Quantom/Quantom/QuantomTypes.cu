@@ -1,4 +1,4 @@
 #include "QuantomTypes.cuh"
 
 
-//__host__ __device__ inline double Double3::len() { return (double) sqrtf(x * x + y * y + z * z); }
+//__host__ __device__ inline float Float3::len() { return (float) sqrtf(x * x + y * y + z * z); }

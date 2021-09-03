@@ -27,6 +27,11 @@ public:
 
 	void step();
 
+
+	~Engine() {
+		for (int i = 0; i < N_STREAMS; i++)
+			cudaStreamDestroy(stream[i]);
+	}
 private:
 	Simulation* simulation;
 	int fillBox();		// Returns # of bodies placed
@@ -35,6 +40,7 @@ private:
 	void linkBlocks();
 
 	void placeBody(SimBody* body);
+	void prepareCudaScheduler();
 
 	Simulation* simToDevice();
 
@@ -43,7 +49,7 @@ private:
 
 
 	// Helper functions
-	Int3 posToBlockIndex(Double3* pos) {
+	Int3 posToBlockIndex(Float3* pos) {
 		return Int3(
 			floor((pos->x + simulation->box_size / 2.f) / simulation->box_size * simulation->blocks_per_dim),
 			floor((pos->y + simulation->box_size / 2.f) / simulation->box_size * simulation->blocks_per_dim),
@@ -57,7 +63,17 @@ private:
 	}
 
 
+
+
+
+
+	// Simulation variables
+	cudaStream_t stream[N_STREAMS];
+	dim3 gridblock_size;
+	int threads_per_gridblock;
+
 	bool finished = false;
+	int sim_blocks;
 
 
 	cudaError_t cuda_status;

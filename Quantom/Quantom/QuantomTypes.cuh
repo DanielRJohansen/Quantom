@@ -17,26 +17,26 @@ struct Int3 {
 	int x=0, y=0, z = 0;
 };
 
-struct Double3 {
-	__host__ __device__ Double3() {}
-	__host__ __device__ Double3(double x, double y, double z) : x(x), y(y), z(z) {}
+struct Float3 {
+	__host__ __device__ Float3() {}
+	__host__ __device__ Float3(float x, float y, float z) : x(x), y(y), z(z) {}
 
-	__host__ __device__ inline Double3 operator * (const double a) const { return Double3(x * a, y * a, z * a); }
-	__host__ __device__ inline Double3 operator + (const Double3 a) const { return Double3(x + a.x, y + a.y, z + a.z); }
-	__host__ __device__ inline Double3 operator - (const Double3 a) const { return Double3(x - a.x, y - a.y, z - a.z); }
-	__host__ __device__ inline bool operator == (const Double3 a) const { return (a.x == x && a.y == y && a.z == z); }
+	__host__ __device__ inline Float3 operator * (const float a) const { return Float3(x * a, y * a, z * a); }
+	__host__ __device__ inline Float3 operator + (const Float3 a) const { return Float3(x + a.x, y + a.y, z + a.z); }
+	__host__ __device__ inline Float3 operator - (const Float3 a) const { return Float3(x - a.x, y - a.y, z - a.z); }
+	__host__ __device__ inline bool operator == (const Float3 a) const { return (a.x == x && a.y == y && a.z == z); }
 
-	__host__ __device__ inline double len() {return (double)sqrtf(x * x + y * y + z * z); }
-	__host__ __device__ Double3 cross(Double3 a) const { return Double3(y * a.z - z * a.y, z * a.x - x * a.z, x * a.y - y * a.x); }
+	__host__ __device__ inline float len() {return (float)sqrtf(x * x + y * y + z * z); }
+	__host__ __device__ Float3 cross(Float3 a) const { return Float3(y * a.z - z * a.y, z * a.x - x * a.z, x * a.y - y * a.x); }
 
-	__host__ __device__ double dot(Double3 a) const { return (x * a.x + y * a.y + z * a.z); }
+	__host__ __device__ float dot(Float3 a) const { return (x * a.x + y * a.y + z * a.z); }
 
-	__host__ __device__ Double3 rotateAroundOrigin(Double3 pitch_yaw_roll) {	//pitch around x, yaw around z, tilt around y
+	__host__ __device__ Float3 rotateAroundOrigin(Float3 pitch_yaw_roll) {	//pitch around x, yaw around z, tilt around y
 		// Pitch around x
-		Double3 v = rodriguesRotatation(*this, Double3(1, 0, 0), pitch_yaw_roll.x);
+		Float3 v = rodriguesRotatation(*this, Float3(1, 0, 0), pitch_yaw_roll.x);
 
 		// Yaw around y
-		v = rodriguesRotatation(v, Double3(0, 1, 0), pitch_yaw_roll.y);
+		v = rodriguesRotatation(v, Float3(0, 1, 0), pitch_yaw_roll.y);
 
 		// Tilt around itself
 		v = rodriguesRotatation(v, v, pitch_yaw_roll.z);
@@ -60,11 +60,11 @@ struct Double3 {
 
 	}
 
-	__host__ __device__ Double3 rodriguesRotatation(Double3 v, Double3 k, double theta) {
+	__host__ __device__ Float3 rodriguesRotatation(Float3 v, Float3 k, float theta) {
 		return v * cos(theta) + k.cross(v) * sin(theta) + k * (k.dot(v)) * (1 - cos(theta));
 	}
 
-	__host__ __device__ double at(int index) {
+	__host__ __device__ float at(int index) {
 		switch (index) {
 		case 0:
 			return x;
@@ -73,7 +73,7 @@ struct Double3 {
 		case 2:
 			return z;
 		//default:
-			//printf("Double3 error!");
+			//printf("Float3 error!");
 			//exit(-2);
 		}
 	}
@@ -81,7 +81,7 @@ struct Double3 {
 	//Utilities
 	//void print()
 
-	double x, y, z;
+	float x, y, z;
 };
 
 
@@ -112,10 +112,10 @@ class KdTree {
 
 public:
 	KdTree(){}
-	KdTree(Double3 block_center) : block_center(block_center) {}
+	KdTree(Float3 block_center) : block_center(block_center) {}
 
 	void addNode(SimBody* body) {
-		double pos[3] = { body->pos.x, body->pos.y,	body->pos.z };
+		float pos[3] = { body->pos.x, body->pos.y,	body->pos.z };
 
 		if (root == NULL)
 			root = new Node(body, NULL);
@@ -132,7 +132,7 @@ public:
 
 private:
 	Node* root = NULL;
-	Double3 block_center;
+	Float3 block_center;
 
 
 	// Helper functions
@@ -162,14 +162,14 @@ private:
 	class Node {
 	public:
 		Node() {}
-		Node(SimBody* body, Node* parent, double pos[3]) : body(body), parent(parent) {
+		Node(SimBody* body, Node* parent, float pos[3]) : body(body), parent(parent) {
 			for (int i = 0; i < 3; i++)
 				this->pos[i] = pos[i];
 			dim = parent->dim.next();
 		}
 		Dim dim;
 
-		void addNode(SimBody* body, double* pos) {
+		void addNode(SimBody* body, float* pos) {
 			if (pos[dim.val] > this->pos[dim.val]) {
 				if (right == NULL)
 					right = new Node(body, this, pos);
@@ -184,10 +184,10 @@ private:
 			}
 		}
 
-		void rootBalance(Double3 block_center) {
-			double left_dist = 99999;
-			double right_dist = 99999;
-			double root_dist = (body->pos - block_center).len();
+		void rootBalance(Float3 block_center) {
+			float left_dist = 99999;
+			float right_dist = 99999;
+			float root_dist = (body->pos - block_center).len();
 			if (left != NULL)
 				left_dist = (left->body->pos - block_center).len();
 			if (right != NULL)
@@ -213,7 +213,7 @@ private:
 
 
 	private:
-		double pos[3];
+		float pos[3];
 		SimBody* body;
 		Node* parent;
 		Node* right = NULL;

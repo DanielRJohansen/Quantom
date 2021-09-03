@@ -2,9 +2,9 @@
 
 
 
-Ray::Ray(Double3 unit_vector, Double3 origin) : unit_vector(unit_vector), origin(origin) {}
+Ray::Ray(Float3 unit_vector, Float3 origin) : unit_vector(unit_vector), origin(origin) {}
 
-__device__ void Ray::findBlockHits(Box* box, Double3 focalpoint) {
+__device__ void Ray::findBlockHits(Box* box, Float3 focalpoint) {
     for (int i = 0; i < MAX_RAY_BLOCKS; i++)
 		block_indexes[i] = -1;
 
@@ -41,8 +41,8 @@ __device__ void Ray::findBlockHits(Box* box, Double3 focalpoint) {
 
     
 	for (int i = 1; i < block_index; i++) {		// I think only 1 swap will be necessary...
-		double d1 = (box->blocks[block_indexes[i - 1]].center - focalpoint).len();
-		double d2 = (box->blocks[block_indexes[i]].center - focalpoint).len();
+		float d1 = (box->blocks[block_indexes[i - 1]].center - focalpoint).len();
+		float d2 = (box->blocks[block_indexes[i]].center - focalpoint).len();
 
 		if (d2 < d1) {
 			int tmp = block_indexes[i - 1];
@@ -53,18 +53,18 @@ __device__ void Ray::findBlockHits(Box* box, Double3 focalpoint) {
       
 }
 
-__device__ double cudaMax(double a, double b) { 
+__device__ float cudaMax(float a, float b) { 
     if (a > b)
         return a;
     return b;
 }
-__device__ double cudaMin(double a, double b) {
+__device__ float cudaMin(float a, float b) {
     if (a < b)
         return a;
     return b;
 }
 
-__device__ bool containedBetweenPlanes(double plane_min, double plane_max, double dir_dim, double origin_dim) {
+__device__ bool containedBetweenPlanes(float plane_min, float plane_max, float dir_dim, float origin_dim) {
     float tmin = -999999;
     float tmax = 999999;
 
@@ -89,12 +89,12 @@ __device__ bool containedBetweenPlanes(double plane_min, double plane_max, doubl
     return true;
 }
 
-__device__ bool Ray::hitsBlock(Block* block, Double3 focalpoint) {
-    double a = BLOCK_LEN_CUDA;               // FUCK YOU VISUAL STUDIO
-    Double3 blocksize = Double3(a, a, a);
+__device__ bool Ray::hitsBlock(Block* block, Float3 focalpoint) {
+    float a = BLOCK_LEN_CUDA;               // FUCK YOU VISUAL STUDIO
+    Float3 blocksize = Float3(a, a, a);
 
-    Double3 min = block->center - Double3(BLOCK_LEN_CUDA / 2, BLOCK_LEN_CUDA / 2, BLOCK_LEN_CUDA / 2);
-    Double3 max = block->center + Double3(BLOCK_LEN_CUDA / 2, BLOCK_LEN_CUDA / 2, BLOCK_LEN_CUDA / 2);
+    Float3 min = block->center - Float3(BLOCK_LEN_CUDA / 2, BLOCK_LEN_CUDA / 2, BLOCK_LEN_CUDA / 2);
+    Float3 max = block->center + Float3(BLOCK_LEN_CUDA / 2, BLOCK_LEN_CUDA / 2, BLOCK_LEN_CUDA / 2);
 
     float tmin = -DBL_MAX;
     float tmax = DBL_MAX;
@@ -159,7 +159,7 @@ __device__ bool Ray::moleculeCollisionHandling(SimBody* body, MoleculeLibrary* m
 
     //int closest_collision = infinity;
     Atom closest_atom;
-    closest_atom.pos = Double3(0, infinity, 0);  // Make sure its infinitely far away in y direction.
+    closest_atom.pos = Float3(0, infinity, 0);  // Make sure its infinitely far away in y direction.
 
     for (int atom_index = 0; atom_index < mol->n_atoms; atom_index++) {
         Atom atom = mol->atoms[atom_index];
@@ -168,7 +168,7 @@ __device__ bool Ray::moleculeCollisionHandling(SimBody* body, MoleculeLibrary* m
         // Rotate ONLY this copy of the atom!!!
         atom.pos = atom.pos.rotateAroundOrigin(body->rotation);                                     // DANGEROUS CODE!!!
 
-        Double3 atom_absolute_pos = body->pos + atom.pos;
+        Float3 atom_absolute_pos = body->pos + atom.pos;
 
         /*
         if (blockIdx.x * 1000 + threadIdx.x == 500500) {
@@ -205,7 +205,7 @@ __device__ bool Ray::moleculeCollisionHandling(SimBody* body, MoleculeLibrary* m
 }
     
 
-__global__ void initRayKernel(Ray* rayptr, Box* box, Double3 focalpoint) {
+__global__ void initRayKernel(Ray* rayptr, Box* box, Float3 focalpoint) {
 	int  index = blockIdx.x * blockDim.x + threadIdx.x;
     Ray ray = rayptr[index];
 
@@ -239,29 +239,21 @@ Raytracer::Raytracer(Simulation* simulation) {
 
 
 
-	double box_size = simulation->box_size;
-	double principal_point_increment = box_size / (double)RAYS_PER_DIM;
+	float box_size = simulation->box_size;
+	float principal_point_increment = box_size / (float)RAYS_PER_DIM;
 
 	Ray* host_rayptr = new Ray[NUM_RAYS];
-	focalpoint = Double3(0, -(box_size / 2.f) * FOCAL_LEN_RATIO - box_size, 0);  
+	focalpoint = Float3(0, -(box_size / 2.f) * FOCAL_LEN_RATIO - box_size, 0);  
 
     printf("\n\nFocal point: %.3f %.3f %.3f\n", focalpoint.x, focalpoint.y, focalpoint.z);
 	int index = 0;
     for (int z_index = 0; z_index < RAYS_PER_DIM; z_index++) {
         for (int x_index = 0; x_index < RAYS_PER_DIM; x_index++) {
 
-            double z = -box_size / 2.f + principal_point_increment * (double)z_index;
-            double x = -box_size / 2.f + principal_point_increment * (double)x_index;
-			Double3 vector = Double3(x, 0, z) - focalpoint;
-
-           
-
-			Double3 uv = vector * (1.f / vector.len());
-            /*if (index == INDEXA) {
-                printf("%.2f %.2f %.2f\n", vector.x, vector.y, vector.z);
-                printf("%.2f %.2f %.2f\n", uv.x, uv.y, uv.z);
-            }*/
-                
+            float z = -box_size / 2.f + principal_point_increment * (float)z_index;
+            float x = -box_size / 2.f + principal_point_increment * (float)x_index;
+			Float3 vector = Float3(x, 0, z) - focalpoint;
+			Float3 uv = vector * (1.f / vector.len());     
             host_rayptr[index++] = Ray(uv, focalpoint);
 		}
 	}
@@ -299,14 +291,8 @@ __device__ void colorRay(Ray* ray, uint8_t* image, int index) {
 
 __global__ void renderKernel(Ray* rayptr, uint8_t* image, Box* box, MoleculeLibrary* mol_library) {
     int  index = blockIdx.x * blockDim.x + threadIdx.x;
-
     Ray ray = rayptr[index];
     
-    /*if (index == 0) {
-        printf("N molecules: %d\n", mol_library->n_molecules);
-        printf("Cuda n mol atoms: %d\n", mol_library->molecules[0].n_atoms);
-    }*/
-        
 
 
     for (int i = 0; i < MAX_RAY_BLOCKS; i++) {
@@ -315,18 +301,12 @@ __global__ void renderKernel(Ray* rayptr, uint8_t* image, Box* box, MoleculeLibr
 
         Block* block = &box->blocks[ray.block_indexes[i]];
 
-        for (int j = 0; j < block->n_bodies; j++) {
-            
+        for (int j = 0; j < block->n_bodies; j++) {     
             if (ray.hitsBody(&block->bodies[j])) {
-
-                if (ray.moleculeCollisionHandling(&block->bodies[j], mol_library, image)) {
-                    
+                if (ray.moleculeCollisionHandling(&block->bodies[j], mol_library, image)) {                 
                     return;
-                }
-                
-                
-            }
-            
+                }       
+            }          
         }
     }
 }
@@ -341,17 +321,24 @@ uint8_t* Raytracer::render(Simulation* simulation) {
         exit(1);
     }
 
+
+
+    cudaStream_t renderstream;
+    cudaStreamCreate(&renderstream);
+
+
     uint8_t* image = new uint8_t[NUM_RAYS * 4];
     uint8_t* cuda_image;
     int im_bytesize = NUM_RAYS * 4 * sizeof(uint8_t);
     cudaMallocManaged(&cuda_image, im_bytesize);
     //printf("Allocating %d KB of ram for image... ", im_bytesize / 1000);
-    Double3 a(1, 0, 1);
-    renderKernel << < RAYS_PER_DIM, RAYS_PER_DIM, 0 >> > ( rayptr, cuda_image, simulation->box, simulation->mol_library);
+    Float3 a(1, 0, 1);
+    renderKernel << < RAYS_PER_DIM, RAYS_PER_DIM, 0, renderstream>>> ( rayptr, cuda_image, simulation->box, simulation->mol_library);
     cudaMemcpy(image, cuda_image, im_bytesize, cudaMemcpyDeviceToHost);
     //exit(1);
 
     cudaFree(cuda_image);
+    cudaStreamDestroy(renderstream);
 
     auto stop = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);

@@ -6,27 +6,29 @@
 
 
 constexpr auto BOX_LEN_CUDA = 20.0;
-constexpr auto BLOCK_LEN_CUDA = 5.0; //nm
+constexpr auto BLOCK_LEN_CUDA = 2.0; //nm
 
-const int MAX_BLOCK_BODIES = 230;
+const int MAX_BLOCK_BODIES = 256;
 
 const int INDEXA = 999;
 const int N_BODIES_START = 10000;
 
-
-
+const int BLOCKS_PER_SM = 4;
+const int GRIDBLOCKS_PER_BODY = 16;
+const int THREADS_PER_GRIDBLOCK = MAX_BLOCK_BODIES / GRIDBLOCKS_PER_BODY;
+const int N_STREAMS = 60;			// 68 total, 0 is general purpose, 1 is for rendering.
 
 
 
 struct Block {	// All boxes are cubic
 
 	__host__ __device__ Block() {}
-	__host__ __device__ Block(Double3 center) : center(center) {}
-	__host__ __device__ bool isInBLock(Double3 point);
+	__host__ __device__ Block(Float3 center) : center(center) {}
+	__host__ __device__ bool isInBLock(Float3 point);
 
 
 
-	Double3 center;
+	Float3 center;
 
 	SimBody bodies[MAX_BLOCK_BODIES];
 	int n_bodies = 0;
@@ -92,7 +94,7 @@ public:
 	}
 
 
-	double box_size = BOX_LEN_CUDA;	//nm
+	float box_size = BOX_LEN_CUDA;	//nm
 	int blocks_per_dim;
 	int n_steps = 1000000;
 
