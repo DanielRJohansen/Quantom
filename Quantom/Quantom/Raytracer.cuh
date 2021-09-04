@@ -43,7 +43,7 @@ public:
 
 
 private:
-
+	__device__ float Ray::distToSphereIntersect(Atom* atom);
 
 	__device__ bool hitsBlock(Block* Block, Float3 focalpoint);
 };

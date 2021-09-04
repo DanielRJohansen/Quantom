@@ -78,7 +78,7 @@ int Engine::fillBox() {
 					break;
 				simulation->bodies[index].pos = Float3(base + dist * (float) x_index, base + dist * float(y_index), base + dist * float(z_index));
 				simulation->bodies[index].rotation = Float3(0, 0, 0);
-				simulation->bodies[index].rot_vel = Float3(0, 0, PI);
+				simulation->bodies[index].rot_vel = Float3(0, PI, 0);
 				placeBody(&simulation->bodies[index++]);
 			}
 		}
@@ -166,7 +166,7 @@ void Engine::step() {
 	int blocks_handled = 0; 
 	while (blocks_handled < sim_blocks) {
 		for (int i = 0; i < N_STREAMS; i++) {
-			stepKernel << < gridblock_size, THREADS_PER_GRIDBLOCK, sizeof(int), stream[i] >> > (simulation);
+			//stepKernel << < gridblock_size, THREADS_PER_GRIDBLOCK, sizeof(int), stream[i] >> > (simulation);
 			blocks_handled += BLOCKS_PER_SM;
 
 			if (blocks_handled >= sim_blocks)

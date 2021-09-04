@@ -3,7 +3,7 @@
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
 #include "math.h"
-
+#include <iostream>
 
 
 constexpr float PI = 3.14159;
@@ -26,41 +26,60 @@ struct Float3 {
 	__host__ __device__ inline Float3 operator - (const Float3 a) const { return Float3(x - a.x, y - a.y, z - a.z); }
 	__host__ __device__ inline bool operator == (const Float3 a) const { return (a.x == x && a.y == y && a.z == z); }
 
+	__host__ __device__ static Float3 norm(Float3 a) { return a * (1.f / a.len()); }
 	__host__ __device__ inline float len() {return (float)sqrtf(x * x + y * y + z * z); }
 	__host__ __device__ Float3 cross(Float3 a) const { return Float3(y * a.z - z * a.y, z * a.x - x * a.z, x * a.y - y * a.x); }
 
 	__host__ __device__ float dot(Float3 a) const { return (x * a.x + y * a.y + z * a.z); }
 
+	__host__ __device__ void print() { printf("%f %f %f\n", x, y, z); }
+
 	__host__ __device__ Float3 rotateAroundOrigin(Float3 pitch_yaw_roll) {	//pitch around x, yaw around z, tilt around y
+		// pitch and yaw is relative to global coordinates. Tilt is relative to body direction
+
 		// Pitch around x
+		//printf("\n\n\n Rotating %f %f %f\n", x, y, z);
+		//printf("By: %f %f %f\n", pitch_yaw_roll.x, pitch_yaw_roll.y, pitch_yaw_roll.z);
 		Float3 v = rodriguesRotatation(*this, Float3(1, 0, 0), pitch_yaw_roll.x);
 
-		// Yaw around y
-		v = rodriguesRotatation(v, Float3(0, 1, 0), pitch_yaw_roll.y);
+		//printf("After x: %f %f %f\n", v.x, v.y, v.z);
+
+		// Yaw around z
+		v = rodriguesRotatation(v, Float3(0, 0, 1), pitch_yaw_roll.y);
+		//printf("After y: %f %f %f\n", v.x, v.y, v.z);
 
 		// Tilt around itself
-		v = rodriguesRotatation(v, v, pitch_yaw_roll.z);
+		//Float3 uv = *this * (1.f / len());
+		//printf("Unit vector: %f %f %f\n", uv.x, uv.y, uv.z);
+		//v = rodriguesRotatation(v, v * (1.f/v.len()), pitch_yaw_roll.z);
+		//printf("After self: %f %f %f\n", v.x, v.y, v.z);
 		return v;
-
-
-		/*float sin_pitch = sin(pitch_yaw_roll.x);
-		float cos_pitch = cos(pitch_yaw_roll.x);
-
-		float sin_yaw = sin(pitch_yaw_roll.z);
-		float cos_yaw = cos(pitch_yaw_roll.z);
-
-		float sin_tilt = sin(pitch_yaw_roll.y);
-		float cos_tilt = cos(pitch_yaw_roll.y);
-
-		//Rotate around x
-		float y_x = cos_pitch * y + sin_pitch * z;
-		float z_x = -sin_pitch * y + cos_pitch * z;*/
-
-		// Rotate 
-
 	}
 
-	__host__ __device__ Float3 rodriguesRotatation(Float3 v, Float3 k, float theta) {
+	/*__host__ __device__ relativisticPYR(Float3 global_pyr, Float3 local_pyr) {
+		Float3 local_x_uv = Float3(1, 0, 0).rotateAroundOrigin(global_pyr);
+		Float3 local_y_uv = Float3(0, 1, 0).rotateAroundOrigin(global_pyr);
+	}*/
+	
+
+	__host__ __device__ Float3 rotateAroundVector(Float3 pitch_yaw_roll, Float3 k) {	// k=normal = z-pointing
+		// I think k is already a unit vector
+		//Float3 rel_x_vector = Float3(k.z, k.y, -k.x);
+		
+		//printf("rel_x_vector: ");
+		
+		Float3 v = rodriguesRotatation(*this, Float3(1,0,0), pitch_yaw_roll.x);
+
+		v = rodriguesRotatation(v, Float3(0,0,1) , pitch_yaw_roll.y);
+
+		//Float3 rel_y_vector = Float3(k.x, -k.z, k.y);
+		
+		v = rodriguesRotatation(v, k, pitch_yaw_roll.z);
+
+		return v;
+	}
+
+	__host__ __device__ static Float3 rodriguesRotatation(Float3 v, Float3 k, float theta) {
 		return v * cos(theta) + k.cross(v) * sin(theta) + k * (k.dot(v)) * (1 - cos(theta));
 	}
 

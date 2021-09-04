@@ -157,7 +157,7 @@ __device__ bool Ray::moleculeCollisionHandling(SimBody* body, MoleculeLibrary* m
 
     int infinity = 9999999;
 
-    //int closest_collision = infinity;
+    int closest_collision = infinity;
     Atom closest_atom;
     closest_atom.pos = Float3(0, infinity, 0);  // Make sure its infinitely far away in y direction.
 
@@ -170,19 +170,13 @@ __device__ bool Ray::moleculeCollisionHandling(SimBody* body, MoleculeLibrary* m
 
         Float3 atom_absolute_pos = body->pos + atom.pos;
 
-        /*
-        if (blockIdx.x * 1000 + threadIdx.x == 500500) {
-            printf("\nBody center: %.8f %.8f %.8f\n", body->pos.x, body->pos.y, body->pos.z);
-            printf("Atom center: %.8f %.8f %.8f\n", atom.pos.x, atom.pos.y, atom.pos.z);
-            printf("Mol CoM: %.8f %.8f %.8f\n", mol->CoM.x, mol->CoM.y, mol->CoM.z);
-            printf("Atom abs pos: %.8f %.8f %.8f\n", atom_absolute_pos.x, atom_absolute_pos.y, atom_absolute_pos.z);
-
-
-            printf("dist %f\n", distToPoint(atom_absolute_pos));
-        }
-          */  
 
         if (distToPoint(atom_absolute_pos) < atom.radius) {
+            float collision_dist = distToSphereIntersect(&atom);
+            if (collision_dist < closest_collision) {
+                //closest_atom = atom;
+                closest_collision = collision_dist;
+            }
             if (atom.pos.y < closest_atom.pos.y)
                 closest_atom = atom;
 
@@ -203,7 +197,13 @@ __device__ bool Ray::moleculeCollisionHandling(SimBody* body, MoleculeLibrary* m
     
     return false;
 }
-    
+
+__device__ float Ray::distToSphereIntersect(Atom* atom) {
+    Float3 projection_on_ray = origin + unit_vector * ((atom->pos - origin).dot(unit_vector) / unit_vector.dot(unit_vector));
+    float center_to_projection = (projection_on_ray - atom->pos).len();
+    float projection_to_intersect = sqrtf(atom->radius * atom->radius - center_to_projection * center_to_projection);
+    return (projection_on_ray - origin).len() - projection_to_intersect;
+}
 
 __global__ void initRayKernel(Ray* rayptr, Box* box, Float3 focalpoint) {
 	int  index = blockIdx.x * blockDim.x + threadIdx.x;

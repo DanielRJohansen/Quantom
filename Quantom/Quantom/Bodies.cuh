@@ -51,7 +51,7 @@ struct SimBody {
 	Float3 pos;	//CoM - nm
 	Float3 vel;	// nm/sec
 
-	Float3 rotation;	//radians
+	Float3 rotation;	//radians pitch, yaw, roll, x-axis, z-axis, y-axis
 	Float3 rot_vel;	//radians/sec
 	//float mass;
 	//float radius = 0.05;
