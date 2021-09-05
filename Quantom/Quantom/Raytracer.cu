@@ -157,32 +157,44 @@ __device__ bool Ray::moleculeCollisionHandling(SimBody* body, MoleculeLibrary* m
 
     int infinity = 9999999;
 
-    int closest_collision = infinity;
+    float closest_collision = infinity;
     Atom closest_atom;
     closest_atom.pos = Float3(0, infinity, 0);  // Make sure its infinitely far away in y direction.
 
-    for (int atom_index = 0; atom_index < mol->n_atoms; atom_index++) {
-        Atom atom = mol->atoms[atom_index];
 
+
+
+    Float3 molecule_tilt_vector = Float3(0, 1, 0).rotateAroundOrigin(body->rotation);
+    for (int atom_index = 0; atom_index < mol->n_atoms; atom_index++) {
+        
+        // Local copy which we can manipulate
+        Atom atom = mol->atoms[atom_index];
+        atom.pos = atom.pos.rotateAroundVector(body->rotation, molecule_tilt_vector);
+        //atom.pos = atom.pos.rotateAroundOrigin(body->rotation);                                     // DANGEROUS CODE!!
+        atom.pos = atom.pos + body->pos;
 
         // Rotate ONLY this copy of the atom!!!
-        atom.pos = atom.pos.rotateAroundOrigin(body->rotation);                                     // DANGEROUS CODE!!!
+        //atom.pos = atom.pos.rotateAroundOrigin(body->rotation);                                     // DANGEROUS CODE!!!
 
         Float3 atom_absolute_pos = body->pos + atom.pos;
 
 
-        if (distToPoint(atom_absolute_pos) < atom.radius) {
+        if (distToPoint(atom.pos) < atom.radius) {
             float collision_dist = distToSphereIntersect(&atom);
             if (collision_dist < closest_collision) {
-                //closest_atom = atom;
+                closest_atom = atom;
                 closest_collision = collision_dist;
             }
-            if (atom.pos.y < closest_atom.pos.y)
-                closest_atom = atom;
+
+
+            //if (atom.pos.y < closest_atom.pos.y)
+              //  closest_atom = atom;
 
         }
             
     }
+    //if (blockIdx.x * 1000 + threadIdx.x == 500500) 
+      //  printf("Closest dist: %f\n", clo)
 
     if (closest_atom.pos.y != infinity) {
         int index = blockIdx.x * blockDim.x + threadIdx.x;

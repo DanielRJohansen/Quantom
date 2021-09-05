@@ -5,13 +5,13 @@
 
 
 
-constexpr auto BOX_LEN_CUDA = 2.0;
-constexpr auto BLOCK_LEN_CUDA = 2.0; //nm
+constexpr auto BOX_LEN_CUDA = 8.0;
+constexpr auto BLOCK_LEN_CUDA = 4.0; //nm
 
 const int MAX_BLOCK_BODIES = 256;
 
-const int INDEXA = 999;
-const int N_BODIES_START = 1;
+const int INDEXA = 500500;
+const int N_BODIES_START = 500;
 
 const int BLOCKS_PER_SM = 4;
 const int GRIDBLOCKS_PER_BODY = 16;
@@ -98,7 +98,7 @@ public:
 	int blocks_per_dim;
 	int n_steps = 1000000;
 
-	const float dt = 0.001;
+	const float dt = 0.1;
 	
 	int n_bodies = N_BODIES_START;
 	Box* box;

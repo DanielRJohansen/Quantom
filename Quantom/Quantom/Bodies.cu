@@ -16,18 +16,13 @@ Molecule::Molecule() {	// Always returns a h2o molecule rn
 		*/	
 	atoms[0] = Atom(Float3(0, 0, 0), 0.152, 15.999, red);
 	atoms[1] = Atom(Float3(0, 0, -95.7 / 1000.f), 0.110, 1.008, white);
-	atoms[2] = Atom(Float3(0, 92.65 / 1000, 23.96 / 1000.f), 0.110, 1.008, blue);// was 0.53
+	atoms[2] = Atom(Float3(0, 92.65 / 1000, 23.96 / 1000.f), 0.110, 1.008, white);// was 0.53
 
-	for (int i = 0; i < 3; i++) {
-		printf("Color %d:  %d %d %d\n", i, atoms[i].color[0], atoms[i].color[1], atoms[i].color[2]);
 
-		
-	}
 
 	
 
 	// Calc com
-	
 	CoM = Float3(0, 0, 0);
 	float accumulated_mass = 0;
 	for (int i = 0; i < 3; i++) {
@@ -38,7 +33,7 @@ Molecule::Molecule() {	// Always returns a h2o molecule rn
 
 	for (int i = 0; i < 3; i++) {
 		atoms[i].pos = atoms[i].pos - CoM;
-		printf("Atom %d pos: %f %f %f\n", i, atoms[i].pos.x, atoms[i].pos.y, atoms[i].pos.z);
+		//printf("Atom %d pos: %f %f %f\n", i, atoms[i].pos.x, atoms[i].pos.y, atoms[i].pos.z);
 	}
 	
 	printf("\n\n");

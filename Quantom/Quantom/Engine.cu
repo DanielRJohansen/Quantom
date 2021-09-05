@@ -14,8 +14,7 @@ Simulation* Engine::prepSimulation(Simulation* simulation) {
 	int n_bodies = fillBox();
 
 
-	printf("\n\nSimbody size: %d\n", sizeof(SimBody));
-	printf("Float3 size: %d", sizeof(Float3));
+	printf("\n\nSimbody size: %d bytes\n", sizeof(SimBody));
 	printf("Block size: %d calculated size: %d\n", sizeof(Block), sizeof(SimBody) * MAX_BLOCK_BODIES + sizeof(Float3) + 7 * sizeof(int));
 
 	printf("Simulation configured with %d blocks, and %d bodies. \n", n_blocks, n_bodies);
@@ -78,7 +77,7 @@ int Engine::fillBox() {
 					break;
 				simulation->bodies[index].pos = Float3(base + dist * (float) x_index, base + dist * float(y_index), base + dist * float(z_index));
 				simulation->bodies[index].rotation = Float3(0, 0, 0);
-				simulation->bodies[index].rot_vel = Float3(0, PI, 0);
+				simulation->bodies[index].rot_vel = Float3(0, 0, PI);
 				placeBody(&simulation->bodies[index++]);
 			}
 		}

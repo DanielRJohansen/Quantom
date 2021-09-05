@@ -24,6 +24,7 @@ void Environment::run() {
 	Molecule h2o;
 	printf("Simulation started\n\n");
 	while (display->window->isOpen()) {
+		//auto start = std::chrono::high_resolution_clock::now();
 
 
 
@@ -35,5 +36,17 @@ void Environment::run() {
 		interface->handleEvents();	
 		if (interface->quit)
 			display->terminate();
+
+
+
+		//auto stop = std::chrono::high_resolution_clock::now();
+		//int duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count();
+		
+		
+		
+		
+		
+
+
 	}
 }
