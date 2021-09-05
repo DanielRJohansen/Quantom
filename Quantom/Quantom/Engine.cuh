@@ -38,6 +38,7 @@ private:
 
 	int initBlocks();	// returns # of blocks created
 	void linkBlocks();
+	void prepareEdgeBlocks();
 
 	void placeBody(SimBody* body);
 	void prepareCudaScheduler();

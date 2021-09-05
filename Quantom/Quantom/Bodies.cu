@@ -8,12 +8,6 @@ Molecule::Molecule() {	// Always returns a h2o molecule rn
 	uint8_t red[3] = { 250, 0, 0 };
 	uint8_t blue[3] = { 0,0,250 };
 	// Using Van der Waals radii.... https://en.m.wikipedia.org/wiki/Van_der_Waals_radius
-
-	/*
-	atoms[0] = Atom(Float3(0, 0, 0), 0.152, 15.999, red);
-	atoms[1] = Atom(Float3(95.7 / 1000.f, 0, 0), 0.110, 1.008, white);
-	atoms[2] = Atom(Float3(-23.96 / 1000.f, 92.65/1000, 0), 0.110, 1.008, white);// was 0.53
-		*/	
 	atoms[0] = Atom(Float3(0, 0, 0), 0.152, 15.999, red);
 	atoms[1] = Atom(Float3(0, 0, -95.7 / 1000.f), 0.110, 1.008, white);
 	atoms[2] = Atom(Float3(0, 92.65 / 1000, 23.96 / 1000.f), 0.110, 1.008, white);// was 0.53
@@ -44,22 +38,15 @@ Molecule::Molecule() {	// Always returns a h2o molecule rn
 		asin(atoms[0].pos.x / atoms[0].pos.len()),
 		0
 	);
-
 	Float3 molecule_normal = Float3(0, 0, 1).rotateAroundOrigin(pitch_yaw_roll * -1);
-
-	printf("molecule normal: %f %f %f\n", molecule_normal.x, molecule_normal.y, molecule_normal.z);
-	printf("pyr: %f %f %f\n", pitch_yaw_roll.x, pitch_yaw_roll.y, pitch_yaw_roll.z);
 
 	for (int i = 0; i < n_atoms; i++) {
 		atoms[i].pos = atoms[i].pos.rotateAroundVector(pitch_yaw_roll, molecule_normal);
-		printf("Atom %d pos: %f %f %f\n",i,  atoms[i].pos.x, atoms[i].pos.y, atoms[i].pos.z);
-	}
+		//printf("Atom %d pos: %f %f %f\n",i,  atoms[i].pos.x, atoms[i].pos.y, atoms[i].pos.z);
+	}	
+	//printf("molecule normal: %f %f %f\n", molecule_normal.x, molecule_normal.y, molecule_normal.z);
+	//printf("pyr: %f %f %f\n", pitch_yaw_roll.x, pitch_yaw_roll.y, pitch_yaw_roll.z);
 	
-
-	//for (int i = 0; i < n_atoms; i++) {
-	//	atoms[i].pos = atoms[i].pos.rotateAroundOrigin(Float3(0,0,3.14));
-	//}
-
 
 }
 

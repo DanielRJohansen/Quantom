@@ -5,13 +5,13 @@
 
 
 
-constexpr auto BOX_LEN_CUDA = 8.0;
-constexpr auto BLOCK_LEN_CUDA = 4.0; //nm
+constexpr auto BOX_LEN_CUDA = 10.0;
+constexpr auto BLOCK_LEN_CUDA = 10.0; //nm
 
 const int MAX_BLOCK_BODIES = 256;
 
 const int INDEXA = 500500;
-const int N_BODIES_START = 500;
+const int N_BODIES_START = 50;
 
 const int BLOCKS_PER_SM = 4;
 const int GRIDBLOCKS_PER_BODY = 16;
@@ -34,15 +34,21 @@ struct Block {	// All boxes are cubic
 	int n_bodies = 0;
 
 	// Following is initiated AFTER being moved to device.
-	int neighbor_indexes[6]; //x- x+ y- y+ z- z+
+	int neighbor_indexes[6] = { NULL }; //x- x+ y- y+ z- z+
 
+	bool edge_block = false;
+	bool edgeforces[6] = { 0 };
 };
 
-class Box {
+class Box {	// Should each GPU block have a copy of the box?
 public:
 	int n_blocks;
 	Block* blocks;
+	
 
+	void finalizeBlock() {
+
+	}
 	void moveToDevice() {	// Loses pointer to RAM location!
 		//printf("Block 38: %.1f %.1f %.1f\n", blocks[38].center.x, blocks[38].center.y, blocks[38].center.z);
 
@@ -55,8 +61,10 @@ public:
 		blocks = blocks_temp;
 		//printf("Block 38: %.1f %.1f %.1f\n", blocks[38].center.x, blocks[38].center.y, blocks[38].center.z);
 		//printf("Block 38: %.1f %.1f %.1f\n", blocks_temp[38].center.x, blocks_temp[38].center.y, blocks_temp[38].center.z);
-
 	}
+
+
+
 };
 
 	

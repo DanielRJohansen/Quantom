@@ -28,9 +28,15 @@ struct Float3 {
 
 	__host__ __device__ static Float3 norm(Float3 a) { return a * (1.f / a.len()); }
 	__host__ __device__ inline float len() {return (float)sqrtf(x * x + y * y + z * z); }
+	__host__ __device__ Float3 zeroIfAbove(float a) { return Float3(x * (x < a), y * (y < a), z * (z < a)); }
+	__host__ __device__ Float3 zeroIfBelow(float a) { return Float3(x * (x > a), y * (y > a), z * (z > a)); }
+
+
 	__host__ __device__ Float3 cross(Float3 a) const { return Float3(y * a.z - z * a.y, z * a.x - x * a.z, x * a.y - y * a.x); }
 
 	__host__ __device__ float dot(Float3 a) const { return (x * a.x + y * a.y + z * a.z); }
+
+
 
 	__host__ __device__ void print() { printf("%f %f %f\n", x, y, z); }
 

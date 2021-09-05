@@ -10,7 +10,9 @@ Simulation* Engine::prepSimulation(Simulation* simulation) {
 
 	int n_blocks = initBlocks();
 	linkBlocks();
+	prepareEdgeBlocks();
 
+	srand(290128301);
 	int n_bodies = fillBox();
 
 
@@ -69,15 +71,26 @@ int Engine::fillBox() {
 	float dist = simulation->box_size / (float)bodies_per_dim;	// dist_per_index
 	float base = -simulation->box_size / 2.f + dist / 2.f;
 
+	float vel_scalar = 0.5;
+
 	int index = 0;
 	for (int x_index = 0; x_index < bodies_per_dim; x_index++) {
 		for (int y_index = 0; y_index < bodies_per_dim; y_index++) {
 			for (int z_index = 0; z_index < bodies_per_dim; z_index++) {
 				if (index == simulation->n_bodies)
 					break;
+
+				int p = 10000;
+				float r1 = rand() % p / (float)p - 0.5;
+				float r2 = rand() % p / (float)p - 0.5;
+				float r3 = rand() % p / (float)p - 0.5;
+
+				printf("%f %f %f\n", r1, r2, r3);
+				//exit(1);
 				simulation->bodies[index].pos = Float3(base + dist * (float) x_index, base + dist * float(y_index), base + dist * float(z_index));
+				simulation->bodies[index].vel = Float3(r1 * vel_scalar, r2 * vel_scalar, r3 * vel_scalar);
 				simulation->bodies[index].rotation = Float3(0, 0, 0);
-				simulation->bodies[index].rot_vel = Float3(0, 0, PI);
+				simulation->bodies[index].rot_vel = Float3(0, PI, 0);
 				placeBody(&simulation->bodies[index++]);
 			}
 		}
@@ -122,6 +135,20 @@ void Engine::linkBlocks() {
 
 				block->neighbor_indexes[4] = z_index > 0 ? block3dIndexTo1dIndex(Int3(x_index, y_index, z_index - 1)) : NULL;
 				block->neighbor_indexes[5] = (z_index + 1) < simulation->blocks_per_dim ? block3dIndexTo1dIndex(Int3(x_index, y_index, z_index + 1)) : NULL;
+			}
+		}
+	}
+}
+
+void Engine::prepareEdgeBlocks() {
+	for (int x_index = 0; x_index < simulation->blocks_per_dim; x_index++) {
+		for (int y_index = 0; y_index < simulation->blocks_per_dim; y_index++) {
+			for (int z_index = 0; z_index < simulation->blocks_per_dim; z_index++) {
+				int block_index = block3dIndexTo1dIndex(Int3(x_index, y_index, z_index));
+				Block* block = &simulation->box->blocks[block_index];
+				if (x_index == 0 || x_index == (simulation->blocks_per_dim - 1) || y_index == 0 || y_index == (simulation->blocks_per_dim - 1) || z_index == 0 || z_index == (simulation->blocks_per_dim-1))
+					block->edge_block = true;
+
 			}
 		}
 	}
@@ -192,9 +219,34 @@ void Engine::step() {
 	printf("Step time: %5.d ys", duration.count());
 }
 
+__device__ float cudaMax1(float a, float b) {
+	if (a > b)
+		return a;
+	return b;
+}
+__device__ float cudaMin1(float a, float b) {
+	if (a < b)
+		return a;
+	return b;
+}
+
+__device__ Float3 forceFromDist(Float3 dists) {
+	return Float3(
+		((0.5f / dists.x) + 0.5),
+		((0.5f / dists.y) + 0.5),
+		((0.5f / dists.z) + 0.5)
+	);
+}
+
+__device__ inline Float3 calcEdgeForce(Block* block, SimBody* body) {
+	Float3 dists1(body->pos.x + BOX_LEN_CUDA / 2.f, body->pos.y + BOX_LEN_CUDA / 2.f, body->pos.z + BOX_LEN_CUDA / 2.f);
+	Float3 dists2(BOX_LEN_CUDA / 2.f - body->pos.x, BOX_LEN_CUDA / 2.f - body->pos.y, BOX_LEN_CUDA / 2.f - body->pos.z);
 
 
-
+	Float3 pos_forces = forceFromDist(dists1).zeroIfBelow(0);
+	Float3 neg_forces = forceFromDist(dists2).zeroIfBelow(0);
+	return pos_forces - neg_forces;
+}
 
 __global__ void stepKernel(Simulation* simulation) {
 	int blockID = blockIdx.x;
@@ -221,8 +273,12 @@ __global__ void stepKernel(Simulation* simulation) {
 
 	//body.rot_vel = test;
 
-	body.rotation = body.rotation + body.rot_vel * simulation->dt;				// * dt of course!
+	if (block->edge_block)
+		body.vel = body.vel + calcEdgeForce(block, &body) * 0.1;
 
+
+	body.rotation = body.rotation + body.rot_vel * simulation->dt;				// * dt of course!
+	body.pos = body.pos + body.vel * simulation->dt;
 
 
 	block->bodies[bodyID] = body;
