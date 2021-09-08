@@ -5,20 +5,38 @@
 
 
 
-constexpr auto BOX_LEN_CUDA = 10.0;
-constexpr auto BLOCK_LEN_CUDA = 10.0; //nm
+constexpr auto BOX_LEN_CUDA = 15.0;
+constexpr auto BLOCK_LEN_CUDA = 4.0;	//nm
+//constexpr auto CUTOFF_LEN = 0.8f;		// nm
+constexpr float BLOCK_OVERLAP = 0.3f;	// nm, must be > 2* vdw radius of largest atom.
+const int MAX_BLOCK_BODIES = 64;
+constexpr float SOLOBLOCK_DIST = BLOCK_LEN_CUDA - BLOCK_OVERLAP;
 
-const int MAX_BLOCK_BODIES = 256;
 
-const int INDEXA = 500500;
-const int N_BODIES_START = 50;
+const int INDEXA = 900900;
+const int N_BODIES_START = 20;
 
-const int BLOCKS_PER_SM = 4;
+const int BLOCKS_PER_SM = 16;
 const int GRIDBLOCKS_PER_BODY = 16;
 const int THREADS_PER_GRIDBLOCK = MAX_BLOCK_BODIES / GRIDBLOCKS_PER_BODY;
 const int N_STREAMS = 60;			// 68 total, 0 is general purpose, 1 is for rendering.
 
 
+
+
+
+struct Sphere {
+	__host__ __device__ Sphere() {}
+	__host__ __device__ Sphere(Float3 center, float radius) : center(center), radius(radius) {}
+	__host__ __device__ bool isInSphere(Float3 point);
+
+
+	Float3 center;
+	float radius;
+
+	SimBody bodies[MAX_BLOCK_BODIES];
+	int n_bodies = 0;
+};
 
 struct Block {	// All boxes are cubic
 
@@ -26,6 +44,24 @@ struct Block {	// All boxes are cubic
 	__host__ __device__ Block(Float3 center) : center(center) {}
 	__host__ __device__ bool isInBLock(Float3 point);
 
+	__host__ bool addBody(SimBody* body) {
+		//printf("NN bodies: %d\n", n_bodies);
+		if (n_bodies > 0) {
+			//printf("n bodies in: %d\n", n_bodies);
+			//bodies[n_bodies - 1].pos.print();
+			//body->pos.print();
+			if (bodies[n_bodies - 1].pos == body->pos)
+				return false;
+		}
+
+		if (n_bodies == MAX_BLOCK_BODIES) {
+			printf("Too many bodies for this block!");
+			exit(1);
+		}
+		bodies[n_bodies] = *body;
+		n_bodies++;
+		return true;
+	}
 
 
 	Float3 center;
@@ -38,6 +74,8 @@ struct Block {	// All boxes are cubic
 
 	bool edge_block = false;
 	bool edgeforces[6] = { 0 };
+
+	int incoming_bodyindex_buffer[26][2] = { -1 };		// UHHHHHHHHHHHHHH
 };
 
 class Box {	// Should each GPU block have a copy of the box?
@@ -45,6 +83,7 @@ public:
 	int n_blocks;
 	Block* blocks;
 	
+	int blocks_per_dim;
 
 	void finalizeBlock() {
 

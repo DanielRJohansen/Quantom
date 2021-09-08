@@ -14,7 +14,7 @@
 
 	
 
-__global__ void stepKernel(Simulation* simulation);
+__global__ void stepKernel(Simulation* simulation, int offset);
 
 
 
@@ -50,17 +50,24 @@ private:
 
 
 	// Helper functions
-	Int3 posToBlockIndex(Float3* pos) {
+	/*Int3 posToBlockIndex(Float3* pos) {
 		return Int3(
 			floor((pos->x + simulation->box_size / 2.f) / simulation->box_size * simulation->blocks_per_dim),
 			floor((pos->y + simulation->box_size / 2.f) / simulation->box_size * simulation->blocks_per_dim),
 			floor((pos->z + simulation->box_size / 2.f) / simulation->box_size * simulation->blocks_per_dim)
 			);
+	}*/
+	Int3 posToBlockIndex(Float3* pos) {
+		return Int3(
+			floor((pos->x - box_base) / (bpd * block_dist) * simulation->blocks_per_dim),
+			floor((pos->y - box_base) / (bpd * block_dist) * simulation->blocks_per_dim),
+			floor((pos->z - box_base) / (bpd * block_dist) * simulation->blocks_per_dim)
+		);
 	}
 	inline int block3dIndexTo1dIndex(Int3 index_3d) {// NOTICE THAT X IS THE "GRANDPARENT" ITERATOR
 		return (index_3d.z + 
-			index_3d.y * simulation->blocks_per_dim + 
-			index_3d.x * simulation->blocks_per_dim * simulation->blocks_per_dim);
+			index_3d.y * bpd + 
+			index_3d.x * bpd*bpd);
 	}
 
 
@@ -76,7 +83,9 @@ private:
 	bool finished = false;
 	int sim_blocks;
 
-
+	float block_dist;
+	int bpd;
+	float box_base;				// Of box (left, back, down-most), is negative!
 	cudaError_t cuda_status;
 
 };

@@ -18,9 +18,9 @@ Simulation* Engine::prepSimulation(Simulation* simulation) {
 
 	printf("\n\nSimbody size: %d bytes\n", sizeof(SimBody));
 	printf("Block size: %d calculated size: %d\n", sizeof(Block), sizeof(SimBody) * MAX_BLOCK_BODIES + sizeof(Float3) + 7 * sizeof(int));
-
-	printf("Simulation configured with %d blocks, and %d bodies. \n", n_blocks, n_bodies);
+	printf("Simulation configured with %d blocks, and %d bodies. Approximately %d bodies per block. \n", n_blocks, n_bodies, n_bodies/n_blocks);
 	printf("Required shared mem for stepKernel: %d\n", sizeof(Block));
+	//exit(1);
 
 
 	prepareCudaScheduler();
@@ -43,28 +43,38 @@ Simulation* Engine::simToDevice() {
 }
 
 int Engine::initBlocks() {
-	int blocks_per_dim = simulation->box_size / BLOCK_LEN_CUDA;
-	simulation->blocks_per_dim = blocks_per_dim;
-	int n_blocks = pow(blocks_per_dim, 3);
+	
+
+	block_dist = (BLOCK_LEN_CUDA - BLOCK_OVERLAP);
+	bpd = ceil(simulation->box_size / block_dist);
+	box_base = -(bpd) / 2.f * block_dist;
+	float block_center_base = box_base + block_dist / 2.f;
+
+	if (BOX_LEN_CUDA == BLOCK_LEN_CUDA)
+		block_center_base = 0;
+	printf("Blocks per dim: %d\n", bpd);
+
+	simulation->blocks_per_dim = bpd;
+	simulation->box->blocks_per_dim = bpd;
+	int n_blocks = pow(bpd, 3);
 	simulation->box->n_blocks = n_blocks;
 	simulation->box->blocks = new Block[n_blocks];
-	printf("Blocks per dim: %d\n", blocks_per_dim);
-	 
 
 	int index = 0;
 	float offset = -simulation->box_size / 2 + 0.5 * BLOCK_LEN_CUDA;
-	for (int x = 0; x < blocks_per_dim; x++) {
-		for (int y = 0; y < blocks_per_dim; y++) {
-			for (int z = 0; z < blocks_per_dim; z++) {
-				Float3 center(x * BLOCK_LEN_CUDA + offset, y * BLOCK_LEN_CUDA + offset, z * BLOCK_LEN_CUDA + offset);
+	for (int x = 0; x < bpd; x++) {
+		for (int y = 0; y < bpd; y++) {
+			for (int z = 0; z < bpd; z++) {
+				//Float3 center(x * BLOCK_LEN_CUDA + offset, y * BLOCK_LEN_CUDA + offset, z * BLOCK_LEN_CUDA + offset);
+				Float3 center(x * block_dist + block_center_base, y * block_dist + block_center_base, z * block_dist + block_center_base);
 				simulation->box->blocks[index++] = Block(center);
-				//printf("%.1f %.1f %.1f\n", center.x, center.y, center.z);
+				//printf("Box center: %.1f %.1f %.1f\n", center.x, center.y, center.z);
 			}
 		}
 	}
 	return index;
 }
-		
+
 int Engine::fillBox() {
 	int bodies_per_dim = ceil(cbrt((float)simulation->n_bodies));
 	printf("Bodies per dim: %d\n", bodies_per_dim);
@@ -85,9 +95,9 @@ int Engine::fillBox() {
 				float r2 = rand() % p / (float)p - 0.5;
 				float r3 = rand() % p / (float)p - 0.5;
 
-				printf("%f %f %f\n", r1, r2, r3);
-				//exit(1);
-				simulation->bodies[index].pos = Float3(base + dist * (float) x_index, base + dist * float(y_index), base + dist * float(z_index));
+				simulation->bodies[index].pos = Float3(base + dist * (float)x_index, base + dist * float(y_index), base + dist * float(z_index));
+				//printf("Body pos: ");
+				//simulation->bodies[index].pos.print();
 				simulation->bodies[index].vel = Float3(r1 * vel_scalar, r2 * vel_scalar, r3 * vel_scalar);
 				simulation->bodies[index].rotation = Float3(0, 0, 0);
 				simulation->bodies[index].rot_vel = Float3(0, PI, 0);
@@ -95,11 +105,38 @@ int Engine::fillBox() {
 			}
 		}
 	}
-
 	return index;
 }
+
+void Engine::placeBody(SimBody* body) {
+	//const Int3 block_index = posToBlockIndex(&body->pos);
 	
-		
+
+	int count = 0;
+
+	SimBody temp;
+	Int3 block_index_;
+
+	for (int z_off = -1; z_off <= 1; z_off++) {
+		for (int y_off = -1; y_off <= 1; y_off++) {
+			for (int x_off = -1; x_off <= 1; x_off++) {
+
+
+				Float3 pos_(body->pos.x + x_off * BLOCK_OVERLAP, body->pos.y + y_off * BLOCK_OVERLAP, body->pos.z + z_off * BLOCK_OVERLAP);
+				block_index_ = posToBlockIndex(&pos_);
+				//printf("%d %d %d\n", block_index_.x, block_index_.y, block_index_.z);
+				int block_index_1d = block3dIndexTo1dIndex(block_index_);
+				//printf("Block index. %d\n", block_index_1d);
+				Block* block = &simulation->box->blocks[block_index_1d];
+				if (block->addBody(body))
+					count++;
+			}
+		}
+	}
+	//printf("Molecule placed in %d blocks\n", count);
+}
+
+/*
 void Engine::placeBody(SimBody* body) {
 	Int3 block_index = posToBlockIndex(&body->pos);
 	
@@ -119,7 +156,7 @@ void Engine::placeBody(SimBody* body) {
 	block->n_bodies++;
 	
 }
-	
+	*/
 void Engine::linkBlocks() {
 	for (int x_index = 0; x_index < simulation->blocks_per_dim; x_index++) {
 		for (int y_index = 0; y_index < simulation->blocks_per_dim; y_index++) {
@@ -161,8 +198,8 @@ void Engine::prepareCudaScheduler() {
 	for (int i = 0; i < N_STREAMS; i++)
 		cudaStreamCreate(&stream[i]);
 
-
-	gridblock_size = dim3(GRIDBLOCKS_PER_BODY, BLOCKS_PER_SM, 1);
+	printf("%d kernel launches necessary to step\n", (int) ceil((float)simulation->box->n_blocks / (float)BLOCKS_PER_SM));
+	//gridblock_size = dim3(GRIDBLOCKS_PER_BODY, BLOCKS_PER_SM, 1);
 }
 
 
@@ -189,17 +226,31 @@ void Engine::step() {
 
 
 	
-	int blocks_handled = 0; 
+	int blocks_handled = 0;
+	int sharedmem_size = sizeof(Block);
 	while (blocks_handled < sim_blocks) {
 		for (int i = 0; i < N_STREAMS; i++) {
-			//stepKernel << < gridblock_size, THREADS_PER_GRIDBLOCK, sizeof(int), stream[i] >> > (simulation);
+			stepKernel << < BLOCKS_PER_SM, MAX_BLOCK_BODIES, sharedmem_size, stream[i] >> > (simulation, blocks_handled);
+
+			
+
 			blocks_handled += BLOCKS_PER_SM;
 
 			if (blocks_handled >= sim_blocks)
 				break;
 		}
-	}
 
+		cudaDeviceSynchronize();
+		if (cudaGetLastError() != cudaSuccess) {
+			fprintf(stderr, "Error during step :/\n");
+			exit(1);
+		}
+
+	}
+	
+
+
+	/*
 	stepKernel <<< sim_blocks, MAX_BLOCK_BODIES, sizeof(int) >> > (simulation);
 	cudaDeviceSynchronize();
 
@@ -208,7 +259,7 @@ void Engine::step() {
 		fprintf(stderr, "step kernel failed!");
 		exit(1);
 	}
-
+	*/
 
 
 	
@@ -216,7 +267,7 @@ void Engine::step() {
 
 	auto stop = std::chrono::high_resolution_clock::now();
 	auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
-	printf("Step time: %5.d ys", duration.count());
+	printf("Step time: %d ys", duration.count());
 }
 
 __device__ float cudaMax1(float a, float b) {
@@ -248,47 +299,69 @@ __device__ inline Float3 calcEdgeForce(Block* block, SimBody* body) {
 	return pos_forces - neg_forces;
 }
 
-__global__ void stepKernel(Simulation* simulation) {
-	int blockID = blockIdx.x;
+
+enum Direction
+{
+	up, down, left, right, back, forward
+};
+
+__device__ void transferBody(Box* box, Block* block, SimBody* body) {
+	Float3 rel_pos = body->pos - block->center;
+
+	//switch (rel_pos.x)
+}
+
+
+
+__global__ void stepKernel(Simulation* simulation, int offset) {
+	int blockID = blockIdx.x + offset;
 	int bodyID = threadIdx.x;
 	//return;
 	
-	if (bodyID >= simulation->box->blocks[blockID].n_bodies)
-		return;
 
 	
 
 
 	// Load bodies into shared memory
-	__shared__ SimBody bodies[MAX_BLOCK_BODIES];	
-	//bodies[bodyID] = simulation->box->blocks[blockID].bodies[bodyID];	// transferring the entrire block is too much for 1 thread. Must find alternative.
+	__shared__ Block block;	
+	if (threadIdx.x == 0)
+		block = simulation->box->blocks[blockID];
 	__syncthreads();
 
 
+	Block block1 = block;
+	// End thread if not needed.
+	if (bodyID >= block.n_bodies)
+		return;
+
 
 	// BEGIN WORK
-	Block* block = &simulation->box->blocks[blockID];
-	SimBody body = block->bodies[bodyID];
-	//SimBody body = bodies[bodyID];
+	SimBody body = block.bodies[bodyID];
+	
 
-	//body.rot_vel = test;
 
-	if (block->edge_block)
-		body.vel = body.vel + calcEdgeForce(block, &body) * 0.1;
+
+	if (block.edge_block)
+		body.vel = body.vel + calcEdgeForce(&block, &body) * 0.1;
+
+	if (abs(body.pos.x - block.center.x) > SOLOBLOCK_DIST) {
+
+	}
+
 
 
 	body.rotation = body.rotation + body.rot_vel * simulation->dt;				// * dt of course!
 	body.pos = body.pos + body.vel * simulation->dt;
 
 
-	block->bodies[bodyID] = body;
+	block.bodies[bodyID] = body;
 
 
 
 
 	__syncthreads();
-	//if (bodyID == 0)
-		//simulation->box->blocks[blockID] = block;
+	if (bodyID == 0)
+		simulation->box->blocks[blockID] = block;	// Very expensive..
 
 	
 } 

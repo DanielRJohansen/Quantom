@@ -15,15 +15,15 @@ __device__ void Ray::findBlockHits(Box* box, Float3 focalpoint) {
 
     
 
-    int bpd = BOX_LEN_CUDA / BLOCK_LEN_CUDA;
+    
 
-    for (int y = 0; y < bpd; y++) {
-        for (int z = 0; z < bpd; z++) {
-            for (int x = 0; x < bpd; x++) {
+    for (int y = 0; y < box->blocks_per_dim; y++) {
+        for (int z = 0; z < box->blocks_per_dim; z++) {
+            for (int x = 0; x < box->blocks_per_dim; x++) {
                 if (block_index == MAX_RAY_BLOCKS)
                     break;
 
-                int index = z * bpd * bpd + y * bpd + x;
+                int index = z * box->blocks_per_dim * box->blocks_per_dim + y * box->blocks_per_dim + x;
 
 
                 if (hitsBlock(&box->blocks[index], focalpoint)) {
@@ -345,7 +345,7 @@ uint8_t* Raytracer::render(Simulation* simulation) {
     cudaMallocManaged(&cuda_image, im_bytesize);
     //printf("Allocating %d KB of ram for image... ", im_bytesize / 1000);
     Float3 a(1, 0, 1);
-    renderKernel << < RAYS_PER_DIM, RAYS_PER_DIM, 0, renderstream>>> ( rayptr, cuda_image, simulation->box, simulation->mol_library);
+    renderKernel << < RAYS_PER_DIM, RAYS_PER_DIM, 0>>> ( rayptr, cuda_image, simulation->box, simulation->mol_library);
     cudaMemcpy(image, cuda_image, im_bytesize, cudaMemcpyDeviceToHost);
     //exit(1);
 
