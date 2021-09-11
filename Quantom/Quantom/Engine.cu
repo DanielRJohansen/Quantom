@@ -9,17 +9,18 @@ Simulation* Engine::prepSimulation(Simulation* simulation) {
 
 
 	int n_blocks = initBlocks();
-	linkBlocks();
-	prepareEdgeBlocks();
+	//linkBlocks();
+	//prepareEdgeBlocks();
 
 	srand(290128301);
 	int n_bodies = fillBox();
 
 
-	printf("\n\nSimbody size: %d bytes\n", sizeof(SimBody));
-	printf("Block size: %d calculated size: %d\n", sizeof(Block), sizeof(SimBody) * MAX_BLOCK_BODIES + sizeof(Float3) + 7 * sizeof(int));
+	printf("\nSimbody size: %d bytes\n", sizeof(SimBody));
+	printf("Block size: %d\n", sizeof(Block));
 	printf("Simulation configured with %d blocks, and %d bodies. Approximately %d bodies per block. \n", n_blocks, n_bodies, n_bodies/n_blocks);
 	printf("Required shared mem for stepKernel: %d\n", sizeof(Block));
+	printf("Required global mem for Box: %d MB\n", (int) (sizeof(Block) * n_blocks / 1000000.f));
 	//exit(1);
 
 
@@ -45,30 +46,29 @@ Simulation* Engine::simToDevice() {
 int Engine::initBlocks() {
 	
 
-	block_dist = (BLOCK_LEN_CUDA - BLOCK_OVERLAP);
-	bpd = ceil(simulation->box_size / block_dist);
-	box_base = -(bpd) / 2.f * block_dist;
-	float block_center_base = box_base + block_dist / 2.f;
+	block_dist = FOCUS_LEN;
+	bpd = ((simulation->box_size + FOCUS_LEN)/ block_dist);		// Otherwise no block focus on edge particles
+	int n_blocks = pow(bpd, 3);
+	box_base = - (BOX_LEN/2.f);			// Is the center of first block!
+	//float block_center_base = box_base + block_dist;
 
-	if (BOX_LEN_CUDA == BLOCK_LEN_CUDA)
-		block_center_base = 0;
+
 	printf("Blocks per dim: %d\n", bpd);
 
 	simulation->blocks_per_dim = bpd;
 	simulation->box->blocks_per_dim = bpd;
-	int n_blocks = pow(bpd, 3);
 	simulation->box->n_blocks = n_blocks;
 	simulation->box->blocks = new Block[n_blocks];
 
+
 	int index = 0;
-	float offset = -simulation->box_size / 2 + 0.5 * BLOCK_LEN_CUDA;
+	float offset = -simulation->box_size / 2 + 0.5 * BLOCK_LEN;
 	for (int x = 0; x < bpd; x++) {
 		for (int y = 0; y < bpd; y++) {
 			for (int z = 0; z < bpd; z++) {
-				//Float3 center(x * BLOCK_LEN_CUDA + offset, y * BLOCK_LEN_CUDA + offset, z * BLOCK_LEN_CUDA + offset);
-				Float3 center(x * block_dist + block_center_base, y * block_dist + block_center_base, z * block_dist + block_center_base);
+				Float3 center(x * block_dist + box_base, y * block_dist + box_base, z * block_dist + box_base);
+				//center.print();
 				simulation->box->blocks[index++] = Block(center);
-				//printf("Box center: %.1f %.1f %.1f\n", center.x, center.y, center.z);
 			}
 		}
 	}
@@ -96,8 +96,11 @@ int Engine::fillBox() {
 				float r3 = rand() % p / (float)p - 0.5;
 
 				simulation->bodies[index].pos = Float3(base + dist * (float)x_index, base + dist * float(y_index), base + dist * float(z_index));
+
 				//printf("Body pos: ");
 				//simulation->bodies[index].pos.print();
+
+				simulation->bodies[index].molecule_type = 0;
 				simulation->bodies[index].vel = Float3(r1 * vel_scalar, r2 * vel_scalar, r3 * vel_scalar);
 				simulation->bodies[index].rotation = Float3(0, 0, 0);
 				simulation->bodies[index].rot_vel = Float3(0, PI, 0);
@@ -107,7 +110,7 @@ int Engine::fillBox() {
 	}
 	return index;
 }
-
+/*
 void Engine::placeBody(SimBody* body) {
 	//const Int3 block_index = posToBlockIndex(&body->pos);
 	
@@ -135,61 +138,27 @@ void Engine::placeBody(SimBody* body) {
 	}
 	//printf("Molecule placed in %d blocks\n", count);
 }
+*/
 
-/*
 void Engine::placeBody(SimBody* body) {
 	Int3 block_index = posToBlockIndex(&body->pos);
-	
+	//printf("Block index: %d %d %d\n", block_index.x, block_index.y, block_index.z);
 
 	int block_index_1d = block3dIndexTo1dIndex(block_index);
-	
+	//printf("Block index: %d\n", block_index_1d);
+
+	if (block_index_1d < 0)
+		printf("Rebuild All you twat\n");
 
 	Block* block = &simulation->box->blocks[block_index_1d];
 
+	if (!block->addBody(body))
+		printf("Body lost!\n");
 
-	if (block->n_bodies == MAX_BLOCK_BODIES) {
-		printf("Too many bodies for this block!");
-		exit(1);
-	}
-
-	block->bodies[block->n_bodies] = *body;
-	block->n_bodies++;
+}
 	
-}
-	*/
-void Engine::linkBlocks() {
-	for (int x_index = 0; x_index < simulation->blocks_per_dim; x_index++) {
-		for (int y_index = 0; y_index < simulation->blocks_per_dim; y_index++) {
-			for (int z_index = 0; z_index < simulation->blocks_per_dim; z_index++) {
-				int block_index = block3dIndexTo1dIndex(Int3(x_index, y_index, z_index));
-				Block* block = &simulation->box->blocks[block_index];
 
-				block->neighbor_indexes[0] = x_index > 0 ? block3dIndexTo1dIndex(Int3(x_index - 1, y_index, z_index)) : NULL;
-				block->neighbor_indexes[1] = (x_index + 1) < simulation->blocks_per_dim ? block3dIndexTo1dIndex(Int3(x_index + 1, y_index, z_index)) : NULL;
 
-				block->neighbor_indexes[2] = y_index > 0 ? block3dIndexTo1dIndex(Int3(x_index, y_index - 1, z_index)) : NULL;
-				block->neighbor_indexes[3] = (y_index + 1) < simulation->blocks_per_dim ? block3dIndexTo1dIndex(Int3(x_index, y_index + 1, z_index)) : NULL;
-
-				block->neighbor_indexes[4] = z_index > 0 ? block3dIndexTo1dIndex(Int3(x_index, y_index, z_index - 1)) : NULL;
-				block->neighbor_indexes[5] = (z_index + 1) < simulation->blocks_per_dim ? block3dIndexTo1dIndex(Int3(x_index, y_index, z_index + 1)) : NULL;
-			}
-		}
-	}
-}
-
-void Engine::prepareEdgeBlocks() {
-	for (int x_index = 0; x_index < simulation->blocks_per_dim; x_index++) {
-		for (int y_index = 0; y_index < simulation->blocks_per_dim; y_index++) {
-			for (int z_index = 0; z_index < simulation->blocks_per_dim; z_index++) {
-				int block_index = block3dIndexTo1dIndex(Int3(x_index, y_index, z_index));
-				Block* block = &simulation->box->blocks[block_index];
-				if (x_index == 0 || x_index == (simulation->blocks_per_dim - 1) || y_index == 0 || y_index == (simulation->blocks_per_dim - 1) || z_index == 0 || z_index == (simulation->blocks_per_dim-1))
-					block->edge_block = true;
-
-			}
-		}
-	}
-}
 
 
 void Engine::prepareCudaScheduler() {
@@ -223,14 +192,11 @@ void Engine::step() {
 
 
 
-
-
-	
 	int blocks_handled = 0;
 	int sharedmem_size = sizeof(Block);
 	while (blocks_handled < sim_blocks) {
 		for (int i = 0; i < N_STREAMS; i++) {
-			stepKernel << < BLOCKS_PER_SM, MAX_BLOCK_BODIES, sharedmem_size, stream[i] >> > (simulation, blocks_handled);
+			stepKernel << < BLOCKS_PER_SM, MAX_FOCUS_BODIES, 0, stream[i] >> > (simulation, blocks_handled);
 
 			
 
@@ -253,17 +219,7 @@ void Engine::step() {
 	/*
 	stepKernel <<< sim_blocks, MAX_BLOCK_BODIES, sizeof(int) >> > (simulation);
 	cudaDeviceSynchronize();
-
-	cuda_status = cudaGetLastError();
-	if (cuda_status != cudaSuccess) {
-		fprintf(stderr, "step kernel failed!");
-		exit(1);
-	}
-	*/
-
-
-	
-
+*/
 
 	auto stop = std::chrono::high_resolution_clock::now();
 	auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
@@ -290,8 +246,8 @@ __device__ Float3 forceFromDist(Float3 dists) {
 }
 
 __device__ inline Float3 calcEdgeForce(Block* block, SimBody* body) {
-	Float3 dists1(body->pos.x + BOX_LEN_CUDA / 2.f, body->pos.y + BOX_LEN_CUDA / 2.f, body->pos.z + BOX_LEN_CUDA / 2.f);
-	Float3 dists2(BOX_LEN_CUDA / 2.f - body->pos.x, BOX_LEN_CUDA / 2.f - body->pos.y, BOX_LEN_CUDA / 2.f - body->pos.z);
+	Float3 dists1(body->pos.x + BOX_LEN / 2.f, body->pos.y + BOX_LEN / 2.f, body->pos.z + BOX_LEN / 2.f);
+	Float3 dists2(BOX_LEN / 2.f - body->pos.x, BOX_LEN / 2.f - body->pos.y, BOX_LEN / 2.f - body->pos.z);
 
 
 	Float3 pos_forces = forceFromDist(dists1).zeroIfBelow(0);
@@ -311,12 +267,32 @@ __device__ void transferBody(Box* box, Block* block, SimBody* body) {
 	//switch (rel_pos.x)
 }
 
+																				// TODO: MAKE IS SUCH THAT A BODY CAN NEVER BE EXACTLY ON THE EDGE OF FOCUS, THUS APPEARING IN MULTIPLE GROUPS!
+__device__ bool bodyInNear(SimBody* body, Float3* block_center) {
+	Float3 dist_from_center = (body->pos - *block_center).abs();
+	return (dist_from_center.x < FOCUS_LEN, dist_from_center.z < FOCUS_LEN, dist_from_center.z < FOCUS_LEN);
+}
+
+__device__ bool bodyInFocus(SimBody* body, Float3* block_center) {
+	Float3 dist_from_center = (body->pos - *block_center).abs();
+	return (dist_from_center.x < FOCUS_LEN_HALF, dist_from_center.z < FOCUS_LEN_HALF, dist_from_center.z < FOCUS_LEN_HALF);
+}
+
+
+
 
 
 __global__ void stepKernel(Simulation* simulation, int offset) {
 	int blockID = blockIdx.x + offset;
 	int bodyID = threadIdx.x;
-	//return;
+
+	if (blockID >= simulation->box->n_blocks)
+		return;
+	
+
+
+
+
 	
 
 	
@@ -326,36 +302,65 @@ __global__ void stepKernel(Simulation* simulation, int offset) {
 	__shared__ Block block;	
 	if (threadIdx.x == 0)
 		block = simulation->box->blocks[blockID];
+
+
+	int focus_ptr = 0;
+
+	if (threadIdx.x == 0) {
+
+		while (block.focus_bodies[focus_ptr].molecule_type != UNUSED_BODY)
+			focus_ptr++;
+
+
+		for (int i = 0; i < MAX_NEAR_BODIES; i++) {
+			SimBody body = block.near_bodies[i];
+
+			if (body.molecule_type == UNUSED_BODY)
+				continue;				// Maybe break if always sorted??
+
+			if (focus_ptr == 16)
+				printf("FUCK! %d\n", blockID);
+
+			if (bodyInFocus(&body, &block.center)) {
+				block.focus_bodies[focus_ptr++] = body;
+				block.near_bodies[i].molecule_type = UNUSED_BODY;
+			}
+		}
+		//printf("%d focusses\n", focus_ptr);
+	}
 	__syncthreads();
 
 
-	Block block1 = block;
-	// End thread if not needed.
-	if (bodyID >= block.n_bodies)
-		return;
-
-
-	// BEGIN WORK
-	SimBody body = block.bodies[bodyID];
 	
 
 
+	// End thread if not needed.
+	if (block.focus_bodies[bodyID].molecule_type == UNUSED_BODY && bodyID != 0)		// Always need thread0 to send block global
+		return;
+		//printf("What the fuckj is going on. n focusses %d\n", focus_ptr);
+		//return;
 
-	if (block.edge_block)
-		body.vel = body.vel + calcEdgeForce(&block, &body) * 0.1;
 
-	if (abs(body.pos.x - block.center.x) > SOLOBLOCK_DIST) {
+	// BEGIN WORK
+	SimBody body = block.focus_bodies[bodyID];
+	
 
-	}
 
+	
+	//if (block.edge_block)
+		//body.vel = body.vel + calcEdgeForce(&block, &body) * 0.1;
+
+	//if (abs(body.pos.x - block.center.x) > SOLOBLOCK_DIST) {
+	//}
+	
 
 
 	body.rotation = body.rotation + body.rot_vel * simulation->dt;				// * dt of course!
-	body.pos = body.pos + body.vel * simulation->dt;
 
+	//body.pos = body.pos + body.vel * simulation->dt;
 
-	block.bodies[bodyID] = body;
-
+	block.focus_bodies[bodyID] = body;
+	
 
 
 

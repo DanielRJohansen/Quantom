@@ -90,11 +90,15 @@ __device__ bool containedBetweenPlanes(float plane_min, float plane_max, float d
 }
 
 __device__ bool Ray::hitsBlock(Block* block, Float3 focalpoint) {
-    float a = BLOCK_LEN_CUDA;               // FUCK YOU VISUAL STUDIO
+    float a = BLOCK_LEN;               // FUCK YOU VISUAL STUDIO
     Float3 blocksize = Float3(a, a, a);
 
-    Float3 min = block->center - Float3(BLOCK_LEN_CUDA / 2, BLOCK_LEN_CUDA / 2, BLOCK_LEN_CUDA / 2);
-    Float3 max = block->center + Float3(BLOCK_LEN_CUDA / 2, BLOCK_LEN_CUDA / 2, BLOCK_LEN_CUDA / 2);
+    //Float3 min = block->center - Float3(BLOCK_LEN / 2, BLOCK_LEN / 2, BLOCK_LEN / 2);
+    //Float3 max = block->center + Float3(BLOCK_LEN / 2, BLOCK_LEN / 2, BLOCK_LEN / 2);
+
+    Float3 offset(FOCUS_LEN, FOCUS_LEN, FOCUS_LEN);
+    Float3 min = block->center - Float3(BLOCK_LEN / 4.f, BLOCK_LEN / 4.f, BLOCK_LEN / 4.f) - offset;
+    Float3 max = block->center + Float3(BLOCK_LEN / 4.f, BLOCK_LEN / 4.f, BLOCK_LEN / 4.f) + offset;
 
     float tmin = -DBL_MAX;
     float tmax = DBL_MAX;
@@ -313,13 +317,25 @@ __global__ void renderKernel(Ray* rayptr, uint8_t* image, Box* box, MoleculeLibr
 
         Block* block = &box->blocks[ray.block_indexes[i]];
 
-        for (int j = 0; j < block->n_bodies; j++) {     
-            if (ray.hitsBody(&block->bodies[j])) {
+
+        for (int j = 0; j < MAX_FOCUS_BODIES; j++) {
+            if (block->focus_bodies[j].molecule_type != UNUSED_BODY) {
+
+                if (ray.hitsBody(&block->focus_bodies[j])) {
+                    if (ray.moleculeCollisionHandling(&block->focus_bodies[j], mol_library, image)) {
+                        return;
+                    }
+                }
+            }
+            
+        }
+        /*for (int j = 0; j < block->n_bodies; j++) {
+            if (ray.hitsBody(&block->focus_bodies[j])) {
                 if (ray.moleculeCollisionHandling(&block->bodies[j], mol_library, image)) {                 
                     return;
                 }       
             }          
-        }
+        }*/
     }
 }
     

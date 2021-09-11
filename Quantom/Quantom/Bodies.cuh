@@ -43,6 +43,8 @@ struct Molecule {
 
 constexpr float BODY_RADIUS = 0.6;
 
+constexpr char UNUSED_BODY = 255;
+
 struct SimBody {
 	//RenderBody* renderbody;
 
@@ -55,10 +57,10 @@ struct SimBody {
 	Float3 rot_vel;	//radians/sec
 	//float mass;
 	//float radius = 0.05;
-	char molecule_type = 0;
+	char molecule_type = UNUSED_BODY;			// 255 is unutilized, 0 is water
 
 	//Float3 charge_unit_vector;
-	float charge_magnitude;
+	float charge_magnitude = 0.f;
 
 };
 

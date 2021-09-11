@@ -30,7 +30,6 @@ Molecule::Molecule() {	// Always returns a h2o molecule rn
 		//printf("Atom %d pos: %f %f %f\n", i, atoms[i].pos.x, atoms[i].pos.y, atoms[i].pos.z);
 	}
 	
-	printf("\n\n");
 
 	// Rotate molecule so first atom is directly on top of the CoM
 	Float3 pitch_yaw_roll(

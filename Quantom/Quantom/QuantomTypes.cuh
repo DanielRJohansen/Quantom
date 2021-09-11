@@ -35,7 +35,11 @@ struct Float3 {
 	__host__ __device__ Float3 cross(Float3 a) const { return Float3(y * a.z - z * a.y, z * a.x - x * a.z, x * a.y - y * a.x); }
 
 	__host__ __device__ float dot(Float3 a) const { return (x * a.x + y * a.y + z * a.z); }
-
+	__device__ Float3 abs() { return Float3(
+		x * (-1 * (x < 0)), 
+		y * (-1 * (y < 0)), 
+		z * (-1 * (z < 0))
+		); }
 
 
 	__host__ __device__ void print() { printf("%f %f %f\n", x, y, z); }
@@ -106,7 +110,7 @@ struct Float3 {
 	//Utilities
 	//void print()
 
-	float x, y, z;
+	float x = 0, y = 0, z = 0;
 };
 
 

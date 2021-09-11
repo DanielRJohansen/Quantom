@@ -5,38 +5,29 @@
 
 
 
-constexpr auto BOX_LEN_CUDA = 15.0;
-constexpr auto BLOCK_LEN_CUDA = 4.0;	//nm
+constexpr auto BOX_LEN = 24.0;	// Multiple of 2 please!
+constexpr auto BLOCK_LEN = 4.0;	//nm
+constexpr float FOCUS_LEN = BLOCK_LEN / 2.f;
+constexpr float FOCUS_LEN_HALF = BLOCK_LEN / 4.f;
 //constexpr auto CUTOFF_LEN = 0.8f;		// nm
-constexpr float BLOCK_OVERLAP = 0.3f;	// nm, must be > 2* vdw radius of largest atom.
-const int MAX_BLOCK_BODIES = 64;
-constexpr float SOLOBLOCK_DIST = BLOCK_LEN_CUDA - BLOCK_OVERLAP;
+//constexpr float BLOCK_OVERLAP = 0.3f;	// nm, must be > 2* vdw radius of largest atom.
+
+const int MAX_FOCUS_BODIES = 16;
+const int MAX_NEAR_BODIES = 64 - MAX_FOCUS_BODIES;
+//constexpr float SOLOBLOCK_DIST = BLOCK_LEN - BLOCK_OVERLAP;
 
 
 const int INDEXA = 900900;
-const int N_BODIES_START = 20;
+const int N_BODIES_START = 2000;
 
 const int BLOCKS_PER_SM = 16;
-const int GRIDBLOCKS_PER_BODY = 16;
-const int THREADS_PER_GRIDBLOCK = MAX_BLOCK_BODIES / GRIDBLOCKS_PER_BODY;
+//const int GRIDBLOCKS_PER_BODY = 16;
+//const int THREADS_PER_GRIDBLOCK = MAX_BLOCK_BODIES / GRIDBLOCKS_PER_BODY;
 const int N_STREAMS = 60;			// 68 total, 0 is general purpose, 1 is for rendering.
 
 
 
 
-
-struct Sphere {
-	__host__ __device__ Sphere() {}
-	__host__ __device__ Sphere(Float3 center, float radius) : center(center), radius(radius) {}
-	__host__ __device__ bool isInSphere(Float3 point);
-
-
-	Float3 center;
-	float radius;
-
-	SimBody bodies[MAX_BLOCK_BODIES];
-	int n_bodies = 0;
-};
 
 struct Block {	// All boxes are cubic
 
@@ -45,20 +36,16 @@ struct Block {	// All boxes are cubic
 	__host__ __device__ bool isInBLock(Float3 point);
 
 	__host__ bool addBody(SimBody* body) {
-		//printf("NN bodies: %d\n", n_bodies);
 		if (n_bodies > 0) {
-			//printf("n bodies in: %d\n", n_bodies);
-			//bodies[n_bodies - 1].pos.print();
-			//body->pos.print();
-			if (bodies[n_bodies - 1].pos == body->pos)
+			if (near_bodies[n_bodies - 1].pos == body->pos)
 				return false;
 		}
 
-		if (n_bodies == MAX_BLOCK_BODIES) {
+		if (n_bodies == MAX_FOCUS_BODIES) {
 			printf("Too many bodies for this block!");
 			exit(1);
 		}
-		bodies[n_bodies] = *body;
+		near_bodies[n_bodies] = *body;
 		n_bodies++;
 		return true;
 	}
@@ -66,16 +53,12 @@ struct Block {	// All boxes are cubic
 
 	Float3 center;
 
-	SimBody bodies[MAX_BLOCK_BODIES];
+	SimBody focus_bodies[MAX_FOCUS_BODIES];
+	SimBody near_bodies[MAX_NEAR_BODIES];
+
 	int n_bodies = 0;
-
-	// Following is initiated AFTER being moved to device.
-	int neighbor_indexes[6] = { NULL }; //x- x+ y- y+ z- z+
-
 	bool edge_block = false;
-	bool edgeforces[6] = { 0 };
 
-	int incoming_bodyindex_buffer[26][2] = { -1 };		// UHHHHHHHHHHHHHH
 };
 
 class Box {	// Should each GPU block have a copy of the box?
@@ -141,7 +124,7 @@ public:
 	}
 
 
-	float box_size = BOX_LEN_CUDA;	//nm
+	float box_size = BOX_LEN;	//nm
 	int blocks_per_dim;
 	int n_steps = 1000000;
 
