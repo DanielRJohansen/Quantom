@@ -29,7 +29,7 @@ void Environment::run() {
 
 
 		engine->step();
-		//exit(1);
+		exit(1);
 
 		display->render(simulation);
 

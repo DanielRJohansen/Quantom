@@ -5,10 +5,14 @@
 
 
 
-constexpr auto BOX_LEN = 30.0;	// Multiple of 2 please!
+constexpr auto BOX_LEN = 4.0;	// Multiple of 2 please!
 constexpr auto BLOCK_LEN = 4.0;	//nm
 constexpr float FOCUS_LEN = BLOCK_LEN / 2.f;
 constexpr float FOCUS_LEN_HALF = BLOCK_LEN / 4.f;
+
+
+
+
 //constexpr auto CUTOFF_LEN = 0.8f;		// nm
 //constexpr float BLOCK_OVERLAP = 0.3f;	// nm, must be > 2* vdw radius of largest atom.
 
@@ -18,7 +22,7 @@ const int MAX_NEAR_BODIES = 64 - MAX_FOCUS_BODIES;
 
 
 const int INDEXA = 100900;
-const int N_BODIES_START = 20000;
+const int N_BODIES_START = 20;
 
 const int BLOCKS_PER_SM = 16;
 //const int GRIDBLOCKS_PER_BODY = 16;
@@ -35,17 +39,13 @@ struct Block {	// All boxes are cubic
 	__host__ __device__ Block(Float3 center) : center(center) {}
 	__host__ __device__ bool isInBLock(Float3 point);
 
-	__host__ bool addBody(SimBody* body) {
-		if (n_bodies > 0) {
-			if (near_bodies[n_bodies - 1].pos == body->pos)
-				return false;
-		}
-
+	__host__ bool addBody(SimBody* body) {			// ONLY USED FOR INITIATION 
 		if (n_bodies == MAX_FOCUS_BODIES) {
 			printf("Too many bodies for this block!");
 			exit(1);
 		}
-		near_bodies[n_bodies] = *body;
+
+		focus_bodies[n_bodies] = *body;
 		n_bodies++;
 		return true;
 	}
@@ -61,11 +61,17 @@ struct Block {	// All boxes are cubic
 
 };
 
+struct AccessPoint {
+	SimBody bodies[MAX_FOCUS_BODIES];
+};
+
 class Box {	// Should each GPU block have a copy of the box?
 public:
 	int n_blocks;
 	Block* blocks;
 	
+	AccessPoint* accesspoint;
+
 	int blocks_per_dim;
 
 	void finalizeBlock() {
@@ -81,6 +87,10 @@ public:
 		cudaDeviceSynchronize();
 		delete blocks;
 		blocks = blocks_temp;
+
+
+		cudaMalloc(&accesspoint, n_blocks * sizeof(AccessPoint));
+
 		//printf("Block 38: %.1f %.1f %.1f\n", blocks[38].center.x, blocks[38].center.y, blocks[38].center.z);
 		//printf("Block 38: %.1f %.1f %.1f\n", blocks_temp[38].center.x, blocks_temp[38].center.y, blocks_temp[38].center.z);
 	}
@@ -128,7 +138,7 @@ public:
 	int blocks_per_dim;
 	int n_steps = 1000000;
 
-	const float dt = 0.1;
+	const float dt = 0.02;
 	
 	int n_bodies = N_BODIES_START;
 	Box* box;
