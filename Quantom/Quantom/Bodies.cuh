@@ -41,8 +41,7 @@ struct Molecule {
 	}
 };
 
-constexpr float BODY_RADIUS = 0.6;
-
+constexpr float BODY_RADIUS = 0.2;		// CRITICAL VALUE!
 constexpr char UNUSED_BODY = 255;
 
 struct SimBody {

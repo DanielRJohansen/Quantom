@@ -5,7 +5,7 @@
 
 
 
-constexpr auto BOX_LEN = 24.0;	// Multiple of 2 please!
+constexpr auto BOX_LEN = 30.0;	// Multiple of 2 please!
 constexpr auto BLOCK_LEN = 4.0;	//nm
 constexpr float FOCUS_LEN = BLOCK_LEN / 2.f;
 constexpr float FOCUS_LEN_HALF = BLOCK_LEN / 4.f;
@@ -17,8 +17,8 @@ const int MAX_NEAR_BODIES = 64 - MAX_FOCUS_BODIES;
 //constexpr float SOLOBLOCK_DIST = BLOCK_LEN - BLOCK_OVERLAP;
 
 
-const int INDEXA = 900900;
-const int N_BODIES_START = 2000;
+const int INDEXA = 100900;
+const int N_BODIES_START = 20000;
 
 const int BLOCKS_PER_SM = 16;
 //const int GRIDBLOCKS_PER_BODY = 16;

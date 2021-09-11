@@ -96,9 +96,10 @@ __device__ bool Ray::hitsBlock(Block* block, Float3 focalpoint) {
     //Float3 min = block->center - Float3(BLOCK_LEN / 2, BLOCK_LEN / 2, BLOCK_LEN / 2);
     //Float3 max = block->center + Float3(BLOCK_LEN / 2, BLOCK_LEN / 2, BLOCK_LEN / 2);
 
-    Float3 offset(FOCUS_LEN, FOCUS_LEN, FOCUS_LEN);
-    Float3 min = block->center - Float3(BLOCK_LEN / 4.f, BLOCK_LEN / 4.f, BLOCK_LEN / 4.f) - offset;
-    Float3 max = block->center + Float3(BLOCK_LEN / 4.f, BLOCK_LEN / 4.f, BLOCK_LEN / 4.f) + offset;
+    Float3 offset(BODY_RADIUS, BODY_RADIUS, BODY_RADIUS);   // Radius of largest molecule!
+    //Float3 offset(0, 0, 0);
+    Float3 min = block->center - Float3(FOCUS_LEN_HALF, FOCUS_LEN_HALF, FOCUS_LEN_HALF) - offset *2;    //I have no idea why we need *2
+    Float3 max = block->center + Float3(FOCUS_LEN_HALF, FOCUS_LEN_HALF, FOCUS_LEN_HALF) + offset *2;
 
     float tmin = -DBL_MAX;
     float tmax = DBL_MAX;
@@ -159,7 +160,7 @@ __device__ bool Ray::hitsBody(SimBody* body) {
 __device__ bool Ray::moleculeCollisionHandling(SimBody* body, MoleculeLibrary* mol_library, uint8_t* image) {
     Molecule* mol = &mol_library->molecules[0];
 
-    int infinity = 9999999;
+    const int infinity = 9999999;
 
     float closest_collision = infinity;
     Atom closest_atom;
@@ -173,12 +174,8 @@ __device__ bool Ray::moleculeCollisionHandling(SimBody* body, MoleculeLibrary* m
         
         // Local copy which we can manipulate
         Atom atom = mol->atoms[atom_index];
-        atom.pos = atom.pos.rotateAroundVector(body->rotation, molecule_tilt_vector);
-        //atom.pos = atom.pos.rotateAroundOrigin(body->rotation);                                     // DANGEROUS CODE!!
+        atom.pos = atom.pos.rotateAroundVector(body->rotation, molecule_tilt_vector);   // Rotate around its relative origin, before moving pos to global coords
         atom.pos = atom.pos + body->pos;
-
-        // Rotate ONLY this copy of the atom!!!
-        //atom.pos = atom.pos.rotateAroundOrigin(body->rotation);                                     // DANGEROUS CODE!!!
 
         Float3 atom_absolute_pos = body->pos + atom.pos;
 
@@ -191,14 +188,9 @@ __device__ bool Ray::moleculeCollisionHandling(SimBody* body, MoleculeLibrary* m
             }
 
 
-            //if (atom.pos.y < closest_atom.pos.y)
-              //  closest_atom = atom;
-
         }
             
     }
-    //if (blockIdx.x * 1000 + threadIdx.x == 500500) 
-      //  printf("Closest dist: %f\n", clo)
 
     if (closest_atom.pos.y != infinity) {
         int index = blockIdx.x * blockDim.x + threadIdx.x;
@@ -259,7 +251,7 @@ Raytracer::Raytracer(Simulation* simulation) {
 	float principal_point_increment = box_size / (float)RAYS_PER_DIM;
 
 	Ray* host_rayptr = new Ray[NUM_RAYS];
-	focalpoint = Float3(0, -(box_size / 2.f) * FOCAL_LEN_RATIO - box_size, 0);  
+	focalpoint = Float3(0, -(box_size  / 2.f) * FOCAL_LEN_RATIO - box_size, 0);  
 
     printf("\n\nFocal point: %.3f %.3f %.3f\n", focalpoint.x, focalpoint.y, focalpoint.z);
 	int index = 0;
@@ -322,6 +314,12 @@ __global__ void renderKernel(Ray* rayptr, uint8_t* image, Box* box, MoleculeLibr
             if (block->focus_bodies[j].molecule_type != UNUSED_BODY) {
 
                 if (ray.hitsBody(&block->focus_bodies[j])) {
+
+                    /*int index = blockIdx.x * blockDim.x + threadIdx.x;
+                    image[index * 4 + 0] = 255;
+                    image[index * 4 + 3] = 255;
+                    return;*/
+
                     if (ray.moleculeCollisionHandling(&block->focus_bodies[j], mol_library, image)) {
                         return;
                     }

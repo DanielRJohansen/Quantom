@@ -77,9 +77,10 @@ int Engine::initBlocks() {
 
 int Engine::fillBox() {
 	int bodies_per_dim = ceil(cbrt((float)simulation->n_bodies));
+	float body_edge_mindist = 0.5;
 	printf("Bodies per dim: %d\n", bodies_per_dim);
-	float dist = simulation->box_size / (float)bodies_per_dim;	// dist_per_index
-	float base = -simulation->box_size / 2.f + dist / 2.f;
+	float dist = (simulation->box_size - body_edge_mindist*2) / (float)bodies_per_dim;	// dist_per_index
+	float base = -simulation->box_size / 2.f + body_edge_mindist;
 
 	float vel_scalar = 0.5;
 
