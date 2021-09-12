@@ -5,8 +5,8 @@
 
 
 
-constexpr auto BOX_LEN = 4.0;	// Multiple of 2 please!
-constexpr auto BLOCK_LEN = 4.0;	//nm
+constexpr float BOX_LEN = 24.0;	// Multiple of 2 please!
+constexpr float BLOCK_LEN = 4.0;	//nm
 constexpr float FOCUS_LEN = BLOCK_LEN / 2.f;
 constexpr float FOCUS_LEN_HALF = BLOCK_LEN / 4.f;
 
@@ -22,7 +22,7 @@ const int MAX_NEAR_BODIES = 64 - MAX_FOCUS_BODIES;
 
 
 const int INDEXA = 100900;
-const int N_BODIES_START = 20;
+const int N_BODIES_START = 800;
 
 const int BLOCKS_PER_SM = 16;
 //const int GRIDBLOCKS_PER_BODY = 16;
@@ -56,7 +56,7 @@ struct Block {	// All boxes are cubic
 	SimBody focus_bodies[MAX_FOCUS_BODIES];
 	SimBody near_bodies[MAX_NEAR_BODIES];
 
-	int n_bodies = 0;
+	int n_bodies = 0;		//  Only used when loading the block
 	bool edge_block = false;
 
 };
@@ -138,7 +138,7 @@ public:
 	int blocks_per_dim;
 	int n_steps = 1000000;
 
-	const float dt = 0.02;
+	const float dt = 0.005;
 	
 	int n_bodies = N_BODIES_START;
 	Box* box;

@@ -15,6 +15,7 @@ struct Int3 {
 
 
 	__host__ __device__ inline Int3 operator + (const Int3 a) const { return Int3(x + a.x, y + a.y, z + a.z); }
+	__host__ __device__ inline Int3 operator - (const Int3 a) const { return Int3(x - a.x, y - a.y, z - a.z); }
 
 
 	int x=0, y=0, z = 0;
@@ -38,10 +39,10 @@ struct Float3 {
 	__host__ __device__ Float3 cross(Float3 a) const { return Float3(y * a.z - z * a.y, z * a.x - x * a.z, x * a.y - y * a.x); }
 
 	__host__ __device__ float dot(Float3 a) const { return (x * a.x + y * a.y + z * a.z); }
-	__device__ Float3 abs() { return Float3(
-		x * (-1 * (x < 0)), 
-		y * (-1 * (y < 0)), 
-		z * (-1 * (z < 0))
+	__host__ __device__ Float3 abs() const { return Float3(
+		std::abs(x),
+		std::abs(y), 
+		std::abs(z)
 		); }
 
 
@@ -50,45 +51,21 @@ struct Float3 {
 	__host__ __device__ Float3 rotateAroundOrigin(Float3 pitch_yaw_roll) {	//pitch around x, yaw around z, tilt around y
 		// pitch and yaw is relative to global coordinates. Tilt is relative to body direction
 
-		// Pitch around x
-		//printf("\n\n\n Rotating %f %f %f\n", x, y, z);
-		//printf("By: %f %f %f\n", pitch_yaw_roll.x, pitch_yaw_roll.y, pitch_yaw_roll.z);
 		Float3 v = rodriguesRotatation(*this, Float3(1, 0, 0), pitch_yaw_roll.x);
-
-		//printf("After x: %f %f %f\n", v.x, v.y, v.z);
 
 		// Yaw around z
 		v = rodriguesRotatation(v, Float3(0, 0, 1), pitch_yaw_roll.y);
-		//printf("After y: %f %f %f\n", v.x, v.y, v.z);
 
-		// Tilt around itself
-		//Float3 uv = *this * (1.f / len());
-		//printf("Unit vector: %f %f %f\n", uv.x, uv.y, uv.z);
-		//v = rodriguesRotatation(v, v * (1.f/v.len()), pitch_yaw_roll.z);
-		//printf("After self: %f %f %f\n", v.x, v.y, v.z);
 		return v;
 	}
 
-	/*__host__ __device__ relativisticPYR(Float3 global_pyr, Float3 local_pyr) {
-		Float3 local_x_uv = Float3(1, 0, 0).rotateAroundOrigin(global_pyr);
-		Float3 local_y_uv = Float3(0, 1, 0).rotateAroundOrigin(global_pyr);
-	}*/
-	
 
-	__host__ __device__ Float3 rotateAroundVector(Float3 pitch_yaw_roll, Float3 k) {	// k=normal = z-pointing
-		// I think k is already a unit vector
-		//Float3 rel_x_vector = Float3(k.z, k.y, -k.x);
-		
-		//printf("rel_x_vector: ");
-		
+
+	__host__ __device__ Float3 rotateAroundVector(Float3 pitch_yaw_roll, Float3 k) {	// k=normal = z-pointing		
 		Float3 v = rodriguesRotatation(*this, Float3(1,0,0), pitch_yaw_roll.x);
 
-		v = rodriguesRotatation(v, Float3(0,0,1) , pitch_yaw_roll.y);
-
-		//Float3 rel_y_vector = Float3(k.x, -k.z, k.y);
-		
+		v = rodriguesRotatation(v, Float3(0,0,1) , pitch_yaw_roll.y);		
 		v = rodriguesRotatation(v, k, pitch_yaw_roll.z);
-
 		return v;
 	}
 
@@ -110,8 +87,7 @@ struct Float3 {
 		}
 	}
 
-	//Utilities
-	//void print()
+
 
 	float x = 0, y = 0, z = 0;
 };

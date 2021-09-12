@@ -45,6 +45,7 @@ constexpr float BODY_RADIUS = 0.2;		// CRITICAL VALUE!
 constexpr char UNUSED_BODY = 255;
 
 struct SimBody {
+	__host__ __device__ SimBody() {}
 	//RenderBody* renderbody;
 
 

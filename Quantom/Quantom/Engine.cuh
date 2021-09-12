@@ -24,7 +24,7 @@ public:
 
 	Simulation* prepSimulation(Simulation* simulation);
 
-
+	int countBodies();
 	void step();
 
 

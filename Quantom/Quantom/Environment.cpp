@@ -23,13 +23,15 @@ void Environment::run() {
 
 	Molecule h2o;
 	printf("Simulation started\n\n");
+	int steps = 0;
+	engine->countBodies();
 	while (display->window->isOpen()) {
 		//auto start = std::chrono::high_resolution_clock::now();
 
 
 
 		engine->step();
-		exit(1);
+		
 
 		display->render(simulation);
 
@@ -38,7 +40,9 @@ void Environment::run() {
 			display->terminate();
 
 
-
+		//printf("\nStep %d\n", steps);
+		if (steps++ == -1)
+			break;
 		//auto stop = std::chrono::high_resolution_clock::now();
 		//int duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count();
 		
@@ -49,4 +53,5 @@ void Environment::run() {
 
 
 	}
+	engine->countBodies();
 }
