@@ -248,7 +248,8 @@ Raytracer::Raytracer(Simulation* simulation) {
 
 
 	float box_size = simulation->box_size;
-	float principal_point_increment = box_size / (float)RAYS_PER_DIM;
+    float base = -(box_size + FOCUS_LEN) / 2.f;
+	float principal_point_increment = (box_size + FOCUS_LEN) / (float)RAYS_PER_DIM;
 
 	Ray* host_rayptr = new Ray[NUM_RAYS];
 	focalpoint = Float3(0, -(box_size  / 2.f) * FOCAL_LEN_RATIO - box_size, 0);  
@@ -258,8 +259,8 @@ Raytracer::Raytracer(Simulation* simulation) {
     for (int z_index = 0; z_index < RAYS_PER_DIM; z_index++) {
         for (int x_index = 0; x_index < RAYS_PER_DIM; x_index++) {
 
-            float z = -box_size / 2.f + principal_point_increment * (float)z_index;
-            float x = -box_size / 2.f + principal_point_increment * (float)x_index;
+            float z = base + principal_point_increment * (float)z_index;
+            float x = base + principal_point_increment * (float)x_index;
 			Float3 vector = Float3(x, 0, z) - focalpoint;
 			Float3 uv = vector * (1.f / vector.len());     
             host_rayptr[index++] = Ray(uv, focalpoint);
