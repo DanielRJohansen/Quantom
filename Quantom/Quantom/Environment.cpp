@@ -26,7 +26,7 @@ void Environment::run() {
 	int steps = 0;
 	engine->countBodies();
 	while (display->window->isOpen()) {
-		//auto start = std::chrono::high_resolution_clock::now();
+		auto start = std::chrono::high_resolution_clock::now();
 
 
 
@@ -40,11 +40,16 @@ void Environment::run() {
 			display->terminate();
 
 
-		//printf("\nStep %d\n", steps);
-		if (steps++ == -1)
+		printf("\nStep %d\n\n", steps);
+		if (steps++ == 16)
 			break;
-		//auto stop = std::chrono::high_resolution_clock::now();
-		//int duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count();
+
+		int duration;
+		do {
+			auto stop = std::chrono::high_resolution_clock::now();
+			duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count();
+		} while (duration < 50);
+		
 		
 		
 		

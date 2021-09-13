@@ -219,7 +219,7 @@ void Engine::step() {
 	}
 
 	cudaDeviceSynchronize();
-
+	printf("\n\n");
 
 	blocks_handled = 0;
 	while (blocks_handled < sim_blocks) {
@@ -243,6 +243,7 @@ void Engine::step() {
 	auto stop = std::chrono::high_resolution_clock::now();
 	auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
 	printf("Step time: %d ys", duration.count());
+	printf("\n");
 }
 
 
@@ -320,7 +321,25 @@ __device__ Int3 indexConversion(int index, int elements_per_dim) {
 
 
 
+__device__ Float3 calcLJForce(SimBody* body0, SimBody* body1, int i, int bid) {
+	float dist_pow2 = (body0->pos - body1->pos).lenSquared();
+	float dist_pow2_inv = 1.f / dist_pow2;
+	float dist_pow6_inv = dist_pow2_inv * dist_pow2_inv * dist_pow2_inv;
 
+	float LJ_pot = 48 * dist_pow2_inv * dist_pow6_inv * (dist_pow6_inv - 0.5f);
+	Float3 force_unit_vector = (body0->pos - body1->pos).norm();
+	
+	if (LJ_pot > 10) {
+		printf("\n\n GIGAFORCE! Block %d thread %d\n", bid, threadIdx.x);
+		printf("other body id: %d", i);
+		printf("Body 0 %f %f %f\n", body0->pos.x, body0->pos.y, body0->pos.z);
+		printf("Body 1 %f %f %f\n", body1->pos.x, body1->pos.y, body1->pos.z);
+		printf("Distance: %f\n", (body0->pos - body1->pos).len());
+		printf("Force: %f\n\n\n", LJ_pot);
+		force_unit_vector.print();
+	}
+	return force_unit_vector * LJ_pot;
+}
 
 
 
@@ -336,7 +355,7 @@ __device__ Int3 indexConversion(int index, int elements_per_dim) {
 
 
 __global__ void stepKernel(Simulation* simulation, int offset) {
-	int blockID = blockIdx.x + offset;
+	int blockID = blockIdx.x + offset;	// Maybe save the register, and just calculate it a couple times.
 	int bodyID = threadIdx.x;
 
 	if (blockID >= simulation->box->n_blocks)
@@ -352,23 +371,74 @@ __global__ void stepKernel(Simulation* simulation, int offset) {
 	if (threadIdx.x == 0)
 		block = simulation->box->blocks[blockID];
 	__syncthreads();
-
-
-	
 	SimBody body = block.focus_bodies[bodyID];
 
 
 	// Always need thread0 to send block global
 	// Also compute for non active blocks, to avoid branching!
-	body.rotation = body.rotation + body.rot_vel * simulation->dt;				// * dt of course!
 
+
+
+	Float3 LJ_pot_force = Float3(0, 0, 0);
+	// Calc all forces from focus bodies
+	for (int i = 0; i < MAX_FOCUS_BODIES; i++) {
+		if (i != bodyID && block.near_bodies[i].molecule_type != UNUSED_BODY)
+			LJ_pot_force = LJ_pot_force + calcLJForce(&body, &block.near_bodies[i], i, blockID);
+	}
+	/*int i = 0;
+	while (i < MAX_FOCUS_BODIES) {
+		i = i + (i == bodyID) 
+	}*/
+	// Calc all forces from Near bodies
+	
+
+	body.vel = body.vel + LJ_pot_force * simulation->dt;
+
+
+
+	//body.rotation = body.rotation + body.rot_vel * simulation->dt;				
+
+
+	if (body.molecule_type != UNUSED_BODY) {
+		//LJ_pot_force.print();
+		//body.pos.print();
+	}
+		
+
+	// Calc all forces from box edge
+	//body.vel = body.vel + calcEdgeForce(&body) * simulation->dt;
+
+
+
+	// Integrate position  AFTER ALL BODIES IN BLOCK HAVE BEEN CALCULATED? No should not be a problem as all update their local body, 
+	// before moving to shared?? Although make the local just a pointer might be faster, since a SimBody might not fit in thread registers!!!!!
+	__syncthreads();
 	body.pos = body.pos + body.vel * simulation->dt;
-	body.vel = body.vel + calcEdgeForce(&body) * simulation->dt;
 
-	block.focus_bodies[bodyID] = body;
+	if (body.molecule_type != UNUSED_BODY ) {
+		//printf("Block %d output body at pos: %f %f %f\n", blockID, body.pos.x, body.pos.y, body.pos.z);
+	}
+
+
+	// Correct for bonded-body constraints? Or maybe this should be calculated as a force too??
+
+
+
+
+	// Ensure no position is EXACTLY on the block edge, causing it to be lost forever!
+
+
+
+
+	// Publish new positions for the focus bodies
+
+	block.focus_bodies[bodyID] = body;	// Probably useless, right?
 	
 	accesspoint.bodies[bodyID] = body;
 	
+
+
+
 
 
 
@@ -452,12 +522,13 @@ __global__ void updateKernel(Simulation* simulation, int offset) {
 			for (int j = 0; j < 27; j++) {
 				if (near_ptr > 47 || focus_ptr > 15) {
 					printf("Block %d overflowing! near %d    focus %d\n", blockID1, near_ptr, focus_ptr);
-					return;
+					break;
 				}
 					
 				
 				if (relationtype[j] > 1) {
 					block.focus_bodies[focus_ptr++] = bodybuffer[j];
+					printf("Block %d loading body at pos: %f %f %f\n",blockID1, block.focus_bodies[focus_ptr - 1].pos.x, block.focus_bodies[focus_ptr - 1].pos.y, block.focus_bodies[focus_ptr - 1].pos.z);
 					//block.n_bodies++;
 				}				
 				else if (relationtype[j] == 1)

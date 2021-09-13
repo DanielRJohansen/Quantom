@@ -30,10 +30,14 @@ struct Float3 {
 	__host__ __device__ inline Float3 operator - (const Float3 a) const { return Float3(x - a.x, y - a.y, z - a.z); }
 	__host__ __device__ inline bool operator == (const Float3 a) const { return (a.x == x && a.y == y && a.z == z); }
 
-	__host__ __device__ static Float3 norm(Float3 a) { return a * (1.f / a.len()); }
+	//__host__ __device__ static Float3 norm(Float3 a) { return a * (1.f / a.len()); }	// Remove this at some point..
+	__host__ __device__ Float3 norm() { return *this * (1.f / len()); }
+	__host__ __device__ Float3 square() {return Float3(x * x, y * y, z * z);}
 	__host__ __device__ inline float len() {return (float)sqrtf(x * x + y * y + z * z); }
+	__host__ __device__ inline float lenSquared() { return (float)(x * x + y * y + z * z); }
 	__host__ __device__ Float3 zeroIfAbove(float a) { return Float3(x * (x < a), y * (y < a), z * (z < a)); }
 	__host__ __device__ Float3 zeroIfBelow(float a) { return Float3(x * (x > a), y * (y > a), z * (z > a)); }
+
 
 
 	__host__ __device__ Float3 cross(Float3 a) const { return Float3(y * a.z - z * a.y, z * a.x - x * a.z, x * a.y - y * a.x); }
@@ -81,9 +85,8 @@ struct Float3 {
 			return y;
 		case 2:
 			return z;
-		//default:
-			//printf("Float3 error!");
-			//exit(-2);
+		default:
+			return -1;
 		}
 	}
 

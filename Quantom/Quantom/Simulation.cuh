@@ -5,7 +5,7 @@
 
 
 
-constexpr float BOX_LEN = 24.0;	// Multiple of 2 please!
+constexpr float BOX_LEN = 4.0;	// Multiple of 2 please!
 constexpr float BLOCK_LEN = 4.0;	//nm
 constexpr float FOCUS_LEN = BLOCK_LEN / 2.f;
 constexpr float FOCUS_LEN_HALF = BLOCK_LEN / 4.f;
@@ -22,7 +22,7 @@ const int MAX_NEAR_BODIES = 64 - MAX_FOCUS_BODIES;
 
 
 const int INDEXA = 100900;
-const int N_BODIES_START = 800;
+const int N_BODIES_START = 6;
 
 const int BLOCKS_PER_SM = 16;
 //const int GRIDBLOCKS_PER_BODY = 16;
@@ -138,7 +138,7 @@ public:
 	int blocks_per_dim;
 	int n_steps = 1000000;
 
-	const float dt = 0.005;
+	const float dt = 0.01;
 	
 	int n_bodies = N_BODIES_START;
 	Box* box;
