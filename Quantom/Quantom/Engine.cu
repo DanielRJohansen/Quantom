@@ -90,12 +90,13 @@ int Engine::initBlocks() {
 }
 
 int Engine::fillBox() {
+
 	int bodies_per_dim = ceil(cbrt((float)simulation->n_bodies));
 	float body_edge_mindist = 0.5;
-	printf("Bodies per dim: %d\n", bodies_per_dim);
-	float dist = (simulation->box_size - body_edge_mindist*2) / (float)bodies_per_dim;	// dist_per_index
-	float base = -simulation->box_size / 2.f + dist/2.f;
 
+	printf("Bodies per dim: %d\n", bodies_per_dim);
+	float dist = (BOX_LEN - body_edge_mindist*2) / (float)bodies_per_dim;	// dist_per_index
+	float base = -BOX_LEN / 2.f + body_edge_mindist + dist/2.f;
 	float vel_scalar = 4;
 
 	int index = 0;
@@ -110,7 +111,7 @@ int Engine::fillBox() {
 				float r2 = rand() % p / (float)p - 0.5;
 				float r3 = rand() % p / (float)p - 0.5;
 
-				simulation->bodies[index].pos = Float3(base + dist * (float)x_index, base + dist * float(y_index), base + dist * float(z_index));
+				simulation->bodies[index].pos = Float3(base + dist * (float)x_index, base + dist * (float)y_index, base + dist * (float)z_index);
 
 				//printf("Body pos: ");
 				//simulation->bodies[index].pos.print();
@@ -240,7 +241,7 @@ void Engine::step() {
 
 	auto stop = std::chrono::high_resolution_clock::now();
 	auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
-	printf("Step time: %d ys", duration.count());
+	printf("Step time: %d ys.\tStep #%05d", duration.count(), simulation->step++);
 }
 
 
@@ -263,21 +264,24 @@ __device__ float cudaMin1(float a, float b) {
 	return b;
 }
 
+
 __device__ Float3 forceFromDist(Float3 dists) {
 	return Float3(
-		((0.5f / dists.x) + 0.5),
-		((0.5f / dists.y) + 0.5),
-		((0.5f / dists.z) + 0.5)
+		((edgeforce_scalar / dists.x)-0.25),
+		((edgeforce_scalar / dists.y)-0.25),
+		((edgeforce_scalar / dists.z)-0.25)
 	);
 }
 
 __device__ inline Float3 calcEdgeForce(SimBody* body) {
-	Float3 dists1(body->pos.x + BOX_LEN / 2.f, body->pos.y + BOX_LEN / 2.f, body->pos.z + BOX_LEN / 2.f);
-	Float3 dists2(BOX_LEN / 2.f - body->pos.x, BOX_LEN / 2.f - body->pos.y, BOX_LEN / 2.f - body->pos.z);
+	//Float3 dists1(body->pos.x + BOX_LEN / 2.f, body->pos.y + BOX_LEN / 2.f, body->pos.z + BOX_LEN / 2.f);
+	//Float3 dists2(BOX_LEN / 2.f - body->pos.x, BOX_LEN / 2.f - body->pos.y, BOX_LEN / 2.f - body->pos.z);
 
+	Float3 dists_from_base = Float3(body->pos.x - BOX_BASE, body->pos.y - BOX_BASE, body->pos.z - BOX_BASE).abs();
+	Float3 dists_from_end = Float3(body->pos.x - BOX_LEN_HALF, body->pos.y - BOX_LEN_HALF, body->pos.z - BOX_LEN_HALF).abs();
 
-	Float3 pos_forces = forceFromDist(dists1).zeroIfBelow(0);
-	Float3 neg_forces = forceFromDist(dists2).zeroIfBelow(0);
+	Float3 pos_forces = forceFromDist(dists_from_base).zeroIfBelow(0);
+	Float3 neg_forces = forceFromDist(dists_from_end).zeroIfBelow(0);
 	return pos_forces - neg_forces;
 }
 																				// TODO: MAKE IS SUCH THAT A BODY CAN NEVER BE EXACTLY ON THE EDGE OF FOCUS, THUS APPEARING IN MULTIPLE GROUPS!
@@ -315,12 +319,12 @@ __device__ Float3 calcLJForce(SimBody* body0, SimBody* body1, int i, int bid) {
 	
 	if (LJ_pot > 1000000) {
 		printf("\n\n MEGAFORCE! Block %d thread %d\n", bid, threadIdx.x);
-		printf("other body id: %d\n", i);
+		/*printf("other body id: %d\n", i);
 		printf("Body 0 %f %f %f\n", body0->pos.x, body0->pos.y, body0->pos.z);
-		printf("Body 1 %f %f %f\n", body1->pos.x, body1->pos.y, body1->pos.z);
+		printf("Body 1 %f %f %f\n", body1->pos.x, body1->pos.y, body1->pos.z);*/
 		printf("Distance: %f\n", (body0->pos - body1->pos).len());
-		printf("Force: %f\n\n\n", LJ_pot);
-		force_unit_vector.print();
+		//printf("Force: %f\n\n\n", LJ_pot);
+		//force_unit_vector.print();
 	}
 	return force_unit_vector * LJ_pot;
 }
@@ -404,7 +408,6 @@ __global__ void stepKernel(Simulation* simulation, int offset) {
 
 	// Integrate position  AFTER ALL BODIES IN BLOCK HAVE BEEN CALCULATED? No should not be a problem as all update their local body, 
 	// before moving to shared?? Although make the local just a pointer might be faster, since a SimBody might not fit in thread registers!!!!!
-	__syncthreads();
 	body.pos = body.pos + body.vel * simulation->dt;
 
 	if (body.molecule_type != UNUSED_BODY ) {
@@ -424,16 +427,9 @@ __global__ void stepKernel(Simulation* simulation, int offset) {
 
 	// Publish new positions for the focus bodies
 	
-	block.focus_bodies[bodyID] = body;	// Probably useless, right?
+	//block.focus_bodies[bodyID] = body;	// Probably useless, right?
 	
 	accesspoint.bodies[bodyID] = body;
-	
-
-
-
-
-
-
 	__syncthreads();
 	if (bodyID == 0) {
 		simulation->box->accesspoint[blockID] = accesspoint;

@@ -6,10 +6,14 @@
 
 
 constexpr float BOX_LEN = 4.0;	// Multiple of 2 please!
+constexpr float BOX_LEN_HALF = BOX_LEN/2.f;
+constexpr float BOX_BASE = -BOX_LEN_HALF;
+
 constexpr float BLOCK_LEN = 4.0;	//nm
 constexpr float FOCUS_LEN = BLOCK_LEN / 2.f;
 constexpr float FOCUS_LEN_HALF = BLOCK_LEN / 4.f;
 
+constexpr float edgeforce_scalar = 10.f;
 
 
 
@@ -22,7 +26,7 @@ const int MAX_NEAR_BODIES = 64 - MAX_FOCUS_BODIES;
 
 
 const int INDEXA = 100900;
-const int N_BODIES_START = 6;
+const int N_BODIES_START = 16;
 
 const int BLOCKS_PER_SM = 16;
 //const int GRIDBLOCKS_PER_BODY = 16;
@@ -30,6 +34,9 @@ const int BLOCKS_PER_SM = 16;
 const int N_STREAMS = 60;			// 68 total, 0 is general purpose, 1 is for rendering.
 
 
+
+
+// USEFUL VALUES
 
 
 
@@ -133,12 +140,15 @@ public:
 		printf("Simulation ready for device\n");
 	}
 
+	bool finished = false;
+	int step = 0;
+
 
 	float box_size = BOX_LEN;	//nm
 	int blocks_per_dim;
 	int n_steps = 1000000;
 
-	const float dt = 0.01;
+	const float dt = 0.001;
 	
 	int n_bodies = N_BODIES_START;
 	Box* box;

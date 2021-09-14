@@ -247,23 +247,20 @@ Raytracer::Raytracer(Simulation* simulation) {
 
 
 
-	float box_size = simulation->box_size;
-    float base = -(box_size + FOCUS_LEN) / 2.f;
-	float principal_point_increment = (box_size + FOCUS_LEN) / (float)RAYS_PER_DIM;
+    float base = -(BOX_LEN) / 2.f;
+	float principal_point_increment = (BOX_LEN) / (float)RAYS_PER_DIM;
 
 	Ray* host_rayptr = new Ray[NUM_RAYS];
-	focalpoint = Float3(0, -(box_size  / 2.f) * FOCAL_LEN_RATIO - box_size, 0);  
+	focalpoint = Float3(0, -(BOX_LEN / 2.f) * FOCAL_LEN_RATIO - BOX_LEN, 0);
 
     printf("\n\nFocal point: %.3f %.3f %.3f\n", focalpoint.x, focalpoint.y, focalpoint.z);
 	int index = 0;
     for (int z_index = 0; z_index < RAYS_PER_DIM; z_index++) {
         for (int x_index = 0; x_index < RAYS_PER_DIM; x_index++) {
-
             float z = base + principal_point_increment * (float)z_index;
             float x = base + principal_point_increment * (float)x_index;
-			Float3 vector = Float3(x, 0, z) - focalpoint;
-			Float3 uv = vector * (1.f / vector.len());     
-            host_rayptr[index++] = Ray(uv, focalpoint);
+			Float3 vector = Float3(x, base, z) - focalpoint;
+            host_rayptr[index++] = Ray(vector.norm(), focalpoint);
 		}
 	}
 

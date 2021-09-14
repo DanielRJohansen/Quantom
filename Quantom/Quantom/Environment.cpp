@@ -43,7 +43,11 @@ void Environment::run() {
 		if (steps++ == -1)
 			break;
 
+		if (simulation->finished)
+			break;
 
+		if (simulation->step == 650)
+			break;
 
 		/*
 		int duration;
