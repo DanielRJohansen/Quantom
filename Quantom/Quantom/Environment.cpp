@@ -40,16 +40,18 @@ void Environment::run() {
 			display->terminate();
 
 
-		printf("\nStep %d\n\n", steps);
-		if (steps++ == 16)
+		if (steps++ == -1)
 			break;
 
+
+
+		/*
 		int duration;
 		do {
 			auto stop = std::chrono::high_resolution_clock::now();
 			duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count();
 		} while (duration < 50);
-		
+		*/
 		
 		
 		

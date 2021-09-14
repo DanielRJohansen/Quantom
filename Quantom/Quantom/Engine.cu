@@ -219,8 +219,7 @@ void Engine::step() {
 	}
 
 	cudaDeviceSynchronize();
-	printf("\n\n");
-
+	
 	blocks_handled = 0;
 	while (blocks_handled < sim_blocks) {
 		for (int i = 0; i < N_STREAMS; i++) {
@@ -239,11 +238,9 @@ void Engine::step() {
 
 
 
-
 	auto stop = std::chrono::high_resolution_clock::now();
 	auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
 	printf("Step time: %d ys", duration.count());
-	printf("\n");
 }
 
 
@@ -283,19 +280,6 @@ __device__ inline Float3 calcEdgeForce(SimBody* body) {
 	Float3 neg_forces = forceFromDist(dists2).zeroIfBelow(0);
 	return pos_forces - neg_forces;
 }
-
-
-enum Direction
-{
-	up, down, left, right, back, forward
-};
-
-__device__ void transferBody(Box* box, Block* block, SimBody* body) {
-	Float3 rel_pos = body->pos - block->center;
-
-	//switch (rel_pos.x)
-}
-
 																				// TODO: MAKE IS SUCH THAT A BODY CAN NEVER BE EXACTLY ON THE EDGE OF FOCUS, THUS APPEARING IN MULTIPLE GROUPS!
 __device__ bool bodyInNear(SimBody* body, Float3* block_center) {
 	Float3 dist_from_center = (body->pos - *block_center).abs();
@@ -304,7 +288,7 @@ __device__ bool bodyInNear(SimBody* body, Float3* block_center) {
 
 __device__ bool bodyInFocus(SimBody* body, Float3* block_center) {
 	Float3 dist_from_center = (body->pos - *block_center).abs();
-	return (dist_from_center.x <= FOCUS_LEN_HALF && dist_from_center.y <= FOCUS_LEN_HALF && dist_from_center.z <= FOCUS_LEN_HALF);
+	return (dist_from_center.x < FOCUS_LEN_HALF && dist_from_center.y < FOCUS_LEN_HALF && dist_from_center.z < FOCUS_LEN_HALF);
 }
 
 __device__ int indexConversion(Int3 xyz, int elements_per_dim) {
@@ -329,9 +313,9 @@ __device__ Float3 calcLJForce(SimBody* body0, SimBody* body1, int i, int bid) {
 	float LJ_pot = 48 * dist_pow2_inv * dist_pow6_inv * (dist_pow6_inv - 0.5f);
 	Float3 force_unit_vector = (body0->pos - body1->pos).norm();
 	
-	if (LJ_pot > 10) {
-		printf("\n\n GIGAFORCE! Block %d thread %d\n", bid, threadIdx.x);
-		printf("other body id: %d", i);
+	if (LJ_pot > 1000000) {
+		printf("\n\n MEGAFORCE! Block %d thread %d\n", bid, threadIdx.x);
+		printf("other body id: %d\n", i);
 		printf("Body 0 %f %f %f\n", body0->pos.x, body0->pos.y, body0->pos.z);
 		printf("Body 1 %f %f %f\n", body1->pos.x, body1->pos.y, body1->pos.z);
 		printf("Distance: %f\n", (body0->pos - body1->pos).len());
@@ -368,8 +352,10 @@ __global__ void stepKernel(Simulation* simulation, int offset) {
 	__shared__ AccessPoint accesspoint;
 	
 	__syncthreads();
-	if (threadIdx.x == 0)
+	if (threadIdx.x == 0) {
 		block = simulation->box->blocks[blockID];
+	}
+		
 	__syncthreads();
 	SimBody body = block.focus_bodies[bodyID];
 
@@ -382,8 +368,14 @@ __global__ void stepKernel(Simulation* simulation, int offset) {
 	Float3 LJ_pot_force = Float3(0, 0, 0);
 	// Calc all forces from focus bodies
 	for (int i = 0; i < MAX_FOCUS_BODIES; i++) {
-		if (i != bodyID && block.near_bodies[i].molecule_type != UNUSED_BODY)
+		if (i != bodyID && block.focus_bodies[i].molecule_type != UNUSED_BODY) {
+			LJ_pot_force = LJ_pot_force + calcLJForce(&body, &block.focus_bodies[i], i, blockID);
+		}
+	}
+	for (int i = 0; i < MAX_NEAR_BODIES; i++) {
+		if (i != bodyID && block.near_bodies[i].molecule_type != UNUSED_BODY) {
 			LJ_pot_force = LJ_pot_force + calcLJForce(&body, &block.near_bodies[i], i, blockID);
+		}
 	}
 	/*int i = 0;
 	while (i < MAX_FOCUS_BODIES) {
@@ -406,7 +398,7 @@ __global__ void stepKernel(Simulation* simulation, int offset) {
 		
 
 	// Calc all forces from box edge
-	//body.vel = body.vel + calcEdgeForce(&body) * simulation->dt;
+	body.vel = body.vel + calcEdgeForce(&body) * simulation->dt;
 
 
 
@@ -431,7 +423,7 @@ __global__ void stepKernel(Simulation* simulation, int offset) {
 
 
 	// Publish new positions for the focus bodies
-
+	
 	block.focus_bodies[bodyID] = body;	// Probably useless, right?
 	
 	accesspoint.bodies[bodyID] = body;
@@ -501,6 +493,11 @@ __global__ void updateKernel(Simulation* simulation, int offset) {
 	// Delete all previous bodies 
 	if (threadID1 < MAX_FOCUS_BODIES)
 		block.focus_bodies[threadID1] = SimBody();
+	for (int i = threadID1; i < MAX_NEAR_BODIES + 27; i += 27) 
+		if (i < MAX_NEAR_BODIES)
+			block.near_bodies[threadID1] = SimBody();
+	
+	
 
 
 
@@ -521,6 +518,7 @@ __global__ void updateKernel(Simulation* simulation, int offset) {
 		if (threadID1 == 0) {		
 			for (int j = 0; j < 27; j++) {
 				if (near_ptr > 47 || focus_ptr > 15) {
+					printf("\n\n\t\t\t\tOVERFLOW\n");
 					printf("Block %d overflowing! near %d    focus %d\n", blockID1, near_ptr, focus_ptr);
 					break;
 				}
@@ -528,7 +526,7 @@ __global__ void updateKernel(Simulation* simulation, int offset) {
 				
 				if (relationtype[j] > 1) {
 					block.focus_bodies[focus_ptr++] = bodybuffer[j];
-					printf("Block %d loading body at pos: %f %f %f\n",blockID1, block.focus_bodies[focus_ptr - 1].pos.x, block.focus_bodies[focus_ptr - 1].pos.y, block.focus_bodies[focus_ptr - 1].pos.z);
+					//printf("Block %d loading body at pos: %f %f %f\n",blockID1, block.focus_bodies[focus_ptr - 1].pos.x, block.focus_bodies[focus_ptr - 1].pos.y, block.focus_bodies[focus_ptr - 1].pos.z);
 					//block.n_bodies++;
 				}				
 				else if (relationtype[j] == 1)
