@@ -51,11 +51,12 @@ struct SimBody {
 
 
 	Float3 pos;	//CoM - nm
-	Float3 vel;	// nm/sec
+	//Float3 vel;	// nm/sec
+	Float3 vel_prev;
 
 	Float3 rotation;	//radians pitch, yaw, roll, x-axis, z-axis, y-axis
 	Float3 rot_vel;	//radians/sec
-	//float mass;
+	float mass = 0;
 	//float radius = 0.05;
 	char molecule_type = UNUSED_BODY;			// 255 is unutilized, 0 is water
 

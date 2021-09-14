@@ -5,11 +5,11 @@
 
 
 
-constexpr float BOX_LEN = 4.0;	// Multiple of 2 please!
+constexpr float BOX_LEN = 24.0;	// Multiple of 2 please!
 constexpr float BOX_LEN_HALF = BOX_LEN/2.f;
 constexpr float BOX_BASE = -BOX_LEN_HALF;
 
-constexpr float BLOCK_LEN = 4.0;	//nm
+constexpr float BLOCK_LEN = 3.0;	//nm
 constexpr float FOCUS_LEN = BLOCK_LEN / 2.f;
 constexpr float FOCUS_LEN_HALF = BLOCK_LEN / 4.f;
 
@@ -21,14 +21,14 @@ constexpr float edgeforce_scalar = 10.f;
 //constexpr float BLOCK_OVERLAP = 0.3f;	// nm, must be > 2* vdw radius of largest atom.
 
 const int MAX_FOCUS_BODIES = 16;
-const int MAX_NEAR_BODIES = 64 - MAX_FOCUS_BODIES;
+const int MAX_NEAR_BODIES = 128 - MAX_FOCUS_BODIES;
 //constexpr float SOLOBLOCK_DIST = BLOCK_LEN - BLOCK_OVERLAP;
 
 
 const int INDEXA = 100900;
-const int N_BODIES_START = 16;
+const int N_BODIES_START = 25000;
 
-const int BLOCKS_PER_SM = 16;
+const int BLOCKS_PER_SM = 256;
 //const int GRIDBLOCKS_PER_BODY = 16;
 //const int THREADS_PER_GRIDBLOCK = MAX_BLOCK_BODIES / GRIDBLOCKS_PER_BODY;
 const int N_STREAMS = 60;			// 68 total, 0 is general purpose, 1 is for rendering.

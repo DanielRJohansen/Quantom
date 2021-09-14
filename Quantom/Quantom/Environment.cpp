@@ -33,11 +33,13 @@ void Environment::run() {
 		engine->step();
 		
 
-		display->render(simulation);
+		if (!(simulation->step % 10)) {
+			display->render(simulation);
 
-		interface->handleEvents();	
-		if (interface->quit)
-			display->terminate();
+			interface->handleEvents();
+			if (interface->quit)
+				display->terminate();
+		}
 
 
 		if (steps++ == -1)
@@ -46,8 +48,8 @@ void Environment::run() {
 		if (simulation->finished)
 			break;
 
-		if (simulation->step == 650)
-			break;
+		//if (simulation->step == 650)
+			//break;
 
 		/*
 		int duration;
