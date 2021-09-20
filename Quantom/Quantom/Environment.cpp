@@ -25,27 +25,41 @@ void Environment::run() {
 	printf("Simulation started\n\n");
 	int steps = 0;
 	engine->countBodies();
+
+
+	
+
 	while (display->window->isOpen()) {
-		auto start = std::chrono::high_resolution_clock::now();
+		auto t0 = std::chrono::high_resolution_clock::now();
+
+
+		for (int i = 0; i < simulation->steps_per_render; i++) {
+			engine->step();
+			printf("\r\tStep #%05d", simulation->step);
+		}
+		float duration = (float) std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - t0).count();
+		printf("\tAverage step time: %.1f ms.\t",  duration/simulation->steps_per_render);
+
+
+		if (!(simulation->step % 50)) {
 
 
 
-		engine->step();
-		
-
-		if (!(simulation->step % 10)) {
 			display->render(simulation);
 
 			interface->handleEvents();
 			if (interface->quit)
 				display->terminate();
 		}
-
+		
 
 		if (steps++ == -1)
 			break;
 
 		if (simulation->finished)
+			break;
+		
+		if (simulation->step == simulation->n_steps)
 			break;
 
 		//if (simulation->step == 650)
@@ -66,5 +80,7 @@ void Environment::run() {
 
 
 	}
+
+	printf("\n\n\n########################## SIMULATION FINISHED ##########################\n");
 	engine->countBodies();
 }

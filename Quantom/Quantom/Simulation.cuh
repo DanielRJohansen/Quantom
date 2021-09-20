@@ -5,30 +5,30 @@
 
 
 
-constexpr float BOX_LEN = 24.0;	// Multiple of 2 please!
+constexpr float BOX_LEN = 16.0;	// Multiple of 2 please!
 constexpr float BOX_LEN_HALF = BOX_LEN/2.f;
 constexpr float BOX_BASE = -BOX_LEN_HALF;
 
-constexpr float BLOCK_LEN = 3.0;	//nm
+constexpr float BLOCK_LEN = 3;	//nm
 constexpr float FOCUS_LEN = BLOCK_LEN / 2.f;
 constexpr float FOCUS_LEN_HALF = BLOCK_LEN / 4.f;
 
-constexpr float edgeforce_scalar = 10.f;
-
+constexpr float edgeforce_scalar = 100000.f;
+constexpr float edgeforce_scalar_half = edgeforce_scalar/2.f;
 
 
 //constexpr auto CUTOFF_LEN = 0.8f;		// nm
 //constexpr float BLOCK_OVERLAP = 0.3f;	// nm, must be > 2* vdw radius of largest atom.
 
-const int MAX_FOCUS_BODIES = 16;
-const int MAX_NEAR_BODIES = 128 - MAX_FOCUS_BODIES;
+const int MAX_FOCUS_BODIES = 32;
+const int MAX_NEAR_BODIES = 256 - MAX_FOCUS_BODIES;
 //constexpr float SOLOBLOCK_DIST = BLOCK_LEN - BLOCK_OVERLAP;
 
 
 const int INDEXA = 100900;
-const int N_BODIES_START = 25000;
+const int N_BODIES_START = 20000;
 
-const int BLOCKS_PER_SM = 256;
+const int BLOCKS_PER_SM = 2048;
 //const int GRIDBLOCKS_PER_BODY = 16;
 //const int THREADS_PER_GRIDBLOCK = MAX_BLOCK_BODIES / GRIDBLOCKS_PER_BODY;
 const int N_STREAMS = 60;			// 68 total, 0 is general purpose, 1 is for rendering.
@@ -146,10 +146,11 @@ public:
 
 	float box_size = BOX_LEN;	//nm
 	int blocks_per_dim;
-	int n_steps = 1000000;
+	int n_steps = 1000;
 
-	const float dt = 0.001;
-	
+	const double dt = 1	*	10.0e-6;		// ns, so first val corresponds to fs
+	int steps_per_render = 50;
+
 	int n_bodies = N_BODIES_START;
 	Box* box;
 	SimBody* bodies;	// The bodies of each block is only total copy, not a pointer to its corresponding body here!

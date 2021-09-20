@@ -94,10 +94,18 @@ int Engine::fillBox() {
 	int bodies_per_dim = ceil(cbrt((float)simulation->n_bodies));
 	float body_edge_mindist = 0.5;
 
-	printf("Bodies per dim: %d\n", bodies_per_dim);
 	float dist = (BOX_LEN - body_edge_mindist*2) / (float)bodies_per_dim;	// dist_per_index
+	printf("Bodies per dim: %d. Dist per dim: %.3f\n", bodies_per_dim, dist);
+
 	float base = -BOX_LEN / 2.f + body_edge_mindist + dist/2.f + 0.000001;
-	float vel_scalar = 0.4;
+	
+
+
+	double m = 18.01528;		// g/mol
+	double k_B = 8.617333262145 * 10e-5;
+	double T = 293;	// Kelvin
+	float mean_velocity = m / (2 * k_B * T);
+	int p = 10000;
 
 	int index = 0;
 	for (int x_index = 0; x_index < bodies_per_dim; x_index++) {
@@ -106,7 +114,6 @@ int Engine::fillBox() {
 				if (index == simulation->n_bodies)
 					break;
 
-				int p = 10000;
 				float r1 = rand() % p / (float)p - 0.5;
 				float r2 = rand() % p / (float)p - 0.5;
 				float r3 = rand() % p / (float)p - 0.5;
@@ -116,12 +123,14 @@ int Engine::fillBox() {
 				//printf("Body pos: ");
 				//simulation->bodies[index].pos.print();
 
-				simulation->bodies[index].molecule_type = 0;
-				simulation->bodies[index].mass = 2.998;
+				simulation->bodies[index].id = index;	// 
 
-				simulation->bodies[index].vel_prev = Float3(r1 * vel_scalar, r2 * vel_scalar, r3 * vel_scalar);
+				simulation->bodies[index].molecule_type = 0;
+				simulation->bodies[index].mass = m;
+
+				simulation->bodies[index].vel_prev = Float3(r1, r2, r3).norm() * mean_velocity;
 				simulation->bodies[index].rotation = Float3(0, 0, 0);
-				simulation->bodies[index].rot_vel = Float3(0, 4*PI, 0);
+				simulation->bodies[index].rot_vel = Float3(r1*r2, 4*PI, 0);
 				placeBody(&simulation->bodies[index++]);
 			}
 		}
@@ -194,7 +203,6 @@ void Engine::prepareCudaScheduler() {
 
 
 void Engine::step() {
-	auto start = std::chrono::high_resolution_clock::now();
 
 	cuda_status = cudaGetLastError();
 	if (cuda_status != cudaSuccess) {
@@ -239,11 +247,9 @@ void Engine::step() {
 		}
 	}
 
+	simulation->step++;
 
-
-	auto stop = std::chrono::high_resolution_clock::now();
-	auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
-	printf("\rStep time: %d ms.\tStep #%05d", duration.count(), simulation->step++);
+	
 }
 
 
@@ -268,22 +274,23 @@ __device__ float cudaMin1(float a, float b) {
 
 __device__ Float3 forceFromDist(Float3 dists) {
 	return Float3(
-		((edgeforce_scalar / dists.x)-0.25),
-		((edgeforce_scalar / dists.y)-0.25),
-		((edgeforce_scalar / dists.z)-0.25)
+		((edgeforce_scalar / dists.x)- edgeforce_scalar),
+		((edgeforce_scalar / dists.y)- edgeforce_scalar),
+		((edgeforce_scalar / dists.z)- edgeforce_scalar)
 	);
 }
 
 __device__ inline Float3 calcEdgeForce(SimBody* body) {
-	//Float3 dists1(body->pos.x + BOX_LEN / 2.f, body->pos.y + BOX_LEN / 2.f, body->pos.z + BOX_LEN / 2.f);
-	//Float3 dists2(BOX_LEN / 2.f - body->pos.x, BOX_LEN / 2.f - body->pos.y, BOX_LEN / 2.f - body->pos.z);
+	Float3 dimensionwise_dists_from_base = Float3(body->pos.x - BOX_BASE, body->pos.y - BOX_BASE, body->pos.z - BOX_BASE).abs();
+	Float3 dimensionwise_dists_from_end = Float3(body->pos.x - BOX_LEN_HALF, body->pos.y - BOX_LEN_HALF, body->pos.z - BOX_LEN_HALF).abs();
 
-	Float3 dists_from_base = Float3(body->pos.x - BOX_BASE, body->pos.y - BOX_BASE, body->pos.z - BOX_BASE).abs();
-	Float3 dists_from_end = Float3(body->pos.x - BOX_LEN_HALF, body->pos.y - BOX_LEN_HALF, body->pos.z - BOX_LEN_HALF).abs();
-
-	Float3 pos_forces = forceFromDist(dists_from_base).zeroIfBelow(0);
-	Float3 neg_forces = forceFromDist(dists_from_end).zeroIfBelow(0);
-	return pos_forces - neg_forces;
+	Float3 pos_forces = forceFromDist(dimensionwise_dists_from_base).zeroIfBelow(0);
+	Float3 neg_forces = forceFromDist(dimensionwise_dists_from_end).zeroIfBelow(0);
+	/*if (body->id == 1) {
+		printf("\n pos: %f %f %f\tForce: %.1f %.1f %.1f\n\n", body->pos.x, body->pos.y, body->pos.z, (pos_forces - neg_forces).x, (pos_forces - neg_forces).y, (pos_forces - neg_forces).z);
+	}*/
+		
+	return (pos_forces - neg_forces);
 }
 																				// TODO: MAKE IS SUCH THAT A BODY CAN NEVER BE EXACTLY ON THE EDGE OF FOCUS, THUS APPEARING IN MULTIPLE GROUPS!
 __device__ bool bodyInNear(SimBody* body, Float3* block_center) {
@@ -324,11 +331,12 @@ __device__ Float3 calcLJForce(SimBody* body0, SimBody* body1, int i, int bid) {
 	float LJ_pot = 48 * dist_pow2_inv * dist_pow6_inv * (dist_pow6_inv - 0.5f);
 	Float3 force_unit_vector = (body0->pos - body1->pos).norm();
 	
-	if (LJ_pot > 10000000) {
-		printf("\n\n MEGAFORCE! Block %d thread %d\n", bid, threadIdx.x);
-		/*printf("other body id: %d\n", i);
-		printf("Body 0 %f %f %f\n", body0->pos.x, body0->pos.y, body0->pos.z);
-		printf("Body 1 %f %f %f\n", body1->pos.x, body1->pos.y, body1->pos.z);*/
+	if (LJ_pot > 10e+9) {
+		body0->molecule_type = 99;
+		printf("\n\n GIGAFORCE! Block %d thread %d\n", bid, threadIdx.x);
+		printf("other body id: %d\n", i);
+		printf("Body 0 id: %d     %f %f %f\n", body0->id,  body0->pos.x, body0->pos.y, body0->pos.z);
+		printf("Body 1 id: %d     %f %f %f\n", body1->id, body1->pos.x, body1->pos.y, body1->pos.z);
 		printf("Distance: %f\n", (body0->pos - body1->pos).len());
 		//printf("Force: %f\n\n\n", LJ_pot);
 		//force_unit_vector.print();
@@ -383,31 +391,42 @@ __global__ void stepKernel(Simulation* simulation, int offset) {
 
 	Float3 force_total = Float3(0, 0, 0);
 	// Calc all Lennard-Jones forces from focus bodies
-	for (int i = 0; i < MAX_FOCUS_BODIES; i++) {
-		if (i != bodyID && block.focus_bodies[i].molecule_type != UNUSED_BODY) {
-			force_total = force_total + calcLJForce(&body, &block.focus_bodies[i], i, blockID);
-		}
-	}
+	if (body.molecule_type != UNUSED_BODY) {
 
-	// Calc all forces from Near bodies
-	for (int i = 0; i < MAX_NEAR_BODIES; i++) {
-		if (i != bodyID && block.near_bodies[i].molecule_type != UNUSED_BODY) {
-			force_total = force_total + calcLJForce(&body, &block.near_bodies[i], i, blockID);
+
+		for (int i = 0; i < MAX_FOCUS_BODIES; i++) {
+			if (i != bodyID && block.focus_bodies[i].molecule_type != UNUSED_BODY) {
+				force_total = force_total + calcLJForce(&body, &block.focus_bodies[i], i, blockID);
+			}
 		}
+
+		// Calc all forces from Near bodies
+		for (int i = 0; i < MAX_NEAR_BODIES; i++) {
+			if (block.near_bodies[i].molecule_type != UNUSED_BODY) {
+				force_total = force_total + calcLJForce(&body, &block.near_bodies[i], i, blockID);
+			}
+		}
+
+
 	}
+	
 	
 
 	//body.vel = body.vel + LJ_pot_force * simulation->dt;
 
 
 
-	//body.rotation = body.rotation + body.rot_vel * simulation->dt;				
+	body.rotation = body.rotation + body.rot_vel * simulation->dt;				
 
 
 
 	// Calc all forces from box edge
 	force_total = force_total + calcEdgeForce(&body);
+	//if (body.id == 1)
+		//printf("\nTotal Force: %.2f %.2f %.2f\n", force_total.x, force_total.y, force_total.z);
 
+	if (body.molecule_type == 99)	// TEMP
+		simulation->finished = true;
 
 	// Integrate position  AFTER ALL BODIES IN BLOCK HAVE BEEN CALCULATED? No should not be a problem as all update their local body, 
 	// before moving to shared?? Although make the local just a pointer might be faster, since a SimBody might not fit in thread registers!!!!!
@@ -487,9 +506,9 @@ __global__ void updateKernel(Simulation* simulation, int offset) {
 	// Delete all previous bodies 
 	if (threadID1 < MAX_FOCUS_BODIES)
 		block.focus_bodies[threadID1] = SimBody();
-	for (int i = threadID1; i < MAX_NEAR_BODIES + 27; i += 27) 
+	for (int i = threadID1; i <= MAX_NEAR_BODIES + 27; i += 27) 
 		if (i < MAX_NEAR_BODIES)
-			block.near_bodies[threadID1] = SimBody();
+			block.near_bodies[i] = SimBody();
 	
 	
 
@@ -512,7 +531,10 @@ __global__ void updateKernel(Simulation* simulation, int offset) {
 					printf("Block %d overflowing! near %d    focus %d\n", blockID1, near_ptr, focus_ptr);
 					break;
 				}
-					
+				/*if (bodybuffer[j].id == 2363 && relationtype[j] > 0) {
+					printf("Block %d has relation %d\n", blockID1, relationtype[j]);
+				}*/
+
 				
 				if (relationtype[j] > 1) {
 					block.focus_bodies[focus_ptr++] = bodybuffer[j];

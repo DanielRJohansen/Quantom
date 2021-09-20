@@ -48,7 +48,7 @@ struct SimBody {
 	__host__ __device__ SimBody() {}
 	//RenderBody* renderbody;
 
-
+	uint16_t id = 0;
 
 	Float3 pos;	//CoM - nm
 	//Float3 vel;	// nm/sec

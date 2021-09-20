@@ -7,7 +7,7 @@ Display::Display(Simulation* simulation) {
     window = new sf::RenderWindow(sf::VideoMode(1000, 1000), "Quantom Simulation");
 
 
-    raytracer = new Raytracer(simulation);
+    raytracer = new Raytracer(simulation, false);
 
     
     sf::Image blank_image;

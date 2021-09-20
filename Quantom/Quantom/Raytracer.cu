@@ -9,21 +9,15 @@ __device__ void Ray::findBlockHits(Box* box, Float3 focalpoint) {
 		block_indexes[i] = -1;
 
     int block_index = 0;
+    int bpd = box->blocks_per_dim;
 
-
-	// Only works if sorted by y axis first!                      
-
-    
-
-    
-
-    for (int y = 0; y < box->blocks_per_dim; y++) {
-        for (int z = 0; z < box->blocks_per_dim; z++) {
-            for (int x = 0; x < box->blocks_per_dim; x++) {
+    for (int y = 0; y < bpd; y++) {
+        for (int z = 0; z < bpd; z++) {
+            for (int x = 0; x < bpd; x++) {
                 if (block_index == MAX_RAY_BLOCKS)
                     break;
 
-                int index = z * box->blocks_per_dim * box->blocks_per_dim + y * box->blocks_per_dim + x;
+                int index = z * bpd * bpd + y * bpd + x;
 
 
                 if (hitsBlock(&box->blocks[index], focalpoint)) {
@@ -33,24 +27,21 @@ __device__ void Ray::findBlockHits(Box* box, Float3 focalpoint) {
                     
                         
                 }
-
             }
         }
     }
 
-
     
 	for (int i = 1; i < block_index; i++) {		// I think only 1 swap will be necessary...
-		float d1 = (box->blocks[block_indexes[i - 1]].center - focalpoint).len();
-		float d2 = (box->blocks[block_indexes[i]].center - focalpoint).len();
+		float d1_sq = (box->blocks[block_indexes[i - 1]].center - focalpoint).lenSquared();
+		float d2_sq = (box->blocks[block_indexes[i]].center - focalpoint).lenSquared();
 
-		if (d2 < d1) {
+		if (d2_sq < d1_sq) {
 			int tmp = block_indexes[i - 1];
 			block_indexes[i - 1] = block_indexes[i];
 			block_indexes[i] = tmp;
 		}
 	}
-      
 }
 
 __device__ float cudaMax(float a, float b) { 
@@ -93,30 +84,19 @@ __device__ bool Ray::hitsBlock(Block* block, Float3 focalpoint) {
     float a = BLOCK_LEN;               // FUCK YOU VISUAL STUDIO
     Float3 blocksize = Float3(a, a, a);
 
-    //Float3 min = block->center - Float3(BLOCK_LEN / 2, BLOCK_LEN / 2, BLOCK_LEN / 2);
-    //Float3 max = block->center + Float3(BLOCK_LEN / 2, BLOCK_LEN / 2, BLOCK_LEN / 2);
-
     Float3 offset(BODY_RADIUS, BODY_RADIUS, BODY_RADIUS);   // Radius of largest molecule!
-    //Float3 offset(0, 0, 0);
     Float3 min = block->center - Float3(FOCUS_LEN_HALF, FOCUS_LEN_HALF, FOCUS_LEN_HALF) - offset *2;    //I have no idea why we need *2
     Float3 max = block->center + Float3(FOCUS_LEN_HALF, FOCUS_LEN_HALF, FOCUS_LEN_HALF) + offset *2;
 
     float tmin = -DBL_MAX;
     float tmax = DBL_MAX;
 
-    /*if (blockIdx.x * 1000 + threadIdx.x == INDEXA) {
-        printf("boxmin: %.2f %.2f %.2f\n", min.x, min.y, min.z);
-        printf("boxmax: %.2f %.2f %.2f\n", max.x, max.y, max.z);
-        //printf("Tmin: %f \t tmax: %f \n", tmin, tmax);
-    }*/
-
     for (int dim = 0; dim < 3; dim++) {
         float invD = unit_vector.at(dim) != 0 ? 1.0f / unit_vector.at(dim) : 999999999;
-        //float invD = 1.0f / unit_vector.at(dim);
+
         float t0 = (min.at(dim) - focalpoint.at(dim)) * invD;
         float t1 = (max.at(dim) - focalpoint.at(dim)) * invD;
-        //if (blockIdx.x * 1000 + threadIdx.x == INDEXA)
-          //  printf("t0 = %.4f\t t1 = %.4f\n", t0, t1);
+
         if (invD < 0.0f) {
             float temp = t1;
             t1 = t0;
@@ -125,29 +105,16 @@ __device__ bool Ray::hitsBlock(Block* block, Float3 focalpoint) {
 
         tmin = t0 > tmin ? t0 : tmin;
         tmax = t1 < tmax ? t1 : tmax;
-        //if (blockIdx.x * 1000 + threadIdx.x == INDEXA)
-          //  printf("%f %f\n", tmin, tmax);
 
 
         if (tmax <= tmin) {    // was <=
             return false;
         }
     } 
-    /*if (blockIdx.x * 1000 + threadIdx.x == INDEXA) {
-        printf("HIT! Block body count: %d. First body pos : %.6f %.6f %.6f\n\n\n", block->n_bodies, block->bodies[0].pos.x, block->bodies[0].pos.y, block->bodies[0].pos.z);
-    }*/
+
         
     return true;
-    /*
-    if (!containedBetweenPlanes(min.x, max.x, unit_vector.x, focalpoint.x))
-        return false;
-    if (!containedBetweenPlanes(min.y, max.y, unit_vector.y, focalpoint.y))
-        return false;
-    if (!containedBetweenPlanes(min.z, max.z, unit_vector.z, focalpoint.z))
-        return false;
 
-
-    return true;*/
 }
     
 
@@ -242,9 +209,8 @@ __global__ void initRayKernel(Ray* rayptr, Box* box, Float3 focalpoint) {
 
 
 
-Raytracer::Raytracer(Simulation* simulation) {
+Raytracer::Raytracer(Simulation* simulation, bool verbose) {
     setGPU();
-
 
 
     float base = -(BOX_LEN) / 2.f;
@@ -253,7 +219,8 @@ Raytracer::Raytracer(Simulation* simulation) {
 	Ray* host_rayptr = new Ray[NUM_RAYS];
 	focalpoint = Float3(0, -(BOX_LEN / 2.f) * FOCAL_LEN_RATIO - BOX_LEN, 0);
 
-    printf("\n\nFocal point: %.3f %.3f %.3f\n", focalpoint.x, focalpoint.y, focalpoint.z);
+    
+
 	int index = 0;
     for (int z_index = 0; z_index < RAYS_PER_DIM; z_index++) {
         for (int x_index = 0; x_index < RAYS_PER_DIM; x_index++) {
@@ -267,8 +234,11 @@ Raytracer::Raytracer(Simulation* simulation) {
     cuda_status = cudaMallocManaged(&rayptr, NUM_RAYS * sizeof(Ray));
     cuda_status = cudaMemcpy(rayptr, host_rayptr, NUM_RAYS * sizeof(Ray), cudaMemcpyHostToDevice);
 
-
-	printf("Allocating %d MB of ram for Rays... \n", NUM_RAYS * sizeof(Ray) / 1000000);
+    if (verbose) {
+        printf("\n\nFocal point: %.3f %.3f %.3f\n", focalpoint.x, focalpoint.y, focalpoint.z);
+        printf("Allocating %d MB of ram for Rays... \n", NUM_RAYS * sizeof(Ray) / 1000000);
+    }
+        
 
     initRayKernel <<< RAYS_PER_DIM, RAYS_PER_DIM>>> (rayptr, simulation->box, focalpoint);
     cudaDeviceSynchronize();
@@ -280,13 +250,13 @@ Raytracer::Raytracer(Simulation* simulation) {
     }
         
         
-    int indexa = INDEXA;
-    printf("Ray %d: %f %f %f\n", indexa, rayptr[indexa].unit_vector.x, rayptr[indexa].unit_vector.y, rayptr[indexa].unit_vector.z);
-    printf("block_indexes: ");
-    for (int i = 0; i < MAX_RAY_BLOCKS; i++) {
-        printf("%d ", rayptr[indexa].block_indexes[i]);
+    if (verbose) {
+        printf("Ray %d: %f %f %f\n", INDEXA, rayptr[INDEXA].unit_vector.x, rayptr[INDEXA].unit_vector.y, rayptr[INDEXA].unit_vector.z);
+        printf("block_indexes: ");
+        for (int i = 0; i < MAX_RAY_BLOCKS; i++) {
+            printf("%d ", rayptr[INDEXA].block_indexes[i]);
+        }
     }
-
 
     printf("Rays initiated\n\n");
 }
@@ -337,23 +307,23 @@ uint8_t* Raytracer::render(Simulation* simulation) {
     cudaStreamCreate(&renderstream);
 
 
-    uint8_t* image = new uint8_t[NUM_RAYS * 4];
     uint8_t* cuda_image;
     int im_bytesize = NUM_RAYS * 4 * sizeof(uint8_t);
     cudaMallocManaged(&cuda_image, im_bytesize);
-    //printf("Allocating %d KB of ram for image... ", im_bytesize / 1000);
-    Float3 a(1, 0, 1);
+
+
     renderKernel << < RAYS_PER_DIM, RAYS_PER_DIM, 0>>> ( rayptr, cuda_image, simulation->box, simulation->mol_library);
+    uint8_t* image = new uint8_t[NUM_RAYS * 4];
     cudaMemcpy(image, cuda_image, im_bytesize, cudaMemcpyDeviceToHost);
-    //exit(1);
+
 
     cudaFree(cuda_image);
     cudaStreamDestroy(renderstream);
 
     auto stop = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
-    printf("\rRender time: %4d ms  ", duration.count());
+    printf("\tRender time: %4d ms  ", duration.count());
     // First render: 666 ms
 
     return image;
-}               
+}

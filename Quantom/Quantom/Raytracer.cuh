@@ -53,7 +53,7 @@ private:
 class Raytracer {
 public:
 	Raytracer(){}
-	Raytracer(Simulation* simulation);
+	Raytracer(Simulation* simulation, bool verbose);
 	uint8_t* render(Simulation* simulation);
 	//void renderKernel(Ray* rayptr, uint8_t* image, Float3 focalpoint);
 
@@ -61,6 +61,7 @@ private:
 	void initRays();
 	Ray* rayptr;
 	Float3 focalpoint;
+
 
 	cudaError_t cuda_status;
 
