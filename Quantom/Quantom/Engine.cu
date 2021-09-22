@@ -3,6 +3,8 @@
 
 
 
+
+
 Simulation* Engine::prepSimulation(Simulation* simulation) {
 	this->simulation = simulation;
 	simulation->bodies = new SimBody[simulation->n_bodies];
@@ -15,12 +17,13 @@ Simulation* Engine::prepSimulation(Simulation* simulation) {
 	srand(290128301);
 	int n_bodies = fillBox();
 
+	int update_bytesize = sizeof(Block) + sizeof(Int3) + sizeof(int) + sizeof(char) * 27 * 3 + sizeof(char) + sizeof(SimBody) * 27 + sizeof(unsigned short int) * 27 * 2 + sizeof(char) * 27 *MAX_FOCUS_BODIES;
 
 	printf("\nSimbody size: %d bytes\n", sizeof(SimBody));
 	printf("Block size: %d\n", sizeof(Block));
 	printf("Simulation configured with %d blocks, and %d bodies. Approximately %02.2f bodies per block. \n", n_blocks, n_bodies, ((float)n_bodies/n_blocks));
-	printf("Required shared mem for stepKernel: %d KB\n", (int) ((sizeof(Block) * BLOCKS_PER_SM) / 1000.f));
-	printf("Required shared mem for updateKernel: %d KB\n", (int) ((sizeof(Block) + sizeof(Int3) + sizeof(int) + sizeof(char)*27 + sizeof(SimBody)*27) * BLOCKS_PER_SM/1000.f));
+	printf("Required shared mem per block for stepKernel: %d KB\n", (int) ((sizeof(Block)) / 1000.f));
+	printf("Required shared mem per block for updateKernel: %d KB\n", (int) (update_bytesize/1000.f));
 	printf("Required global mem for Box: %d MB\n", (int) (sizeof(Block) * n_blocks / 1000000.f));
 
 
@@ -82,7 +85,11 @@ int Engine::initBlocks() {
 			for (int z = 0; z < bpd; z++) {
 				Float3 center(x * block_dist + box_base, y * block_dist + box_base, z * block_dist + box_base);
 				//center.print();
-				simulation->box->blocks[index++] = Block(center);
+				simulation->box->blocks[index] = Block(center);
+				simulation->box->blocks[index].edge_type[0] = -1 * (x == 0) + (x == (bpd - 1));
+				simulation->box->blocks[index].edge_type[1] = -1 * (y == 0) + (y == (bpd - 1));
+				simulation->box->blocks[index].edge_type[2] = -1 * (z == 0) + (z == (bpd - 1));
+				index++;
 			}
 		}
 	}
@@ -211,7 +218,7 @@ void Engine::step() {
 	}
 
 
-
+	auto t0 = std::chrono::high_resolution_clock::now();
 
 	int blocks_handled = 0;
 	while (blocks_handled < sim_blocks) {
@@ -229,8 +236,8 @@ void Engine::step() {
 		}
 	}
 
-	cudaDeviceSynchronize();
-	
+	auto t1 = std::chrono::high_resolution_clock::now();
+
 	blocks_handled = 0;
 	while (blocks_handled < sim_blocks) {
 		for (int i = 0; i < N_STREAMS; i++) {
@@ -246,6 +253,16 @@ void Engine::step() {
 			exit(1);
 		}
 	}
+
+	auto t2 = std::chrono::high_resolution_clock::now();
+
+	bool verbose = true;
+	if (verbose) {
+		int step_duration = (int)std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
+		int update_duration = (int)std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
+		printf("\nStep %d ys.\tUpdate: %d\n\n", step_duration, update_duration);
+	}
+
 
 	simulation->step++;
 
@@ -479,27 +496,36 @@ __global__ void updateKernel(Simulation* simulation, int offset) {
 	__shared__ Block block;
 	__shared__ Int3 blockID3;
 	__shared__ int bpd;
-	__shared__ char relationtype[27];	// 0 = far, 1 = near, 2 = focus
-	__shared__ SimBody bodybuffer[27];
+	__shared__ unsigned char element_cnt_focus[27];
+	__shared__ unsigned char element_sum_focus[27 + 1];
+	__shared__ unsigned short int element_cnt_near[27];
+	__shared__ unsigned short int element_sum_near[27+1];
+	__shared__ char relation_array[27][MAX_FOCUS_BODIES];	// 0 = far, 1 = near, 2 = focus
+
 	
-	__syncthreads();
+
+	element_sum_focus[threadID1 + 1] = -1;
+	element_sum_near[threadID1 + 1] = -1;
 	if (threadID1 == 0) {
 		block = simulation->box->blocks[blockID1];
 		bpd = simulation->blocks_per_dim;
 		blockID3 = indexConversion(blockID1, bpd);
+
+		element_sum_focus[0] = 0;
+		element_sum_near[0] = 0;
 	}
 	__syncthreads();
 
 
-
-
-	Int3 neighbor_index3 = blockID3 + (Int3(threadIdx.x, threadIdx.y, threadIdx.z) -Int3(1,1,1));
-
-
 	AccessPoint accesspoint;
-	if (!(neighbor_index3.x < 0 || neighbor_index3.x >= bpd || neighbor_index3.y < 0 || neighbor_index3.y >= bpd || neighbor_index3.z < 0 || neighbor_index3.z >= bpd)) {
+
+	{	
+		Int3 neighbor_index3 = blockID3 + (Int3(threadIdx.x, threadIdx.y, threadIdx.z) - Int3(1, 1, 1));
+		neighbor_index3 = neighbor_index3 + Int3(bpd * (neighbor_index3.x == 0), bpd * (neighbor_index3.y == 0), bpd * (neighbor_index3.z == 0));
+		neighbor_index3 = neighbor_index3 - Int3(bpd * (neighbor_index3.x == (bpd-1)), bpd * (neighbor_index3.y == (bpd-1)), bpd * (neighbor_index3.z == (bpd-1)));
 		accesspoint = simulation->box->accesspoint[indexConversion(neighbor_index3, bpd)];
 	}
+	
 		
 
 
@@ -515,37 +541,45 @@ __global__ void updateKernel(Simulation* simulation, int offset) {
 
 
 	
-	int focus_ptr = 0;	
-	int near_ptr = 0;
-	for (int i = 0; i < MAX_FOCUS_BODIES; i++) {
-		SimBody* body = &accesspoint.bodies[i];
+	{	// To make these to variables temporary
+		int focus_cnt = 0;
+		int near_cnt = 0;
+		for (int i = 0; i < MAX_FOCUS_BODIES; i++) {
+			SimBody* body = &accesspoint.bodies[i];
+			int relation_type = (bodyInNear(body, &block.center) + bodyInFocus(body, &block.center) * 2);// *(body->molecule_type != UNUSED_BODY);
 
-		bodybuffer[threadID1] = *body;
-		relationtype[threadID1] = (bodyInNear(body, &block.center) + bodyInFocus(body, &block.center) * 2) * (body->molecule_type != UNUSED_BODY);
+			relation_array[threadID1][i] = relation_type;
+			near_cnt += relation_type == 1;
+			focus_cnt += relation_type > 1;
+		}
+		
+		for (int i = 0; i < 27; i++) {
+			if (threadID1 == i) {
+				element_sum_focus[i + 1] = element_sum_focus[i] + focus_cnt;
+				element_sum_near[i + 1] = element_sum_near[i] + near_cnt;
+				//break;		// This break SHOULD let first threads start the transfer as soon as they reserve the space!
 
-
-		__syncthreads();
-		if (threadID1 == 0) {		
-			for (int j = 0; j < 27; j++) {
-				if (near_ptr == MAX_NEAR_BODIES || focus_ptr == MAX_FOCUS_BODIES) {
-					printf("Block %d overflowing! near %d    focus %d\n", blockID1, near_ptr, focus_ptr);
+				if (element_sum_focus[i + 1] == MAX_FOCUS_BODIES+1 || element_sum_near[i+1] == MAX_NEAR_BODIES + 1) {
+					printf("Block %d overflowing! near %d    focus %d\n", blockID1, element_sum_near[i + 1], element_sum_focus[i + 1]);
 					break;
 				}
-				/*if (bodybuffer[j].id == 2363 && relationtype[j] > 0) {
-					printf("Block %d has relation %d\n", blockID1, relationtype[j]);
-				}*/
 
-				
-				if (relationtype[j] > 1) {
-					block.focus_bodies[focus_ptr++] = bodybuffer[j];
-				}				
-				else if (relationtype[j] == 1)
-					block.near_bodies[near_ptr++] = bodybuffer[j];	
 			}
+			__syncthreads();
 		}
-		__syncthreads();
 	}
 
+
+	{
+		unsigned short int focus_index = element_sum_focus[threadID1];
+		unsigned short int near_index = element_sum_near[threadID1];
+		for (int i = 0; i < MAX_FOCUS_BODIES; i++) {
+			if (relation_array[threadID1][i] > 1)
+				block.focus_bodies[focus_index++] = accesspoint.bodies[i];
+			else if (relation_array[threadID1][i] == 1)
+				block.near_bodies[near_index++] = accesspoint.bodies[i];
+		}
+	}
 
 	__syncthreads();
 	if (threadID1 == 0) {

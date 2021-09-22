@@ -5,7 +5,7 @@
 
 
 
-constexpr float BOX_LEN = 16.0;	// Multiple of 2 please!
+constexpr float BOX_LEN = 12.0;	// Multiple of 2 please!
 constexpr float BOX_LEN_HALF = BOX_LEN/2.f;
 constexpr float BOX_BASE = -BOX_LEN_HALF;
 
@@ -26,9 +26,9 @@ const int MAX_NEAR_BODIES = 256 - MAX_FOCUS_BODIES;
 
 
 const int INDEXA = 100900;
-const int N_BODIES_START = 20000;
+const int N_BODIES_START = 9000;
 
-const int BLOCKS_PER_SM = 2048;
+const int BLOCKS_PER_SM = 512;
 //const int GRIDBLOCKS_PER_BODY = 16;
 //const int THREADS_PER_GRIDBLOCK = MAX_BLOCK_BODIES / GRIDBLOCKS_PER_BODY;
 const int N_STREAMS = 60;			// 68 total, 0 is general purpose, 1 is for rendering.
@@ -65,6 +65,8 @@ struct Block {	// All boxes are cubic
 
 	int n_bodies = 0;		//  Only used when loading the block
 	bool edge_block = false;
+
+	signed char edge_type[3] = { 0,0,0 }; // -1 negative edge, 0 non-edge, 1 pos-edge, xyz
 
 };
 
@@ -149,7 +151,7 @@ public:
 	int n_steps = 1000;
 
 	const double dt = 1	*	10.0e-6;		// ns, so first val corresponds to fs
-	int steps_per_render = 50;
+	int steps_per_render = 40;
 
 	int n_bodies = N_BODIES_START;
 	Box* box;

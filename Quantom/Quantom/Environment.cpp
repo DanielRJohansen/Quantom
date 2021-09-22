@@ -41,7 +41,7 @@ void Environment::run() {
 		printf("\tAverage step time: %.1f ms.\t",  duration/simulation->steps_per_render);
 
 
-		if (!(simulation->step % 50)) {
+		if (!(simulation->step % simulation->steps_per_render)) {
 
 
 
@@ -59,7 +59,7 @@ void Environment::run() {
 		if (simulation->finished)
 			break;
 		
-		if (simulation->step == simulation->n_steps)
+		if (simulation->step >= simulation->n_steps)
 			break;
 
 		//if (simulation->step == 650)
