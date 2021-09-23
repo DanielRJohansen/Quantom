@@ -598,6 +598,9 @@ __global__ void updateKernel(Simulation* simulation, int offset) {
 		int focus_index = element_sum_focus[threadID1];
 		int near_index = element_sum_near[threadID1];
 		for (int i = 0; i < MAX_FOCUS_BODIES; i++) {
+			
+			//if (accesspoint.bodies[i].id == 7272 && relation_array[threadID1][i] > 1)
+
 			if (relation_array[threadID1][i] > 1) 
 				simulation->box->blocks[blockID1].focus_bodies[focus_index++] = accesspoint.bodies[i];				
 			else if (relation_array[threadID1][i] == 1)
@@ -607,9 +610,12 @@ __global__ void updateKernel(Simulation* simulation, int offset) {
 
 
 		// Handle deactivating now-obsolete bodies
-		if (threadID1 >= element_sum_focus[26]) {	// Each thread makes sure its corresponding focusbody is deactivated
-			simulation->box->blocks[blockID1].focus_bodies[threadID1].molecule_type = UNUSED_BODY;
-		}
+		for (int j = 0; j * 27 < MAX_FOCUS_BODIES; j++) {
+			int focusbody_index = threadID1 + j * 27;
+			if (focusbody_index >= element_sum_focus[26]) {	// Each thread makes sure its corresponding focusbody is deactivated
+				simulation->box->blocks[blockID1].focus_bodies[focusbody_index].molecule_type = UNUSED_BODY;
+			}
+		}	
 		if (threadID1 == 26) {	// For nearbodies we only need to terminate 1 body, this saves alot of writes to global!
 			if (near_index < (MAX_NEAR_BODIES))
 				simulation->box->blocks[blockID1].near_bodies[near_index].molecule_type = UNUSED_BODY;
@@ -620,20 +626,4 @@ __global__ void updateKernel(Simulation* simulation, int offset) {
 }
 
 
-
-
-/*if (relation_array[threadID1][i] > 1)
-	block.focus_bodies[focus_index++] = accesspoint.bodies[i];
-else if (relation_array[threadID1][i] == 1)
-	block.near_bodies[near_index++] = accesspoint.bodies[i];
-	*/
-
-	// Delete all previous bodies 
-		/*
-		if (threadID1 < MAX_FOCUS_BODIES)
-			block.focus_bodies[threadID1] = SimBody();
-		for (int i = threadID1; i <= MAX_NEAR_BODIES + 27; i += 27)
-			if (i < MAX_NEAR_BODIES)
-				block.near_bodies[i] = SimBody();
-		*/
 
