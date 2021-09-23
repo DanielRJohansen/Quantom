@@ -37,8 +37,9 @@ int Engine::countBodies() {
 	int count = 0;
 	for (int i = 0; i < simulation->box->n_blocks; i++) {
 		for (int j = 0; j < MAX_FOCUS_BODIES; j++) {
-			if (simulation->box->blocks[i].focus_bodies[j].molecule_type != UNUSED_BODY)
-				count++;
+			if (simulation->box->blocks[i].focus_bodies[j].molecule_type == UNUSED_BODY)
+				break;
+			count++;
 		}
 	}
 	printf("\nBody count: %d\n\n", count);
@@ -86,9 +87,6 @@ int Engine::initBlocks() {
 				Float3 center(x * block_dist + box_base, y * block_dist + box_base, z * block_dist + box_base);
 				//center.print();
 				simulation->box->blocks[index] = Block(center);
-				simulation->box->blocks[index].edge_type[0] = -1 * (x == 0) + (x == (bpd - 1));
-				simulation->box->blocks[index].edge_type[1] = -1 * (y == 0) + (y == (bpd - 1));
-				simulation->box->blocks[index].edge_type[2] = -1 * (z == 0) + (z == (bpd - 1));
 				index++;
 			}
 		}
@@ -260,7 +258,8 @@ void Engine::step() {
 	if (verbose) {
 		int step_duration = (int)std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
 		int update_duration = (int)std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
-		printf("\nStep %d ys.\tUpdate: %d\n\n", step_duration, update_duration);
+		timings = timings + Int3(step_duration, update_duration, 0);
+		//printf("\nStep %d ys.\tUpdate: %d\n\n", step_duration, update_duration);
 	}
 
 
@@ -351,7 +350,7 @@ __device__ Float3 calcLJForce(SimBody* body0, SimBody* body1, int i, int bid) {
 	if (LJ_pot > 10e+9) {
 		body0->molecule_type = 99;
 		printf("\n\n GIGAFORCE! Block %d thread %d\n", bid, threadIdx.x);
-		printf("other body id: %d\n", i);
+		printf("other body index: %d\n", i);
 		printf("Body 0 id: %d     %f %f %f\n", body0->id,  body0->pos.x, body0->pos.y, body0->pos.z);
 		printf("Body 1 id: %d     %f %f %f\n", body1->id, body1->pos.x, body1->pos.y, body1->pos.z);
 		printf("Distance: %f\n", (body0->pos - body1->pos).len());
@@ -395,6 +394,7 @@ __global__ void stepKernel(Simulation* simulation, int offset) {
 	__syncthreads();
 	if (threadIdx.x == 0) {
 		block = simulation->box->blocks[blockID];
+		accesspoint = AccessPoint();
 	}
 		
 	__syncthreads();
@@ -410,17 +410,25 @@ __global__ void stepKernel(Simulation* simulation, int offset) {
 	// Calc all Lennard-Jones forces from focus bodies
 	if (body.molecule_type != UNUSED_BODY) {
 
-
+		// I assume that all present molecules come in order!!!!!!
 		for (int i = 0; i < MAX_FOCUS_BODIES; i++) {
-			if (i != bodyID && block.focus_bodies[i].molecule_type != UNUSED_BODY) {
-				force_total = force_total + calcLJForce(&body, &block.focus_bodies[i], i, blockID);
+			if (block.focus_bodies[i].molecule_type != UNUSED_BODY) {
+				if (i != bodyID) {
+					force_total = force_total + calcLJForce(&body, &block.focus_bodies[i], -i, blockID);
+				}
+			}
+			else {
+				break;
 			}
 		}
 
 		// Calc all forces from Near bodies
 		for (int i = 0; i < MAX_NEAR_BODIES; i++) {
 			if (block.near_bodies[i].molecule_type != UNUSED_BODY) {
-				force_total = force_total + calcLJForce(&body, &block.near_bodies[i], i, blockID);
+				force_total = force_total + calcLJForce(&body, &block.near_bodies[i], i + MAX_FOCUS_BODIES, blockID);
+			}
+			else {
+				break;
 			}
 		}
 
@@ -468,6 +476,14 @@ __global__ void stepKernel(Simulation* simulation, int offset) {
 	//block.focus_bodies[bodyID] = body;	// Probably useless, right?
 	accesspoint.bodies[bodyID] = body;
 
+
+
+
+
+
+	// Mark all bodies as obsolete
+
+
 	__syncthreads();
 	if (bodyID == 0) {
 		simulation->box->accesspoint[blockID] = accesspoint;
@@ -485,39 +501,45 @@ __global__ void stepKernel(Simulation* simulation, int offset) {
 
 __global__ void updateKernel(Simulation* simulation, int offset) {
 	int blockID1 = blockIdx.x + offset;
-	int threadID1 = indexConversion(Int3(threadIdx.x, threadIdx.y, threadIdx.z), 3);
-
 	if (blockID1 >= simulation->box->n_blocks)
 		return;
+
+	int threadID1 = indexConversion(Int3(threadIdx.x, threadIdx.y, threadIdx.z), 3);
+
+	
 
 
 
 	
-	__shared__ Block block;
+	//__shared__ Block block;
+	__shared__ Float3 block_center;
 	__shared__ Int3 blockID3;
 	__shared__ int bpd;
-	__shared__ unsigned char element_cnt_focus[27];
-	__shared__ unsigned char element_sum_focus[27 + 1];
-	__shared__ unsigned short int element_cnt_near[27];
-	__shared__ unsigned short int element_sum_near[27+1];
+	__shared__ char element_cnt_focus[27];
+	__shared__ char element_sum_focus[27 + 1];
+	__shared__ short int element_cnt_near[27];
+	__shared__ short int element_sum_near[27+1];
 	__shared__ char relation_array[27][MAX_FOCUS_BODIES];	// 0 = far, 1 = near, 2 = focus
+	
+	AccessPoint accesspoint;
 
 	
 
 	element_sum_focus[threadID1 + 1] = -1;
 	element_sum_near[threadID1 + 1] = -1;
+	for (int i = 0; i < MAX_FOCUS_BODIES; i++)
+		relation_array[threadID1][i] = 0;
 	if (threadID1 == 0) {
-		block = simulation->box->blocks[blockID1];
+		block_center = simulation->box->blocks[blockID1].center;			// probably faster to just calculate
 		bpd = simulation->blocks_per_dim;
 		blockID3 = indexConversion(blockID1, bpd);
 
 		element_sum_focus[0] = 0;
 		element_sum_near[0] = 0;
 	}
+	
 	__syncthreads();
 
-
-	AccessPoint accesspoint;
 
 	{	
 		Int3 neighbor_index3 = blockID3 + (Int3(threadIdx.x, threadIdx.y, threadIdx.z) - Int3(1, 1, 1));
@@ -529,60 +551,89 @@ __global__ void updateKernel(Simulation* simulation, int offset) {
 		
 
 
-	// Delete all previous bodies 
-	if (threadID1 < MAX_FOCUS_BODIES)
-		block.focus_bodies[threadID1] = SimBody();
-	for (int i = threadID1; i <= MAX_NEAR_BODIES + 27; i += 27) 
-		if (i < MAX_NEAR_BODIES)
-			block.near_bodies[i] = SimBody();
 	
-	
-
-
-
 	
 	{	// To make these to variables temporary
 		int focus_cnt = 0;
 		int near_cnt = 0;
+		int array_index = threadID1 + 1;
 		for (int i = 0; i < MAX_FOCUS_BODIES; i++) {
 			SimBody* body = &accesspoint.bodies[i];
-			int relation_type = (bodyInNear(body, &block.center) + bodyInFocus(body, &block.center) * 2);// *(body->molecule_type != UNUSED_BODY);
+			if (body->molecule_type == UNUSED_BODY)
+				break;
+
+			int relation_type = (bodyInNear(body, &block_center) + bodyInFocus(body, &block_center) * 2);
 
 			relation_array[threadID1][i] = relation_type;
-			near_cnt += relation_type == 1;
-			focus_cnt += relation_type > 1;
+			near_cnt += (relation_type == 1);
+			focus_cnt += (relation_type > 1);
 		}
 		
+		/*
+		while (true) {
+			if (element_sum_near[threadID1] > -1) {
+				element_sum_focus[array_index] = element_sum_focus[threadID1] + focus_cnt;
+				element_sum_near[array_index] = element_sum_near[threadID1] + near_cnt;
+				break;
+			}
+		}*/
+		// Safer solution below, with no while true!
+		/**/
 		for (int i = 0; i < 27; i++) {
 			if (threadID1 == i) {
-				element_sum_focus[i + 1] = element_sum_focus[i] + focus_cnt;
-				element_sum_near[i + 1] = element_sum_near[i] + near_cnt;
-				//break;		// This break SHOULD let first threads start the transfer as soon as they reserve the space!
-
-				if (element_sum_focus[i + 1] == MAX_FOCUS_BODIES+1 || element_sum_near[i+1] == MAX_NEAR_BODIES + 1) {
+				element_sum_focus[array_index] = element_sum_focus[i] + focus_cnt;
+				element_sum_near[array_index] = element_sum_near[i] + near_cnt;
+				if (element_sum_focus[array_index] == MAX_FOCUS_BODIES+1 || element_sum_near[i+1] == MAX_NEAR_BODIES + 1) {
 					printf("Block %d overflowing! near %d    focus %d\n", blockID1, element_sum_near[i + 1], element_sum_focus[i + 1]);
 					break;
 				}
-
 			}
 			__syncthreads();
 		}
+		
 	}
 
-
+	
 	{
-		unsigned short int focus_index = element_sum_focus[threadID1];
-		unsigned short int near_index = element_sum_near[threadID1];
+		int focus_index = element_sum_focus[threadID1];
+		int near_index = element_sum_near[threadID1];
 		for (int i = 0; i < MAX_FOCUS_BODIES; i++) {
-			if (relation_array[threadID1][i] > 1)
-				block.focus_bodies[focus_index++] = accesspoint.bodies[i];
+			if (relation_array[threadID1][i] > 1) 
+				simulation->box->blocks[blockID1].focus_bodies[focus_index++] = accesspoint.bodies[i];				
 			else if (relation_array[threadID1][i] == 1)
-				block.near_bodies[near_index++] = accesspoint.bodies[i];
+				simulation->box->blocks[blockID1].near_bodies[near_index++] = accesspoint.bodies[i];
+		}
+
+
+
+		// Handle deactivating now-obsolete bodies
+		if (threadID1 >= element_sum_focus[26]) {	// Each thread makes sure its corresponding focusbody is deactivated
+			simulation->box->blocks[blockID1].focus_bodies[threadID1].molecule_type = UNUSED_BODY;
+		}
+		if (threadID1 == 26) {	// For nearbodies we only need to terminate 1 body, this saves alot of writes to global!
+			if (near_index < (MAX_NEAR_BODIES))
+				simulation->box->blocks[blockID1].near_bodies[near_index].molecule_type = UNUSED_BODY;
 		}
 	}
+	
 
-	__syncthreads();
-	if (threadID1 == 0) {
-		simulation->box->blocks[blockID1] = block;
-	}
 }
+
+
+
+
+/*if (relation_array[threadID1][i] > 1)
+	block.focus_bodies[focus_index++] = accesspoint.bodies[i];
+else if (relation_array[threadID1][i] == 1)
+	block.near_bodies[near_index++] = accesspoint.bodies[i];
+	*/
+
+	// Delete all previous bodies 
+		/*
+		if (threadID1 < MAX_FOCUS_BODIES)
+			block.focus_bodies[threadID1] = SimBody();
+		for (int i = threadID1; i <= MAX_NEAR_BODIES + 27; i += 27)
+			if (i < MAX_NEAR_BODIES)
+				block.near_bodies[i] = SimBody();
+		*/
+

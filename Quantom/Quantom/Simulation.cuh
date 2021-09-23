@@ -66,7 +66,7 @@ struct Block {	// All boxes are cubic
 	int n_bodies = 0;		//  Only used when loading the block
 	bool edge_block = false;
 
-	signed char edge_type[3] = { 0,0,0 }; // -1 negative edge, 0 non-edge, 1 pos-edge, xyz
+	//signed char edge_type[3] = { 0,0,0 }; // -1 negative edge, 0 non-edge, 1 pos-edge, xyz
 
 };
 
@@ -151,7 +151,7 @@ public:
 	int n_steps = 1000;
 
 	const double dt = 1	*	10.0e-6;		// ns, so first val corresponds to fs
-	int steps_per_render = 40;
+	int steps_per_render = 50;
 
 	int n_bodies = N_BODIES_START;
 	Box* box;

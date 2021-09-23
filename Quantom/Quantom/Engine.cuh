@@ -28,6 +28,9 @@ public:
 	void step();
 
 
+	Int3 timings = Int3(0, 0, 0);
+
+
 	~Engine() {
 		for (int i = 0; i < N_STREAMS; i++)
 			cudaStreamDestroy(stream[i]);

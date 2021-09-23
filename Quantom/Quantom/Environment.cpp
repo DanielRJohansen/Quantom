@@ -38,13 +38,10 @@ void Environment::run() {
 			printf("\r\tStep #%05d", simulation->step);
 		}
 		float duration = (float) std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - t0).count();
-		printf("\tAverage step time: %.1f ms.\t",  duration/simulation->steps_per_render);
-
+		printf("\tAverage step time: %.1fms.\t(%d/%d)\t",  duration/simulation->steps_per_render, engine->timings.x/simulation->steps_per_render, engine->timings.y / simulation->steps_per_render);
+		engine->timings = Int3(0, 0, 0);
 
 		if (!(simulation->step % simulation->steps_per_render)) {
-
-
-
 			display->render(simulation);
 
 			interface->handleEvents();
