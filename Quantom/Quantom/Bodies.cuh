@@ -42,7 +42,7 @@ struct Molecule {
 };
 
 constexpr float BODY_RADIUS = 0.2;		// CRITICAL VALUE!
-constexpr char UNUSED_BODY = 255;
+constexpr unsigned char UNUSED_BODY = 255;
 
 struct SimBody {
 	__host__ __device__ SimBody() {}
@@ -58,7 +58,7 @@ struct SimBody {
 	Float3 rot_vel;	//radians/sec
 	float mass = 0;
 	//float radius = 0.05;
-	char molecule_type = UNUSED_BODY;			// 255 is unutilized, 0 is water
+	unsigned char molecule_type = UNUSED_BODY;			// 255 is unutilized, 0 is water
 
 	//Float3 charge_unit_vector;
 	float charge_magnitude = 0.f;

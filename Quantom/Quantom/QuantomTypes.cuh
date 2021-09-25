@@ -37,7 +37,15 @@ struct Float3 {
 	__host__ __device__ inline float lenSquared() { return (float)(x * x + y * y + z * z); }
 	__host__ __device__ Float3 zeroIfAbove(float a) { return Float3(x * (x < a), y * (y < a), z * (z < a)); }
 	__host__ __device__ Float3 zeroIfBelow(float a) { return Float3(x * (x > a), y * (y > a), z * (z > a)); }
-
+	__host__ __device__ Float3 elementwiseModulus(float a) {
+		while (x > a)
+			x -= a;
+		while (y > a)
+			y -= a;
+		while (z > a)
+			z -= a;
+		return *this;
+	}
 
 
 	__host__ __device__ Float3 cross(Float3 a) const { return Float3(y * a.z - z * a.y, z * a.x - x * a.z, x * a.y - y * a.x); }

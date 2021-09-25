@@ -62,9 +62,9 @@ private:
 	}*/
 	Int3 posToBlockIndex(Float3* pos) {
 		return Int3(
-			floor((pos->x - effective_box_base) / (bpd * block_dist) * simulation->blocks_per_dim),
-			floor((pos->y - effective_box_base) / (bpd * block_dist) * simulation->blocks_per_dim),
-			floor((pos->z - effective_box_base) / (bpd * block_dist) * simulation->blocks_per_dim)
+			floor((pos->x - box_base) / (bpd * block_dist) * simulation->blocks_per_dim),
+			floor((pos->y - box_base) / (bpd * block_dist) * simulation->blocks_per_dim),
+			floor((pos->z - box_base) / (bpd * block_dist) * simulation->blocks_per_dim)
 		);
 	}
 	inline int block3dIndexTo1dIndex(Int3 index_3d) {// NOTICE THAT X IS THE "GRANDPARENT" ITERATOR
@@ -89,7 +89,7 @@ private:
 	float block_dist;
 	int bpd;
 	float box_base;				// Of box (left, back, down-most), is negative!
-	float effective_box_base;	// Including that edge blocks focus area is halfway outside the box
+	float block_center_base;	// Including that edge blocks focus area is halfway outside the box
 	cudaError_t cuda_status;
 
 };

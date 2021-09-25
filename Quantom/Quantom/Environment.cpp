@@ -36,6 +36,9 @@ void Environment::run() {
 		for (int i = 0; i < simulation->steps_per_render; i++) {
 			engine->step();
 			printf("\r\tStep #%05d", simulation->step);
+			//exit(1);
+			if (simulation->finished)
+				break;
 		}
 		float duration = (float) std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - t0).count();
 		printf("\tAverage step time: %.1fms.\t(%d/%d)\t",  duration/simulation->steps_per_render, engine->timings.x/simulation->steps_per_render, engine->timings.y / simulation->steps_per_render);
