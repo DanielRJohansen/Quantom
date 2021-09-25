@@ -340,7 +340,7 @@ __device__ Int3 indexConversion(int index, int elements_per_dim) {
 }
 
 __device__ Float3 getHyperPosition(Float3 pos) {
-	pos = pos + Float3(BOX_LEN, BOX_LEN, BOX_LEN) * 0.5;
+	pos = pos + Float3(BOX_LEN, BOX_LEN, BOX_LEN) * 1.5;
 	pos = pos.elementwiseModulus(BOX_LEN);
 	return pos - Float3(BOX_LEN, BOX_LEN, BOX_LEN) * 0.5;
 }
@@ -434,71 +434,70 @@ __global__ void stepKernel(Simulation* simulation, int offset) {
 				break;
 			}
 		}
+
+
+
+
+
+
+
+		// Integrate position  AFTER ALL BODIES IN BLOCK HAVE BEEN CALCULATED? No should not be a problem as all update their local body, 
+		// before moving to shared?? Although make the local just a pointer might be faster, since a SimBody might not fit in thread registers!!!!!
+		//body.pos = body.pos + body.vel * simulation->dt;
+		integrateTimestep(simulation, &body, force_total);
+
+
+
+
+		// Correct for bonded-body constraints? Or maybe this should be calculated as a force too??
+
+
+
+
+
+		// Swap with mirror image if body has moved out of box
+		Float3 hyper_pos = getHyperPosition(body.pos);
+		if ((hyper_pos - body.pos).len() > 1) {	// If the hyperposition is different, the body is out, and we import the mirror body
+			printf("\nBlock %d thread %d\n", blockID, bodyID);
+			printf("Body: ");
+			body.pos.print();
+			body.pos = hyper_pos;
+			printf("Hyper: ");
+			hyper_pos.print();
+			printf("Body: ");
+			body.pos.print();
+			printf("\n");
+			//simulation->finished = true;
+		}
+
+
 	}
 	
-	
-
-	//body.vel = body.vel + LJ_pot_force * simulation->dt;
 
 
 
-	body.rotation = body.rotation + body.rot_vel * simulation->dt;				
+	//body.rotation = body.rotation + body.rot_vel * simulation->dt;				
 
 
 
-	// Calc all forces from box edge
-	//force_total = force_total + calcEdgeForce(&body);
-	//if (body.id == 1)
-		//printf("\nTotal Force: %.2f %.2f %.2f\n", force_total.x, force_total.y, force_total.z);
 
 	if (body.molecule_type == 99)	// TEMP
 		simulation->finished = true;
 
-	// Integrate position  AFTER ALL BODIES IN BLOCK HAVE BEEN CALCULATED? No should not be a problem as all update their local body, 
-	// before moving to shared?? Although make the local just a pointer might be faster, since a SimBody might not fit in thread registers!!!!!
-	//body.pos = body.pos + body.vel * simulation->dt;
-	integrateTimestep(simulation, &body, force_total);
-
-
-
-
-	// Correct for bonded-body constraints? Or maybe this should be calculated as a force too??
-
-
-
-
-	// Ensure no position is EXACTLY on the block edge, causing it to be lost forever!
 
 
 
 
 	// Publish new positions for the focus bodies
-	
-	//block.focus_bodies[bodyID] = body;	// Probably useless, right?
-	//body.molecule_type = UNUSED_BODY;
 	accesspoint.bodies[bodyID] = body;
-	
-	//if (blockID == 12)
-		//printf("Thread %d Exporting: %d\n", threadIdx.x, body.molecule_type);
-
-
-
-
 
 	// Mark all bodies as obsolete
+	simulation->box->blocks[blockID].focus_bodies[bodyID].molecule_type = UNUSED_BODY;
 
 
 	__syncthreads();
 	if (bodyID == 0) {
 		simulation->box->accesspoint[blockID] = accesspoint;
-
-		int bods = 0;
-		for (int i = 0; i < MAX_FOCUS_BODIES; i++)
-			if (accesspoint.bodies[i].molecule_type != UNUSED_BODY)
-				bods++;
-
-		//printf("Block %d exporting %d bodies:\n", blockID, bods);
-		//simulation->box->blocks[blockID] = block;	// Very expensive, only needed for rendering.	NOT NECESSARY IF WE RUN UPDATEKERNEL AFTER STEP BEFORE RENDER!!
 	}
 } 
 
@@ -532,7 +531,6 @@ __global__ void updateKernel(Simulation* simulation, int offset) {
 	__shared__ short int element_sum_near[27+1];
 	__shared__ char relation_array[27][MAX_FOCUS_BODIES];	// 0 = far, 1 = near, 2 = focus
 	
-	AccessPoint accesspoint;
 
 	
 
@@ -552,6 +550,7 @@ __global__ void updateKernel(Simulation* simulation, int offset) {
 	__syncthreads();
 
 
+	AccessPoint accesspoint;
 	{	
 		Int3 neighbor_index3 = blockID3 + (Int3(threadIdx.x, threadIdx.y, threadIdx.z) - Int3(1, 1, 1));
 		neighbor_index3 = neighbor_index3 + Int3(bpd * (neighbor_index3.x == 0), bpd * (neighbor_index3.y == 0), bpd * (neighbor_index3.z == 0));
@@ -566,8 +565,6 @@ __global__ void updateKernel(Simulation* simulation, int offset) {
 	
 		
 
-
-	
 	
 	{	// To make these to variables temporary
 		int focus_cnt = 0;
@@ -578,17 +575,15 @@ __global__ void updateKernel(Simulation* simulation, int offset) {
 			if (body->molecule_type == UNUSED_BODY)
 				break;
 
-			Float3 hyper_pos = getHyperPosition(body->pos);
-			int relation_type = (bodyInNear(&hyper_pos, &block_center) + bodyInFocus(&hyper_pos, &block_center) * 2);
-			
-			if ((hyper_pos - body->pos).len() > 1) {	// If the hyperposition is different, the body is out, and we import the mirror body
-				printf("Body: ");
-				body->pos.print();
-				body->pos = hyper_pos;
-				printf("Hyper: ");
-				hyper_pos.print();
-			}
+			int relation_type = (bodyInNear(&body->pos, &block_center) + bodyInFocus(&body->pos, &block_center) * 2);
+		
+			if (body->pos.z > 3 && relation_type > 1)
+				printf("Block %d loading %f %f %f\t from self? %d\n", blockID1, body->pos.x, body->pos.y, body->pos.z, threadID1 == 13);
 
+			if (simulation->step == 2157 && relation_type > 1 && blockID1 == 20) {
+				printf("Thread %d found body %f %f %f\n", threadID1, body->pos.x, body->pos.y, body->pos.z);
+				simulation->finished = true;
+			}
 
 			relation_array[threadID1][i] = relation_type;
 			near_cnt += (relation_type == 1);

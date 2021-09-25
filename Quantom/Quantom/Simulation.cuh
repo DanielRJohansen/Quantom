@@ -27,7 +27,7 @@ const int MAX_NEAR_BODIES = 256 - MAX_FOCUS_BODIES;
 
 
 const int INDEXA = 100900;
-const int N_BODIES_START = 8;
+const int N_BODIES_START = 64;
 
 const int BLOCKS_PER_SM = 512;
 //const int GRIDBLOCKS_PER_BODY = 16;
@@ -148,7 +148,7 @@ public:
 	int blocks_per_dim;
 	int n_steps = 10000;
 
-	const double dt = 1	*	10.0e-6;		// ns, so first val corresponds to fs
+	const double dt = 2 *	10.0e-6;		// ns, so first val corresponds to fs
 	int steps_per_render = 50;
 
 	int n_bodies = N_BODIES_START;
