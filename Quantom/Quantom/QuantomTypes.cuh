@@ -26,6 +26,7 @@ struct Float3 {
 	__host__ __device__ Float3(float x, float y, float z) : x(x), y(y), z(z) {}
 
 	__host__ __device__ inline Float3 operator * (const float a) const { return Float3(x * a, y * a, z * a); }
+	__host__ __device__ inline Float3 operator * (const Float3 a) const { return Float3(x * a.x, y * a.y, z * a.z); }
 	__host__ __device__ inline Float3 operator + (const Float3 a) const { return Float3(x + a.x, y + a.y, z + a.z); }
 	__host__ __device__ inline Float3 operator - (const Float3 a) const { return Float3(x - a.x, y - a.y, z - a.z); }
 	__host__ __device__ inline bool operator == (const Float3 a) const { return (a.x == x && a.y == y && a.z == z); }

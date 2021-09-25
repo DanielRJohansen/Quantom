@@ -135,6 +135,11 @@ int Engine::fillBox() {
 				simulation->bodies[index].vel_prev = Float3(r1, r2, r3).norm() * mean_velocity;
 				simulation->bodies[index].rotation = Float3(0, 0, 0);
 				simulation->bodies[index].rot_vel = Float3(r1*r2, 4*PI, 0);
+
+				simulation->bodies[index].pos = Float3(1-0.2 + (1 +0.4 * z_index), 0, 0);
+				simulation->bodies[index].vel_prev = Float3(0, 0, 0);
+				simulation->bodies[index].pos.print();
+
 				placeBody(&simulation->bodies[index++]);
 			}
 		}
@@ -345,6 +350,17 @@ __device__ Float3 getHyperPosition(Float3 pos) {
 	return pos - Float3(BOX_LEN, BOX_LEN, BOX_LEN) * 0.5;
 }
 
+__device__ Float3 getClosestMirrorPos(Float3 pos, Float3 block_center) {
+	Float3 dists = block_center - pos;
+	Float3 abs_dists = dists.abs();
+	Float3 directional_hotencoded_vector(
+		round(dists.x / abs_dists.x) * (abs_dists.x > BOX_LEN_HALF),
+		round(dists.y / abs_dists.y) * (abs_dists.y > BOX_LEN_HALF),
+		round(dists.z / abs_dists.z) * (abs_dists.z > BOX_LEN_HALF)
+	);
+	return pos + directional_hotencoded_vector * Float3(BOX_LEN, BOX_LEN, BOX_LEN);
+}
+
 __device__ Float3 calcLJForce(SimBody* body0, SimBody* body1, int i, int bid) {
 	float dist_pow2 = (body0->pos - body1->pos).lenSquared();
 	float dist_pow2_inv = 1.f / dist_pow2;
@@ -458,16 +474,7 @@ __global__ void stepKernel(Simulation* simulation, int offset) {
 		// Swap with mirror image if body has moved out of box
 		Float3 hyper_pos = getHyperPosition(body.pos);
 		if ((hyper_pos - body.pos).len() > 1) {	// If the hyperposition is different, the body is out, and we import the mirror body
-			printf("\nBlock %d thread %d\n", blockID, bodyID);
-			printf("Body: ");
-			body.pos.print();
 			body.pos = hyper_pos;
-			printf("Hyper: ");
-			hyper_pos.print();
-			printf("Body: ");
-			body.pos.print();
-			printf("\n");
-			//simulation->finished = true;
 		}
 
 
@@ -575,8 +582,16 @@ __global__ void updateKernel(Simulation* simulation, int offset) {
 			if (body->molecule_type == UNUSED_BODY)
 				break;
 
-			int relation_type = (bodyInNear(&body->pos, &block_center) + bodyInFocus(&body->pos, &block_center) * 2);
-		
+			Float3 closest_mirror_pos = getClosestMirrorPos(body->pos, block_center);
+			int relation_type = (bodyInNear(&closest_mirror_pos, &block_center) + bodyInFocus(&body->pos, &block_center) * 2);
+			/*if ((closest_mirror_pos - body->pos).len() > 1) {
+				printf("body  ");
+				body->pos.print();
+				closest_mirror_pos.print();
+				simulation->finished = true;
+			}*/
+
+
 			if (body->pos.z > 3 && relation_type > 1)
 				printf("Block %d loading %f %f %f\t from self? %d\n", blockID1, body->pos.x, body->pos.y, body->pos.z, threadID1 == 13);
 
