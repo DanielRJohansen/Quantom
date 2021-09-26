@@ -5,7 +5,7 @@
 
 
 
-constexpr float BOX_LEN = 6.0;	// Multiple of FOCUS_LEN please!
+constexpr float BOX_LEN = 20.0;	// Multiple of FOCUS_LEN please!
 
 constexpr float BOX_LEN_HALF = BOX_LEN/2.f;
 constexpr float BOX_BASE = -BOX_LEN_HALF;
@@ -27,7 +27,7 @@ const int MAX_NEAR_BODIES = 256 - MAX_FOCUS_BODIES;
 
 
 const int INDEXA = 100900;
-const int N_BODIES_START = 2;
+const int N_BODIES_START = 6000;
 
 const int BLOCKS_PER_SM = 512;
 //const int GRIDBLOCKS_PER_BODY = 16;
@@ -99,8 +99,14 @@ public:
 		blocks = blocks_temp;
 
 
-		cudaMalloc(&accesspoint, n_blocks * sizeof(AccessPoint));
-
+		AccessPoint* ap_temp = new AccessPoint[n_blocks];
+		for (int i = 0; i < n_blocks; i++) {
+			ap_temp[i] = AccessPoint();
+		}
+		int ap_bytesize = n_blocks * sizeof(AccessPoint);
+		cudaMalloc(&accesspoint, ap_bytesize);
+		cudaMemcpy(accesspoint, ap_temp, ap_bytesize, cudaMemcpyHostToDevice);
+		delete ap_temp;
 		//printf("Block 38: %.1f %.1f %.1f\n", blocks[38].center.x, blocks[38].center.y, blocks[38].center.z);
 		//printf("Block 38: %.1f %.1f %.1f\n", blocks_temp[38].center.x, blocks_temp[38].center.y, blocks_temp[38].center.z);
 	}
@@ -148,7 +154,7 @@ public:
 	int blocks_per_dim;
 	int n_steps = 10000;
 
-	const double dt = 2 *	10.0e-6;		// ns, so first val corresponds to fs
+	const double dt = 1 *	10.0e-6;		// ns, so first val corresponds to fs
 	int steps_per_render = 50;
 
 	int n_bodies = N_BODIES_START;

@@ -82,12 +82,21 @@ int Engine::initBlocks() {
 	//exit(1);
 
 	int index = 0;
-	for (int x = 0; x < bpd; x++) {
+	for (int z = 0; z < bpd; z++) {
 		for (int y = 0; y < bpd; y++) {
-			for (int z = 0; z < bpd; z++) {
+			for (int x = 0; x < bpd; x++) {
 				Float3 center(x * block_dist + block_center_base, y * block_dist + block_center_base, z * block_dist + block_center_base);
 				//center.print();
 				simulation->box->blocks[index] = Block(center);
+
+
+
+				for (int i = 0; i < MAX_FOCUS_BODIES; i++) {
+					simulation->box->blocks[index].focus_bodies[i] = SimBody();
+				}
+				for (int i = 0; i < MAX_NEAR_BODIES; i++) {
+					simulation->box->blocks[index].near_bodies[i] = SimBody();
+				}
 				index++;
 			}
 		}
@@ -112,9 +121,9 @@ int Engine::fillBox() {
 	int p = 10000;
 
 	int index = 0;
-	for (int x_index = 0; x_index < bodies_per_dim; x_index++) {
+	for (int z_index = 0; z_index < bodies_per_dim; z_index++) {
 		for (int y_index = 0; y_index < bodies_per_dim; y_index++) {
-			for (int z_index = 0; z_index < bodies_per_dim; z_index++) {
+			for (int x_index = 0; x_index < bodies_per_dim; x_index++) {
 				if (index == simulation->n_bodies)
 					break;
 
@@ -136,9 +145,11 @@ int Engine::fillBox() {
 				simulation->bodies[index].rotation = Float3(0, 0, 0);
 				simulation->bodies[index].rot_vel = Float3(r1*r2, 4*PI, 0);
 
-				simulation->bodies[index].pos = Float3(1-0.2 + (1 +0.4 * z_index), 0, 0);
+				/*
+				simulation->bodies[index].pos = Float3(0.5 + 2 - (0.5*2 * x_index), 0, 0);
 				simulation->bodies[index].vel_prev = Float3(0, 0, 0);
 				simulation->bodies[index].pos.print();
+				*/
 
 				placeBody(&simulation->bodies[index++]);
 			}
@@ -353,6 +364,7 @@ __device__ Float3 getHyperPosition(Float3 pos) {
 __device__ Float3 getClosestMirrorPos(Float3 pos, Float3 block_center) {
 	Float3 dists = block_center - pos;
 	Float3 abs_dists = dists.abs();
+	abs_dists = abs_dists + Float3(0.000001 * !(abs_dists.x), 0.000001 * !(abs_dists.y), 0.000001 * !(abs_dists.z));
 	Float3 directional_hotencoded_vector(
 		round(dists.x / abs_dists.x) * (abs_dists.x > BOX_LEN_HALF),
 		round(dists.y / abs_dists.y) * (abs_dists.y > BOX_LEN_HALF),
@@ -370,7 +382,7 @@ __device__ Float3 calcLJForce(SimBody* body0, SimBody* body1, int i, int bid) {
 	Float3 force_unit_vector = (body0->pos - body1->pos).norm();
 	
 	if (LJ_pot > 10e+9) {
-		body0->molecule_type = 99;
+		//body0->molecule_type = 99;
 		printf("\n\n GIGAFORCE! Block %d thread %d\n", bid, threadIdx.x);
 		printf("other body index: %d\n", i);
 		printf("Body 0 id: %d     %f %f %f\n", body0->id,  body0->pos.x, body0->pos.y, body0->pos.z);
@@ -418,10 +430,9 @@ __global__ void stepKernel(Simulation* simulation, int offset) {
 	__syncthreads();
 	SimBody body = block.focus_bodies[bodyID];
 
-	//printf("uhhh %d\n", accesspoint.bodies[bodyID].molecule_type);
 
 
-	// ACTUAL MOLECULAR DYNAMICS HAPPENING HERE! //
+	// --------------------------------- ACTUAL MOLECULAR DYNAMICS HAPPENING HERE! --------------------------------- //
 	Float3 force_total = Float3(0, 0, 0);
 
 	// Calc all Lennard-Jones forces from focus bodies
@@ -442,6 +453,7 @@ __global__ void stepKernel(Simulation* simulation, int offset) {
 		}
 
 		// Calc all forces from Near bodies
+		//printf("\nActive body here\n");
 		for (int i = 0; i < MAX_NEAR_BODIES; i++) {
 			if (block.near_bodies[i].molecule_type != UNUSED_BODY) {
 				force_total = force_total + calcLJForce(&body, &block.near_bodies[i], i + MAX_FOCUS_BODIES, blockID);
@@ -474,6 +486,7 @@ __global__ void stepKernel(Simulation* simulation, int offset) {
 		// Swap with mirror image if body has moved out of box
 		Float3 hyper_pos = getHyperPosition(body.pos);
 		if ((hyper_pos - body.pos).len() > 1) {	// If the hyperposition is different, the body is out, and we import the mirror body
+			//printf("\nSwapping Body %f %f %f to hyperpos %f %f %f\n\n", body.pos.x, body.pos.y, body.pos.z, hyper_pos.x, hyper_pos.y, hyper_pos.z);
 			body.pos = hyper_pos;
 		}
 
@@ -516,6 +529,14 @@ __global__ void stepKernel(Simulation* simulation, int offset) {
 
 
 
+
+
+
+
+
+
+
+
 __global__ void updateKernel(Simulation* simulation, int offset) {
 	int blockID1 = blockIdx.x + offset;
 	if (blockID1 >= simulation->box->n_blocks)
@@ -524,8 +545,6 @@ __global__ void updateKernel(Simulation* simulation, int offset) {
 	int threadID1 = indexConversion(Int3(threadIdx.x, threadIdx.y, threadIdx.z), 3);
 
 	
-
-
 
 	
 	//__shared__ Block block;
@@ -551,28 +570,21 @@ __global__ void updateKernel(Simulation* simulation, int offset) {
 		blockID3 = indexConversion(blockID1, bpd);
 
 		element_sum_focus[0] = 0;
-		element_sum_near[0] = 0;
+		element_sum_near[0] = 0;	
 	}
 	
 	__syncthreads();
 
 
-	AccessPoint accesspoint;
+	AccessPoint accesspoint;		// Personal to all threads
 	{	
 		Int3 neighbor_index3 = blockID3 + (Int3(threadIdx.x, threadIdx.y, threadIdx.z) - Int3(1, 1, 1));
-		neighbor_index3 = neighbor_index3 + Int3(bpd * (neighbor_index3.x == 0), bpd * (neighbor_index3.y == 0), bpd * (neighbor_index3.z == 0));
-		neighbor_index3 = neighbor_index3 - Int3(bpd * (neighbor_index3.x == (bpd)), bpd * (neighbor_index3.y == (bpd)), bpd * (neighbor_index3.z == (bpd)));
-		/*if (blockID1 == 13) {
-			printf("N3 %d %d %d\n", neighbor_index3.x, neighbor_index3.y, neighbor_index3.z);
-			printf("Loading from index %d\n\n", indexConversion(neighbor_index3, bpd));
-		}*/
-			
+		neighbor_index3 = neighbor_index3 + Int3(bpd * (neighbor_index3.x == -1), bpd * (neighbor_index3.y == -1), bpd * (neighbor_index3.z == -1));
+		neighbor_index3 = neighbor_index3 - Int3(bpd * (neighbor_index3.x == bpd), bpd * (neighbor_index3.y == bpd), bpd * (neighbor_index3.z == bpd));
 		accesspoint = simulation->box->accesspoint[indexConversion(neighbor_index3, bpd)];
 	}
 	
-		
 
-	
 	{	// To make these to variables temporary
 		int focus_cnt = 0;
 		int near_cnt = 0;
@@ -584,21 +596,12 @@ __global__ void updateKernel(Simulation* simulation, int offset) {
 
 			Float3 closest_mirror_pos = getClosestMirrorPos(body->pos, block_center);
 			int relation_type = (bodyInNear(&closest_mirror_pos, &block_center) + bodyInFocus(&body->pos, &block_center) * 2);
-			/*if ((closest_mirror_pos - body->pos).len() > 1) {
-				printf("body  ");
-				body->pos.print();
-				closest_mirror_pos.print();
-				simulation->finished = true;
-			}*/
+			
 
 
-			if (body->pos.z > 3 && relation_type > 1)
-				printf("Block %d loading %f %f %f\t from self? %d\n", blockID1, body->pos.x, body->pos.y, body->pos.z, threadID1 == 13);
 
-			if (simulation->step == 2157 && relation_type > 1 && blockID1 == 20) {
-				printf("Thread %d found body %f %f %f\n", threadID1, body->pos.x, body->pos.y, body->pos.z);
-				simulation->finished = true;
-			}
+			if (relation_type == 1)		// If the body is ONLY in near, we make a temporary copy, with the mirrors position.
+				body->pos = closest_mirror_pos;
 
 			relation_array[threadID1][i] = relation_type;
 			near_cnt += (relation_type == 1);
@@ -614,7 +617,6 @@ __global__ void updateKernel(Simulation* simulation, int offset) {
 			}
 		}*/
 		// Safer solution below, with no while true!
-		/**/
 		for (int i = 0; i < 27; i++) {
 			if (threadID1 == i) {
 				element_sum_focus[array_index] = element_sum_focus[i] + focus_cnt;
@@ -634,27 +636,25 @@ __global__ void updateKernel(Simulation* simulation, int offset) {
 		int focus_index = element_sum_focus[threadID1];
 		int near_index = element_sum_near[threadID1];
 		for (int i = 0; i < MAX_FOCUS_BODIES; i++) {
-			
-			//if (accesspoint.bodies[i].id == 7272 && relation_array[threadID1][i] > 1)
-
 			if (relation_array[threadID1][i] > 1) 
 				simulation->box->blocks[blockID1].focus_bodies[focus_index++] = accesspoint.bodies[i];				
-			else if (relation_array[threadID1][i] == 1)
+			else if (relation_array[threadID1][i] == 1) {
 				simulation->box->blocks[blockID1].near_bodies[near_index++] = accesspoint.bodies[i];
+				//printf("\n%d\t %d %d %d\t%d\t nearindex: %d\n", blockID1, blockID3.x, blockID3.y, blockID3.z, accesspoint.bodies[i].molecule_type, near_index);
+			}
+				
 		}
 
 
 
 		// Handle deactivating now-obsolete bodies
-		for (int j = 0; j * 27 < MAX_FOCUS_BODIES; j++) {
-			int focusbody_index = threadID1 + j * 27;
-			if (focusbody_index >= element_sum_focus[26]) {	// Each thread makes sure its corresponding focusbody is deactivated
-				simulation->box->blocks[blockID1].focus_bodies[focusbody_index].molecule_type = UNUSED_BODY;
-			}
-		}	
-		if (threadID1 == 26) {	// For nearbodies we only need to terminate 1 body, this saves alot of writes to global!
+		// The stepkernel will handle the marking of focus bodies, as it has the correct amount of threads. Less overhead!
+
+		// For nearbodies we only need to terminate 1 body, this saves alot of writes to global!
+		if (threadID1 == 26) {	
 			if (near_index < (MAX_NEAR_BODIES))
 				simulation->box->blocks[blockID1].near_bodies[near_index].molecule_type = UNUSED_BODY;
+			//printf("\n%f %f %f\tExporting %d\n", block_center.x, block_center.y, block_center.z, near_index);
 			//printf("Block %d loaded %d bodies\n", blockID1, focus_index);
 		}
 	}

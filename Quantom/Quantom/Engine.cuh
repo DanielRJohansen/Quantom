@@ -68,9 +68,9 @@ private:
 		);
 	}
 	inline int block3dIndexTo1dIndex(Int3 index_3d) {// NOTICE THAT X IS THE "GRANDPARENT" ITERATOR
-		return (index_3d.z + 
+		return (index_3d.x + 
 			index_3d.y * bpd + 
-			index_3d.x * bpd*bpd);
+			index_3d.z * bpd*bpd);
 	}
 
 
