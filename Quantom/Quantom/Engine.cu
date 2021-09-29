@@ -215,7 +215,7 @@ void Engine::prepareCudaScheduler() {
 	for (int i = 0; i < N_STREAMS; i++)
 		cudaStreamCreate(&stream[i]);
 
-	printf("%d kernel launches necessary to step\n", (int) ceil((float)simulation->box->n_blocks / (float)BLOCKS_PER_SM));
+	printf("%d kernel launches necessary to step\n", (int) ceil((float)simulation->box->n_blocks / (float)(BLOCKS_PER_SM * N_STREAMS)));
 	//gridblock_size = dim3(GRIDBLOCKS_PER_BODY, BLOCKS_PER_SM, 1);
 }
 
@@ -421,7 +421,6 @@ __global__ void stepKernel(Simulation* simulation, int offset) {
 	__shared__ Block block;	
 	__shared__ AccessPoint accesspoint;
 	
-	__syncthreads();
 	if (threadIdx.x == 0) {
 		block = simulation->box->blocks[blockID];
 		accesspoint = AccessPoint();
@@ -436,10 +435,8 @@ __global__ void stepKernel(Simulation* simulation, int offset) {
 	Float3 force_total = Float3(0, 0, 0);
 
 	// Calc all Lennard-Jones forces from focus bodies
-	if (body.molecule_type != UNUSED_BODY) {
-		//Float3 body_hyperpos = getHyperPosition(body.pos);
-		//body.pos = body_hyperpos
-
+	
+	if (body.molecule_type != UNUSED_BODY) {						// This part acounts for about 2/5 of compute time
 		// I assume that all present molecules come in order!!!!!!
 		for (int i = 0; i < MAX_FOCUS_BODIES; i++) {
 			if (block.focus_bodies[i].molecule_type != UNUSED_BODY) {
@@ -462,7 +459,7 @@ __global__ void stepKernel(Simulation* simulation, int offset) {
 				break;
 			}
 		}
-
+		
 
 
 
@@ -498,11 +495,6 @@ __global__ void stepKernel(Simulation* simulation, int offset) {
 
 	//body.rotation = body.rotation + body.rot_vel * simulation->dt;				
 
-
-
-
-	if (body.molecule_type == 99)	// TEMP
-		simulation->finished = true;
 
 
 
@@ -547,7 +539,6 @@ __global__ void updateKernel(Simulation* simulation, int offset) {
 	
 
 	
-	//__shared__ Block block;
 	__shared__ Float3 block_center;
 	__shared__ Int3 blockID3;
 	__shared__ int bpd;
@@ -560,15 +551,14 @@ __global__ void updateKernel(Simulation* simulation, int offset) {
 
 	
 
-	element_sum_focus[threadID1 + 1] = -1;
-	element_sum_near[threadID1 + 1] = -1;
+	//element_sum_focus[threadID1 + 1] = -1;
+	//element_sum_near[threadID1 + 1] = -1;
 	for (int i = 0; i < MAX_FOCUS_BODIES; i++)
 		relation_array[threadID1][i] = 0;
 	if (threadID1 == 0) {
 		block_center = simulation->box->blocks[blockID1].center;			// probably faster to just calculate
 		bpd = simulation->blocks_per_dim;
 		blockID3 = indexConversion(blockID1, bpd);
-
 		element_sum_focus[0] = 0;
 		element_sum_near[0] = 0;	
 	}
@@ -641,8 +631,7 @@ __global__ void updateKernel(Simulation* simulation, int offset) {
 			else if (relation_array[threadID1][i] == 1) {
 				simulation->box->blocks[blockID1].near_bodies[near_index++] = accesspoint.bodies[i];
 				//printf("\n%d\t %d %d %d\t%d\t nearindex: %d\n", blockID1, blockID3.x, blockID3.y, blockID3.z, accesspoint.bodies[i].molecule_type, near_index);
-			}
-				
+			}	
 		}
 
 
@@ -658,8 +647,6 @@ __global__ void updateKernel(Simulation* simulation, int offset) {
 			//printf("Block %d loaded %d bodies\n", blockID1, focus_index);
 		}
 	}
-	
-
 }
 
 
