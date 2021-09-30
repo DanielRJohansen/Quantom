@@ -27,12 +27,12 @@ const int MAX_NEAR_BODIES = 256 - MAX_FOCUS_BODIES;
 
 
 const int INDEXA = 100900;
-const int N_BODIES_START = BOX_LEN*BOX_LEN*BOX_LEN/(FOCUS_LEN*FOCUS_LEN*FOCUS_LEN) * 25;
-
+//const int N_BODIES_START = BOX_LEN*BOX_LEN*BOX_LEN/(FOCUS_LEN*FOCUS_LEN*FOCUS_LEN) * 25;
+const int N_BODIES_START = 80'000;
 const int BLOCKS_PER_SM = 512;
 //const int GRIDBLOCKS_PER_BODY = 16;
 //const int THREADS_PER_GRIDBLOCK = MAX_BLOCK_BODIES / GRIDBLOCKS_PER_BODY;
-const int N_STREAMS = 60;			// 68 total, 0 is general purpose, 1 is for rendering.
+const int N_STREAMS = 50;			// 68 total, 0 is general purpose, 1 is for rendering.
 
 
 
@@ -109,6 +109,7 @@ public:
 		delete ap_temp;
 		//printf("Block 38: %.1f %.1f %.1f\n", blocks[38].center.x, blocks[38].center.y, blocks[38].center.z);
 		//printf("Block 38: %.1f %.1f %.1f\n", blocks_temp[38].center.x, blocks_temp[38].center.y, blocks_temp[38].center.z);
+		printf("Box transferred to device\n\n");
 	}
 
 

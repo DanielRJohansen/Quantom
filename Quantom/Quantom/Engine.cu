@@ -142,7 +142,7 @@ int Engine::fillBox() {
 				simulation->bodies[index].mass = m;
 
 				simulation->bodies[index].vel_prev = Float3(r1, r2, r3).norm() * mean_velocity;
-				simulation->bodies[index].rotation = Float3(0, 0, 0);
+				simulation->bodies[index].rotation = Float3(r1 * 2 * PI, r2 * 2 * PI, r3 * 2 * PI);
 				simulation->bodies[index].rot_vel = Float3(r1*r2, 4*PI, 0);
 
 				/*

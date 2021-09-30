@@ -114,9 +114,36 @@ __device__ bool Ray::hitsBlock(Block* block, Float3 focalpoint) {
 
         
     return true;
-
 }
+
+__device__ bool Ray::hitsBlock(Float3* blockmin, Float3* blockmax, Float3* focalpoint) {
+    float tmin = -DBL_MAX;
+    float tmax = DBL_MAX;
     
+    for (int dim = 0; dim < 3; dim++) {
+        float invD = unit_vector.at(dim) != 0 ? 1.0f / unit_vector.at(dim) : 999999999;
+
+        float t0 = (blockmin->at(dim) - focalpoint->at(dim)) * invD;
+        float t1 = (blockmax->at(dim) - focalpoint->at(dim)) * invD;
+
+        if (invD < 0.0f) {
+            float temp = t1;
+            t1 = t0;
+            t0 = temp;
+        }
+
+        tmin = t0 > tmin ? t0 : tmin;
+        tmax = t1 < tmax ? t1 : tmax;
+
+
+        if (tmax <= tmin) {    // was <=
+            return false;
+        }
+    }
+
+
+    return true;
+}
 
 __device__ bool Ray::hitsBody(SimBody* body) {
     if (distToPoint(body->pos) < BODY_RADIUS)
@@ -180,11 +207,80 @@ __device__ float Ray::distToSphereIntersect(Atom* atom) {
     return (projection_on_ray - origin).len() - projection_to_intersect;
 }
 
-__global__ void initRayKernel(Ray* rayptr, Box* box, Float3 focalpoint) {
-	int  index = blockIdx.x * blockDim.x + threadIdx.x;
-    Ray ray = rayptr[index];
 
-	ray.findBlockHits(box, focalpoint);
+__global__ void initRayKernel(Ray* rayptr, Box* box, Float3 focalp, int offset) {
+	int index = blockIdx.x * blockDim.x + threadIdx.x + offset;
+    //int index = blockIdx.x * stride + threadIdx.x;
+    if (index > NUM_RAYS)
+        return;
+
+    
+    //extern __shared__ Float3 row_blockcenters[];
+    extern __shared__ Float3 row_block_minsmaxs[]; //[min0, max0,min1,max1]
+    __shared__ int bpd;
+    __shared__ Float3 boxsize_half;
+    __shared__ Float3 boxsize_offset;
+    __shared__ Float3 focalpoint;
+
+
+    if (threadIdx.x == 0) {
+        bpd = box->blocks_per_dim;
+        boxsize_half = Float3(FOCUS_LEN_HALF, FOCUS_LEN_HALF, FOCUS_LEN_HALF);
+        boxsize_offset = Float3(BODY_RADIUS, BODY_RADIUS, BODY_RADIUS);
+        focalpoint = focalp;
+    }
+    __syncthreads();
+
+
+
+
+    Ray ray = rayptr[index];
+    int ray_blockcnt = 0;
+    for (int i = 0; i < MAX_RAY_BLOCKS; i++)
+        ray.block_indexes[i] = -1;
+
+
+
+
+
+    for (int z = 0; z < bpd; z++) {
+        for (int y = 0; y < bpd; y++) {
+
+            // First load the entire row into shared memory
+            if (threadIdx.x < bpd) {            // UNSAFE if i change bpd too large, og threads_per_gpublock too small!!!
+                int blockindex1 = z * bpd * bpd + y * bpd + threadIdx.x;
+                Float3 block_center = box->blocks[blockindex1].center;
+                Float3 min = block_center - boxsize_half - boxsize_offset;// -offset;    //I have no idea why we need *2
+                Float3 max = block_center + boxsize_half + boxsize_offset;
+
+                row_block_minsmaxs[threadIdx.x * 2] = min;
+                row_block_minsmaxs[threadIdx.x * 2 + 1] = max;
+                //row_block_minsmaxs[threadIdx.x] = box->blocks[blockindex1].center;
+            }
+            __syncthreads();
+
+            
+            // Each threads loops over all blockcenters
+            for (int x = 0; x < bpd; x++) {
+                if (ray_blockcnt == MAX_RAY_BLOCKS)
+                    break;  // Only break this inner loop, as the thread might need to fetch blockcenters in other rows
+
+                //break;
+                //if (ray.hitsBlock(row_block_minsmaxs[x], focalpoint)) {
+                if (ray.hitsBlock(&row_block_minsmaxs[x*2], &row_block_minsmaxs[x * 2 + 1], &focalpoint)) {
+                    ray.block_indexes[ray_blockcnt++] = z * bpd * bpd + y * bpd + x;
+                }
+            }
+            
+
+
+        }
+    }
+    
+
+
+
+	//ray.findBlockHits(box, focalpoint);
 
     rayptr[index] = ray;
 }
@@ -203,13 +299,11 @@ __global__ void initRayKernel(Ray* rayptr, Box* box, Float3 focalpoint) {
 
 
 
-    
-
-
-
 
 
 Raytracer::Raytracer(Simulation* simulation, bool verbose) {
+    auto t0 = std::chrono::high_resolution_clock::now();
+    printf("\n\n");
     setGPU();
 
 
@@ -235,20 +329,54 @@ Raytracer::Raytracer(Simulation* simulation, bool verbose) {
     cuda_status = cudaMemcpy(rayptr, host_rayptr, NUM_RAYS * sizeof(Ray), cudaMemcpyHostToDevice);
 
     if (verbose) {
-        printf("\n\nFocal point: %.3f %.3f %.3f\n", focalpoint.x, focalpoint.y, focalpoint.z);
+        printf("Focal point: %.3f %.3f %.3f\n", focalpoint.x, focalpoint.y, focalpoint.z);
         printf("Allocating %d MB of ram for Rays... \n", NUM_RAYS * sizeof(Ray) / 1000000);
     }
-        
+    
 
-    initRayKernel <<< RAYS_PER_DIM, RAYS_PER_DIM>>> (rayptr, simulation->box, focalpoint);
+    // INIT KERNEL PREP ----------------------------------------------------
+    const int n_streams = 10;
+    cudaStream_t stream[n_streams];
+    for (int i = 0; i < n_streams; i++)
+        cudaStreamCreate(&stream[i]);
     cudaDeviceSynchronize();
+    cuda_status = cudaGetLastError();
+    if (cuda_status != cudaSuccess) {
+        fprintf(stderr, "rayptr init kernel failed!");
+        exit(1);
+    }
+
+    int bytesize = sizeof(Float3) * simulation->blocks_per_dim * 2;
+    int threads_per_gpublock = 32;
+    int gpublocks_needed = ceil((int)((float)NUM_RAYS / (float)threads_per_gpublock));
+    int gpublocks_per_SM = ceil((float)gpublocks_needed / (float)n_streams);
+    int stride = gpublocks_per_SM * threads_per_gpublock;
+    
+
+    printf("Rayinit requires %d bytes of shared mem\n", bytesize);
+    printf("Calling initkernel with %d blocks of %d threads per SM. Total: (%d/%d)\n", gpublocks_per_SM, threads_per_gpublock, n_streams*gpublocks_per_SM*threads_per_gpublock, NUM_RAYS);
+
+    Box* boxx;
+    boxx = new Box();
+    Box* box = simulation->box;
+    for (int i = 0; i < n_streams; i++) {
+        int offset = stride * i;
+        initRayKernel << < gpublocks_per_SM, threads_per_gpublock, bytesize, stream[i] >> > (rayptr, box, focalpoint, offset);
+    }
+    cudaDeviceSynchronize();
+
+    for (int i = 0; i < n_streams; i++)
+        cudaStreamDestroy(stream[i]);
 
     cuda_status = cudaGetLastError();
     if (cuda_status != cudaSuccess) {
         fprintf(stderr, "rayptr init kernel failed!");
         exit(1);
     }
-        
+
+    
+
+    // FINAL OUTPUT
         
     if (verbose) {
         printf("Ray %d: %f %f %f\n", INDEXA, rayptr[INDEXA].unit_vector.x, rayptr[INDEXA].unit_vector.y, rayptr[INDEXA].unit_vector.z);
@@ -258,7 +386,8 @@ Raytracer::Raytracer(Simulation* simulation, bool verbose) {
         }
     }
 
-    printf("Rays initiated\n\n");
+    int duration = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - t0).count();
+    printf("\nRaytracer initiated in %d ms\n\n", duration);
 }
     
 __device__ void colorRay(Ray* ray, uint8_t* image, int index) {
