@@ -151,60 +151,28 @@ int Engine::fillBox() {
 				simulation->bodies[index].pos.print();
 				*/
 
-				placeBody(&simulation->bodies[index++]);
+				if (placeBody(&simulation->bodies[index]))
+					index++;
 			}
 		}
 	}
 	return index;
 }
-/*
-void Engine::placeBody(SimBody* body) {
-	//const Int3 block_index = posToBlockIndex(&body->pos);
-	
 
-	int count = 0;
-
-	SimBody temp;
-	Int3 block_index_;
-
-	for (int z_off = -1; z_off <= 1; z_off++) {
-		for (int y_off = -1; y_off <= 1; y_off++) {
-			for (int x_off = -1; x_off <= 1; x_off++) {
-
-
-				Float3 pos_(body->pos.x + x_off * BLOCK_OVERLAP, body->pos.y + y_off * BLOCK_OVERLAP, body->pos.z + z_off * BLOCK_OVERLAP);
-				block_index_ = posToBlockIndex(&pos_);
-				//printf("%d %d %d\n", block_index_.x, block_index_.y, block_index_.z);
-				int block_index_1d = block3dIndexTo1dIndex(block_index_);
-				//printf("Block index. %d\n", block_index_1d);
-				Block* block = &simulation->box->blocks[block_index_1d];
-				if (block->addBody(body))
-					count++;
-			}
-		}
-	}
-	//printf("Molecule placed in %d blocks\n", count);
-}
-*/
-
-void Engine::placeBody(SimBody* body) {
+bool Engine::placeBody(SimBody* body) {
 	Int3 block_index = posToBlockIndex(&body->pos);
 	//printf("Block index: %d %d %d\n", block_index.x, block_index.y, block_index.z);
-	
-
 	int block_index_1d = block3dIndexTo1dIndex(block_index);
+	Block* block = &simulation->box->blocks[block_index_1d];
+	if (block_index_1d < 0)
+		printf("Rebuild All you twat\n");
+
+	return block->addBody(body);
+
 	//printf("Block index1: %d\n", block_index_1d);
 	//printf("BLock center:");
 	//simulation->box->blocks[block_index_1d].center.print();
 	//printf("\n");
-	if (block_index_1d < 0)
-		printf("Rebuild All you twat\n");
-
-	Block* block = &simulation->box->blocks[block_index_1d];
-
-	
-	if (!block->addBody(body))
-		printf("Body lost!\n");
 
 }
 
@@ -382,7 +350,7 @@ __device__ Float3 calcLJForce(SimBody* body0, SimBody* body1, int i, int bid) {
 	Float3 force_unit_vector = (body0->pos - body1->pos).norm();
 	
 	if (LJ_pot > 10e+9) {
-		//body0->molecule_type = 99;
+		body0->molecule_type = 99;
 		printf("\n\n GIGAFORCE! Block %d thread %d\n", bid, threadIdx.x);
 		printf("other body index: %d\n", i);
 		printf("Body 0 id: %d     %f %f %f\n", body0->id,  body0->pos.x, body0->pos.y, body0->pos.z);
@@ -435,7 +403,6 @@ __global__ void stepKernel(Simulation* simulation, int offset) {
 	Float3 force_total = Float3(0, 0, 0);
 
 	// Calc all Lennard-Jones forces from focus bodies
-	
 	if (body.molecule_type != UNUSED_BODY) {						// This part acounts for about 2/5 of compute time
 		// I assume that all present molecules come in order!!!!!!
 		for (int i = 0; i < MAX_FOCUS_BODIES; i++) {
@@ -460,7 +427,8 @@ __global__ void stepKernel(Simulation* simulation, int offset) {
 			}
 		}
 		
-
+		if (body.molecule_type == 99)
+			simulation->finished = true;
 
 
 
@@ -567,12 +535,12 @@ __global__ void updateKernel(Simulation* simulation, int offset) {
 
 
 	AccessPoint accesspoint;		// Personal to all threads
-	{	
+		
 		Int3 neighbor_index3 = blockID3 + (Int3(threadIdx.x, threadIdx.y, threadIdx.z) - Int3(1, 1, 1));
 		neighbor_index3 = neighbor_index3 + Int3(bpd * (neighbor_index3.x == -1), bpd * (neighbor_index3.y == -1), bpd * (neighbor_index3.z == -1));
 		neighbor_index3 = neighbor_index3 - Int3(bpd * (neighbor_index3.x == bpd), bpd * (neighbor_index3.y == bpd), bpd * (neighbor_index3.z == bpd));
 		accesspoint = simulation->box->accesspoint[indexConversion(neighbor_index3, bpd)];
-	}
+	
 	
 
 	{	// To make these to variables temporary
@@ -592,6 +560,9 @@ __global__ void updateKernel(Simulation* simulation, int offset) {
 
 			if (relation_type == 1)		// If the body is ONLY in near, we make a temporary copy, with the mirrors position.
 				body->pos = closest_mirror_pos;
+
+			//if (relation_type > 1 && body->id == 0)
+				//printf("\nLoading %d to block %d %d %d by thread %d %d %d from block %d %d %d\n", body->id, blockID3.x, blockID3.y, blockID3.z, threadIdx.x-1, threadIdx.y - 1, threadIdx.z - 1, neighbor_index3.x, neighbor_index3.y, neighbor_index3.z);
 
 			relation_array[threadID1][i] = relation_type;
 			near_cnt += (relation_type == 1);

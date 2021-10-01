@@ -5,7 +5,7 @@
 
 
 
-constexpr float BOX_LEN = 36.0;	// Multiple of FOCUS_LEN please!
+constexpr float BOX_LEN = 10.0;	// Multiple of FOCUS_LEN please!
 
 constexpr float BOX_LEN_HALF = BOX_LEN/2.f;
 constexpr float BOX_BASE = -BOX_LEN_HALF;
@@ -28,7 +28,7 @@ const int MAX_NEAR_BODIES = 256 - MAX_FOCUS_BODIES;
 
 const int INDEXA = 100900;
 //const int N_BODIES_START = BOX_LEN*BOX_LEN*BOX_LEN/(FOCUS_LEN*FOCUS_LEN*FOCUS_LEN) * 25;
-const int N_BODIES_START = 80'000;
+const int N_BODIES_START = 2500;
 const int BLOCKS_PER_SM = 512;
 //const int GRIDBLOCKS_PER_BODY = 16;
 //const int THREADS_PER_GRIDBLOCK = MAX_BLOCK_BODIES / GRIDBLOCKS_PER_BODY;
@@ -48,9 +48,9 @@ struct Block {	// All boxes are cubic
 	__host__ __device__ bool isInBLock(Float3 point);
 
 	__host__ bool addBody(SimBody* body) {			// ONLY USED FOR INITIATION 
-		if (n_bodies == MAX_FOCUS_BODIES) {
-			printf("Too many bodies for this block!");
-			exit(1);
+		if (n_bodies == MAX_FOCUS_BODIES-8) {
+			//printf("Too many bodies for this block!");
+			return false;
 		}
 		//printf("Added\n");
 		focus_bodies[n_bodies] = *body;
@@ -153,10 +153,10 @@ public:
 
 	float box_size = BOX_LEN;	//nm
 	int blocks_per_dim;
-	int n_steps = 10000;
+	int n_steps = 60000;
 
 	const double dt = 1 *	10.0e-6;		// ns, so first val corresponds to fs
-	int steps_per_render = 50;
+	int steps_per_render = 500;
 
 	int n_bodies = N_BODIES_START;
 	Box* box;

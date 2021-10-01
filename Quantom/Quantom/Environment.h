@@ -19,6 +19,7 @@ public:
 
 
 private:
+	bool verifySimulationParameters();
 	Display* display;
 	Interface* interface;
 	Engine* engine;

@@ -43,7 +43,7 @@ private:
 	void linkBlocks();
 	void prepareEdgeBlocks();
 
-	void placeBody(SimBody* body);
+	bool placeBody(SimBody* body);
 	void prepareCudaScheduler();
 
 	Simulation* simToDevice();
