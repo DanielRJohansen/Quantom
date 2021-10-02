@@ -28,7 +28,7 @@ const int MAX_NEAR_BODIES = 256 - MAX_FOCUS_BODIES;
 
 const int INDEXA = 100900;
 //const int N_BODIES_START = BOX_LEN*BOX_LEN*BOX_LEN/(FOCUS_LEN*FOCUS_LEN*FOCUS_LEN) * 25;
-const int N_BODIES_START = 2500;
+const int N_BODIES_START = 8;
 const int BLOCKS_PER_SM = 512;
 //const int GRIDBLOCKS_PER_BODY = 16;
 //const int THREADS_PER_GRIDBLOCK = MAX_BLOCK_BODIES / GRIDBLOCKS_PER_BODY;
@@ -84,6 +84,9 @@ public:
 
 	int blocks_per_dim;
 
+	CompactParticle* all_particles;	// Used for communation between inter and intra-molecular kernels
+	uint32_t n_particles = 0;
+
 	void finalizeBlock() {
 
 	}
@@ -97,6 +100,14 @@ public:
 		cudaDeviceSynchronize();
 		delete blocks;
 		blocks = blocks_temp;
+
+
+		CompactParticle* particles_temp;
+		int bytesize = n_particles * sizeof(CompactParticle);
+		cudaMalloc(&particles_temp, bytesize);
+		cudaMemcpy(particles_temp, all_particles, bytesize, cudaMemcpyHostToDevice);
+		delete all_particles;
+		all_particles = particles_temp;
 
 
 		AccessPoint* ap_temp = new AccessPoint[n_blocks];
@@ -156,7 +167,7 @@ public:
 	int n_steps = 60000;
 
 	const double dt = 1 *	10.0e-6;		// ns, so first val corresponds to fs
-	int steps_per_render = 500;
+	int steps_per_render = 50;
 
 	int n_bodies = N_BODIES_START;
 	Box* box;

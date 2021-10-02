@@ -186,6 +186,16 @@ __device__ bool Ray::moleculeCollisionHandling(SimBody* body, MoleculeLibrary* m
             
     }
 
+
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+
+    image[index * 4 + 0] = closest_atom.color[0];
+    image[index * 4 + 1] = closest_atom.color[1];
+    image[index * 4 + 2] = closest_atom.color[2];
+    image[index * 4 + 3] = 255;
+
+
+    /*  // TEMP REMOVED 
     if (closest_atom.pos.y != infinity) {
         int index = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -194,7 +204,7 @@ __device__ bool Ray::moleculeCollisionHandling(SimBody* body, MoleculeLibrary* m
         image[index * 4 + 2] = closest_atom.color[2];
         image[index * 4 + 3] = 255;
         return true;
-    }
+    }*/
     
     
     return false;

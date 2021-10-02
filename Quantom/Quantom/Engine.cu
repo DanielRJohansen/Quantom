@@ -105,6 +105,33 @@ int Engine::initBlocks() {
 	return index;
 }
 
+
+void Engine::compoundPlacer(Float3 center_pos, Compound_H2O compound) {
+	Molecule molecule = simulation->mol_library->molecules[0];	// Make a copy of the molecule
+
+	uint32_t bondpairs[2][2] = { {1,2}, {2,3} };
+	uint32_t molecule_start_index = simulation->box->n_particles; // index of first atom
+
+	
+
+	for (int i = 0; i < molecule.n_atoms; i++) {
+		Particle particle;
+		particle.pos = molecule.atoms[i].pos + center_pos;
+		particle.id = simulation->box->n_particles;
+
+		if (!placeParticle(&particle))
+			printf("\nFUck\n");
+
+		simulation->box->particles[simulation->box->n_particles] = particle;	// Copy to the rightful place!
+		simulation->box->n_particles++;
+	}
+
+	for (int i = 0; i < compound.n_pairbonds; i++) {
+
+	}
+
+}
+
 int Engine::fillBox() {
 	int bodies_per_dim = ceil(cbrt((float)simulation->n_bodies));
 	float dist = (BOX_LEN) / (float)bodies_per_dim;	// dist_per_index
@@ -113,12 +140,14 @@ int Engine::fillBox() {
 	float base = box_base + dist/2.f ;
 	
 
-
 	double m = 18.01528;		// g/mol
 	double k_B = 8.617333262145 * 10e-5;
 	double T = 293;	// Kelvin
 	float mean_velocity = m / (2 * k_B * T);
 	int p = 10000;
+
+	simulation->box->particles = new Particle[1'000'000];
+	simulation->box->compounds = new Compound_H2O[1'000'000];
 
 	int index = 0;
 	for (int z_index = 0; z_index < bodies_per_dim; z_index++) {
@@ -131,7 +160,15 @@ int Engine::fillBox() {
 				float r2 = rand() % p / (float)p - 0.5;
 				float r3 = rand() % p / (float)p - 0.5;
 
-				simulation->bodies[index].pos = Float3(base + dist * (float)x_index, base + dist * (float)y_index, base + dist * (float)z_index);
+
+				Float3 compound_base_pos = Float3(base + dist * (float)x_index, base + dist * (float)y_index, base + dist * (float)z_index);
+				int compound_first_index = simulation->box->n_particles;
+
+				Compound_H2O compound(compound_first_index);
+				compoundPlacer(compound_base_pos, compound);
+
+				/*
+				simulation->bodies[index].pos = 
 
 				//printf("Body pos: ");
 				//simulation->bodies[index].pos.print();
@@ -149,10 +186,11 @@ int Engine::fillBox() {
 				simulation->bodies[index].pos = Float3(0.5 + 2 - (0.5*2 * x_index), 0, 0);
 				simulation->bodies[index].vel_prev = Float3(0, 0, 0);
 				simulation->bodies[index].pos.print();
-				*/
+				
 
-				if (placeBody(&simulation->bodies[index]))
-					index++;
+				//if (placeBody(&simulation->bodies[index]))
+					//index++;
+				moleculePlacer(&simulation->bodies[index]); */
 			}
 		}
 	}

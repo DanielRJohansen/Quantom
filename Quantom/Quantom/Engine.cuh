@@ -26,6 +26,7 @@ public:
 
 	int countBodies();
 	void step();
+	void moleculePlacer(SimBody* body);
 
 
 	Int3 timings = Int3(0, 0, 0);
@@ -38,6 +39,7 @@ public:
 private:
 	Simulation* simulation;
 	int fillBox();		// Returns # of bodies placed
+
 
 	int initBlocks();	// returns # of blocks created
 	void linkBlocks();

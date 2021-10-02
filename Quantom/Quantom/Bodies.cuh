@@ -44,47 +44,40 @@ struct Molecule {
 constexpr float BODY_RADIUS = 0.2;		// CRITICAL VALUE!
 constexpr unsigned char UNUSED_BODY = 255;
 
-struct SimBody {
-	__host__ __device__ SimBody() {}
+struct Particle {
+	__host__ __device__ Particle() {}
+	__host__ Particle(uint32_t id, Float3 pos, Float3 vel_prev, float mass, uint32_t bondp_ids[4]) :
+		id(id), pos(pos), vel_prev(vel_prev), mass(mass)
+	{
+		active = true;
+		for (size_t i = 0; i < 4; i++) {
+			bondpair_ids[i] = bondp_ids[i];
+		}
+	}
 	//RenderBody* renderbody;
 
-	uint16_t id = 0;
+	uint32_t id = 0;
 
 	Float3 pos;	//CoM - nm
-	//Float3 vel;	// nm/sec
 	Float3 vel_prev;
 
-	Float3 rotation;	//radians pitch, yaw, roll, x-axis, z-axis, y-axis
-	Float3 rot_vel;	//radians/sec
+
 	float mass = 0;
 	//float radius = 0.05;
-	unsigned char molecule_type = UNUSED_BODY;			// 255 is unutilized, 0 is water
+	//unsigned char molecule_type = UNUSED_BODY;			// 255 is unutilized, 0 is water
+	bool active = false;
+	uint32_t bondpair_ids[4];		// only to avoid intermol forces between bonded atoms
 
 	//Float3 charge_unit_vector;
-	float charge_magnitude = 0.f;
+	//float charge_magnitude = 0.f;
 
-};
-
-
-
-
-
-struct Compound {	//Or molecule
-	Compound() {};
-	Compound(int n_bodies) : n_bodies(n_bodies) {
-		bodies = new SimBody[n_bodies]; 
-	}
-
-	bool non_bonded = true;
-
-	int n_bodies = 0;
-	SimBody* bodies;
+	Float3 force;
 };
 
 
 struct MoleculeLibrary {
 
-	MoleculeLibrary(){
+	MoleculeLibrary() {
 		molecules = new Molecule[1];
 		n_molecules++;
 
@@ -110,3 +103,78 @@ struct MoleculeLibrary {
 	Molecule* molecules;
 
 };
+
+
+
+//--------------------------- THE FOLLOWING IS FOR HANDLING INTRAMOLECULAR FORCES ---------------------------//
+
+struct CompactParticle {
+	CompactParticle(){}
+	CompactParticle(Float3 pos, float mass) : pos(pos), mass(mass) {}
+	Float3 pos;
+	float mass;
+};
+
+struct PairBond {	// IDS and indexes are used interchangeably here!
+	PairBond(){}
+	PairBond(float ref_dist, uint32_t particleindex_a, uint32_t particleindex_b, uint32_t bond_index) : 
+		reference_dist(ref_dist), bond_index(bond_index) {
+		atom_indexes[0] = particleindex_a;
+		atom_indexes[1] = particleindex_b;
+	}
+
+	uint32_t bond_index;	
+	float reference_dist;
+	uint32_t atom_indexes[2];	// Relative to the compund - NOT ABSOLUTE INDEX. Used in global table with compunds start-index
+};
+
+struct AngleBond {
+	float reference_theta;
+	uint32_t atom_indexes[3]; // i,j,k angle between i and k
+};
+
+
+
+
+
+
+// A shell script will automate writing these compounds
+const int H2O_PARTICLES = 3;
+const int H2O_PAIRBONDS = 2;
+struct Compound_H2O {	// Entire molecule for small < 500 atoms molcules, or part of large molecule
+	Compound_H2O() {};	// {O, H, H}
+	Compound_H2O(Particle* global_particle_table, uint32_t startindex_particle, uint32_t startindex_bond) : 
+		startindex_particle(startindex_particle) {
+		pairbonds[0] = PairBond(0.095, 0, 1, startindex_bond++);
+		pairbonds[1] = PairBond(0.095, 0, 2, startindex_bond++);
+
+		uint8_t particle_bond_count[H2O_PARTICLES] = { 0 };
+		for (int i = 0; i < H2O_PAIRBONDS; i++) {	
+			for (int j = 0; j < 2; j++) {		// Iterate over both particles in bond
+				uint32_t rel_p_index = pairbonds[i].atom_indexes[j];
+				uint32_t abs_p_index = startindex_particle + rel_p_index;
+				uint8_t p_bond_cnt = particle_bond_count[rel_p_index];
+				global_particle_table[abs_p_index].bondpair_ids[p_bond_cnt] = pairbonds[i].bond_index;
+				particle_bond_count[rel_p_index]++;
+			}
+		}
+	}
+
+	void loadParticles(Particle* global_particle_table) {
+		for (int i = 0; i < n_particles ; i++) {
+			particles[i].pos = global_particle_table[startindex_particle + i].pos;
+		}
+	}
+
+	const uint16_t n_particles = H2O_PARTICLES;
+	CompactParticle particles[H2O_PARTICLES];
+
+	uint32_t startindex_particle;
+	
+	const uint16_t n_pairbonds = H2O_PAIRBONDS;
+	PairBond pairbonds[H2O_PAIRBONDS];
+	
+	
+
+};
+
