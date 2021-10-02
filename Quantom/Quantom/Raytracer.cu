@@ -145,13 +145,13 @@ __device__ bool Ray::hitsBlock(Float3* blockmin, Float3* blockmax, Float3* focal
     return true;
 }
 
-__device__ bool Ray::hitsBody(SimBody* body) {
-    if (distToPoint(body->pos) < BODY_RADIUS)
+__device__ bool Ray::hitsParticle(Particle* particle) {
+    if (distToPoint(particle->pos) < BODY_RADIUS)
         return true;
     return false;
 }
 
-__device__ bool Ray::moleculeCollisionHandling(SimBody* body, MoleculeLibrary* mol_library, uint8_t* image) {
+__device__ bool Ray::moleculeCollisionHandling(Particle* particle, MoleculeLibrary* mol_library, uint8_t* image) {
     Molecule* mol = &mol_library->molecules[0];
 
     const int infinity = 9999999;
@@ -163,7 +163,8 @@ __device__ bool Ray::moleculeCollisionHandling(SimBody* body, MoleculeLibrary* m
 
 
 
-    Float3 molecule_tilt_vector = Float3(0, 1, 0).rotateAroundOrigin(body->rotation);
+    //Float3 molecule_tilt_vector = Float3(0, 1, 0).rotateAroundOrigin(body->rotation);
+    /*
     for (int atom_index = 0; atom_index < mol->n_atoms; atom_index++) {
         
         // Local copy which we can manipulate
@@ -185,7 +186,7 @@ __device__ bool Ray::moleculeCollisionHandling(SimBody* body, MoleculeLibrary* m
         }
             
     }
-
+    */
 
     int index = blockIdx.x * blockDim.x + threadIdx.x;
 

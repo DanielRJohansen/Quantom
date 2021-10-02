@@ -26,7 +26,7 @@ public:
 
 	int countBodies();
 	void step();
-	void moleculePlacer(SimBody* body);
+	void compoundPlacer(Float3 center_pos, Compound_H2O compound);
 
 
 	Int3 timings = Int3(0, 0, 0);
@@ -45,7 +45,7 @@ private:
 	void linkBlocks();
 	void prepareEdgeBlocks();
 
-	bool placeBody(SimBody* body);
+	bool placeParticle(Particle* particle);
 	void prepareCudaScheduler();
 
 	Simulation* simToDevice();

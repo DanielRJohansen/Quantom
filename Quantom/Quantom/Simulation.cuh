@@ -84,12 +84,14 @@ public:
 
 	int blocks_per_dim;
 
-	CompactParticle* all_particles;	// Used for communation between inter and intra-molecular kernels
+	Particle* particles;
 	uint32_t n_particles = 0;
+	//CompactParticle* all_particles;	// Used for communation between inter and intra-molecular kernels
+	
+	Compound_H2O* compounds;
+	uint32_t n_compounds = 0;
 
-	void finalizeBlock() {
 
-	}
 	void moveToDevice() {	// Loses pointer to RAM location!
 		//printf("Block 38: %.1f %.1f %.1f\n", blocks[38].center.x, blocks[38].center.y, blocks[38].center.z);
 
@@ -171,7 +173,7 @@ public:
 
 	int n_bodies = N_BODIES_START;
 	Box* box;
-	SimBody* bodies;	// The bodies of each block is only total copy, not a pointer to its corresponding body here!
+	//SimBody* bodies;	// The bodies of each block is only total copy, not a pointer to its corresponding body here!
 	MoleculeLibrary* mol_library;
 
 	~Simulation() {
