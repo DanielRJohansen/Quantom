@@ -47,24 +47,24 @@ struct Block {	// All boxes are cubic
 	__host__ __device__ Block(Float3 center) : center(center) {}
 	__host__ __device__ bool isInBLock(Float3 point);
 
-	__host__ bool addBody(SimBody* body) {			// ONLY USED FOR INITIATION 
-		if (n_bodies == MAX_FOCUS_BODIES-8) {
-			//printf("Too many bodies for this block!");
+	__host__ bool addParticle(Particle* particle) {			// ONLY USED FOR INITIATION 
+		if (n_particles == MAX_FOCUS_BODIES-8) {
+			//printf("Too many particles for this block!");
 			return false;
 		}
 		//printf("Added\n");
-		focus_bodies[n_bodies] = *body;
-		n_bodies++;
+		focus_particles[n_particles] = *particle;
+		n_particles++;
 		return true;
 	}
 
 
 	Float3 center;
 
-	SimBody focus_bodies[MAX_FOCUS_BODIES];
-	SimBody near_bodies[MAX_NEAR_BODIES];
+	Particle focus_particles[MAX_FOCUS_BODIES];
+	Particle near_particles[MAX_NEAR_BODIES];
 
-	int n_bodies = 0;		//  Only used when loading the block
+	int n_particles = 0;		//  Only used when loading the block
 	bool edge_block = false;
 
 	//signed char edge_type[3] = { 0,0,0 }; // -1 negative edge, 0 non-edge, 1 pos-edge, xyz
@@ -72,7 +72,7 @@ struct Block {	// All boxes are cubic
 };
 
 struct AccessPoint {
-	SimBody bodies[MAX_FOCUS_BODIES];
+	Particle particles[MAX_FOCUS_BODIES];
 };
 
 class Box {	// Should each GPU block have a copy of the box?
@@ -91,6 +91,7 @@ public:
 	Compound_H2O* compounds;
 	uint32_t n_compounds = 0;
 
+	uint32_t n_pairbonds = 0;	//Need to record this so we can avoid LJ pot for bonded particles
 
 	void moveToDevice() {	// Loses pointer to RAM location!
 		//printf("Block 38: %.1f %.1f %.1f\n", blocks[38].center.x, blocks[38].center.y, blocks[38].center.z);
@@ -104,12 +105,19 @@ public:
 		blocks = blocks_temp;
 
 
-		CompactParticle* particles_temp;
-		int bytesize = n_particles * sizeof(CompactParticle);
+		Particle* particles_temp;
+		int bytesize = n_particles * sizeof(Particle);
 		cudaMalloc(&particles_temp, bytesize);
-		cudaMemcpy(particles_temp, all_particles, bytesize, cudaMemcpyHostToDevice);
-		delete all_particles;
-		all_particles = particles_temp;
+		cudaMemcpy(particles_temp, particles, bytesize, cudaMemcpyHostToDevice);
+		delete particles;
+		particles = particles_temp;
+
+		Compound_H2O* compounds_temp;
+		bytesize = n_compounds * sizeof(Compound_H2O);
+		cudaMalloc(&compounds_temp, bytesize);
+		cudaMemcpy(compounds_temp, compounds, bytesize, cudaMemcpyHostToDevice);
+		delete compounds;
+		compounds = compounds_temp;
 
 
 		AccessPoint* ap_temp = new AccessPoint[n_blocks];

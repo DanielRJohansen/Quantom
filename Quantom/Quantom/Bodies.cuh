@@ -46,13 +46,10 @@ constexpr unsigned char UNUSED_BODY = 255;
 
 struct Particle {
 	__host__ __device__ Particle() {}
-	__host__ Particle(uint32_t id, Float3 pos, Float3 vel_prev, float mass, uint32_t bondp_ids[4]) :
+	__host__ Particle(uint32_t id, Float3 pos, Float3 vel_prev, float mass) :
 		id(id), pos(pos), vel_prev(vel_prev), mass(mass)
 	{
 		active = true;
-		for (size_t i = 0; i < 4; i++) {
-			bondpair_ids[i] = bondp_ids[i];
-		}
 	}
 	//RenderBody* renderbody;
 
@@ -67,6 +64,7 @@ struct Particle {
 	//unsigned char molecule_type = UNUSED_BODY;			// 255 is unutilized, 0 is water
 	bool active = false;
 	uint32_t bondpair_ids[4];		// only to avoid intermol forces between bonded atoms
+	// these are handled later when we create the compound
 
 	//Float3 charge_unit_vector;
 	//float charge_magnitude = 0.f;
@@ -144,7 +142,7 @@ const int H2O_PAIRBONDS = 2;
 struct Compound_H2O {	// Entire molecule for small < 500 atoms molcules, or part of large molecule
 	Compound_H2O() {};	// {O, H, H}
 	Compound_H2O(Particle* global_particle_table, uint32_t startindex_particle, uint32_t startindex_bond) : 
-		startindex_particle(startindex_particle) {
+		global_particle_table(global_particle_table), startindex_particle(startindex_particle) {
 		pairbonds[0] = PairBond(0.095, 0, 1, startindex_bond++);
 		pairbonds[1] = PairBond(0.095, 0, 2, startindex_bond++);
 
@@ -160,6 +158,7 @@ struct Compound_H2O {	// Entire molecule for small < 500 atoms molcules, or part
 		}
 	}
 
+	Compound_H2O operator = (const Compound_H2O a) { return Compound_H2O(&a->global_particle_table, a.startindex_particle, a.s); }
 	void loadParticles(Particle* global_particle_table) {
 		for (int i = 0; i < n_particles ; i++) {
 			particles[i].pos = global_particle_table[startindex_particle + i].pos;
@@ -169,12 +168,12 @@ struct Compound_H2O {	// Entire molecule for small < 500 atoms molcules, or part
 	const uint16_t n_particles = H2O_PARTICLES;
 	CompactParticle particles[H2O_PARTICLES];
 
-	uint32_t startindex_particle;
+	uint32_t startindex_particle = 0;
 	
 	const uint16_t n_pairbonds = H2O_PAIRBONDS;
 	PairBond pairbonds[H2O_PAIRBONDS];
 	
-	
+	Particle* global_particle_table;	// Host address, only usable when creating compound
 
 };
 

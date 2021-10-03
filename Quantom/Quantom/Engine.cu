@@ -106,30 +106,29 @@ int Engine::initBlocks() {
 }
 
 
-void Engine::compoundPlacer(Float3 center_pos, Compound_H2O compound) {
+void Engine::compoundPlacer(Float3 center_pos, Float3 united_vel) {
 	Molecule molecule = simulation->mol_library->molecules[0];	// Make a copy of the molecule
 
 	uint32_t bondpairs[2][2] = { {1,2}, {2,3} };
 	uint32_t molecule_start_index = simulation->box->n_particles; // index of first atom
 
 	
-
+	// First place all particles in blocks and global table
 	for (int i = 0; i < molecule.n_atoms; i++) {
-		Particle particle;
-		particle.pos = molecule.atoms[i].pos + center_pos;
-		particle.id = simulation->box->n_particles;
+		Particle particle(simulation->box->n_particles + i, center_pos, united_vel, molecule.atoms[i].mass);
 
-		if (!placeParticle(&particle))
+		if (!placeParticle(&particle))											// Copy into appropriate block!
 			printf("\nFUck\n");
 
-		simulation->box->particles[simulation->box->n_particles] = particle;	// Copy to the rightful place!
+		simulation->box->particles[simulation->box->n_particles] = particle;	// Copy to global communication channel!
 		simulation->box->n_particles++;
 	}
 
-	for (int i = 0; i < compound.n_pairbonds; i++) {
-
-	}
-
+	// Now create all compounds, which link to the created particles!
+	Compound_H2O compound(simulation->box->particles, simulation->box->n_particles, simulation->box->n_compounds);
+	simulation->box->n_particles += compound.n_particles;
+	simulation->box->n_pairbonds += compound.n_pairbonds;
+	simulation->box->compounds[simulation->box->n_compounds++] = compound;	// Copy to Box compounds
 }
 
 int Engine::fillBox() {
@@ -163,9 +162,9 @@ int Engine::fillBox() {
 
 				Float3 compound_base_pos = Float3(base + dist * (float)x_index, base + dist * (float)y_index, base + dist * (float)z_index);
 				int compound_first_index = simulation->box->n_particles;
+				Float3 compound_united_vel = Float3(r1, r2, r3).norm() * mean_velocity;
 
-				Compound_H2O compound(compound_first_index);
-				compoundPlacer(compound_base_pos, compound);
+				compoundPlacer(compound_base_pos, compound_united_vel);
 
 				/*
 				simulation->bodies[index].pos = 
@@ -197,15 +196,15 @@ int Engine::fillBox() {
 	return index;
 }
 
-bool Engine::placeBody(SimBody* body) {
-	Int3 block_index = posToBlockIndex(&body->pos);
+bool Engine::placeParticle(Particle* particle) {
+	Int3 block_index = posToBlockIndex(&particle->pos);
 	//printf("Block index: %d %d %d\n", block_index.x, block_index.y, block_index.z);
 	int block_index_1d = block3dIndexTo1dIndex(block_index);
 	Block* block = &simulation->box->blocks[block_index_1d];
 	if (block_index_1d < 0)
 		printf("Rebuild All you twat\n");
 
-	return block->addBody(body);
+	return block->addParticle(particle);
 
 	//printf("Block index1: %d\n", block_index_1d);
 	//printf("BLock center:");
