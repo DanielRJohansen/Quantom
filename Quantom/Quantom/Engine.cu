@@ -112,25 +112,27 @@ void Engine::compoundPlacer(Float3 center_pos, Float3 united_vel) {
 
 	uint32_t bondpairs[2][2] = { {1,2}, {2,3} };
 	uint32_t molecule_start_index = simulation->box->n_particles; // index of first atom
-
+	uint32_t compound_index = simulation->box->n_compounds++;
 	
 	// First place all particles in blocks and global table
 	for (int i = 0; i < molecule.n_atoms; i++) {
-		Particle particle(simulation->box->n_particles + i, center_pos, united_vel, molecule.atoms[i].mass);
+		uint32_t abs_index = simulation->box->n_particles++;
+		Particle particle(abs_index, center_pos + molecule.atoms[i].pos, united_vel, molecule.atoms[i].mass, compound_index);
+		particle.radius = molecule.atoms[i].radius;
+		for (int j = 0; j < 3; j++)
+			particle.color[j] = molecule.atoms[i].color[j];
 
 		if (!placeParticle(&particle))											// Copy into appropriate block!
 			printf("\nFUck\n");
 
-		simulation->box->particles[simulation->box->n_particles] = particle;	// Copy to global communication channel!
-		simulation->box->n_particles++;
+		simulation->box->particles[abs_index] = particle;	// Copy to global communication channel!
 	}
 
 	// Now create all compounds, which link to the created particles!
-	Compound_H2O compound(simulation->box->particles, simulation->box->n_particles, simulation->box->n_compounds);
-	simulation->box->n_particles += compound.n_particles;
-	simulation->box->n_pairbonds += compound.n_pairbonds;
-	//simulation->box->compounds[simulation->box->n_compounds++] = compound;	// Copy to Box compounds
-	simulation->box->compounds[simulation->box->n_compounds++].init(simulation->box->particles, simulation->box->n_particles, simulation->box->n_compounds);
+	//Compound_H2O compound(simulation->box->particles, simulation->box->n_particles, simulation->box->n_compounds);
+	uint32_t particle_startindex = simulation->box->n_particles - molecule.n_atoms;
+	simulation->box->compounds[compound_index].init(particle_startindex, compound_index);
+
 }
 
 int Engine::fillBox() {
@@ -197,9 +199,17 @@ int Engine::fillBox() {
 			}
 		}
 	}
-	return index;
-}
 
+	for (int i = 0; i < simulation->box->n_particles; i++) {
+		//simulation->box->particles[i].pos.print();
+		//printf("\nParticle %d bond ids:\n", i);
+		//for (int j = 0; j < 4; j++)
+			//printf("%d\t", simulation->box->particles[i].bondpair_ids[j]);
+	}	
+	//exit(1);
+	return index;
+}	
+	
 bool Engine::placeParticle(Particle* particle) {
 	Int3 block_index = posToBlockIndex(&particle->pos);
 	//printf("Block index: %d %d %d\n", block_index.x, block_index.y, block_index.z);
@@ -398,6 +408,7 @@ __device__ void integrateTimestep(Simulation* simulation, Particle* particle, Fl
 	particle->vel_prev = vel_next;
 }
 
+/*
 __device__ bool isBonded(Particle* a, Particle* b) {
 	for (int i = 0; i < 4; i++) {
 		for (int j = 0; j < 4; j++) {
@@ -410,7 +421,7 @@ __device__ bool isBonded(Particle* a, Particle* b) {
 	}
 	return false;
 }
-
+*/
 
 // ------------------------------------------------------------------------------------------- KERNELS -------------------------------------------------------------------------------------------//
 
@@ -448,7 +459,7 @@ __global__ void stepKernel(Simulation* simulation, int offset) {
 		// I assume that all present molecules come in order!!!!!!
 		for (int i = 0; i < MAX_FOCUS_BODIES; i++) {
 			if (block.focus_particles[i].active) {
-				if (i != bodyID && !isBonded(&particle, &block.focus_particles[i])) {
+				if (i != bodyID && particle.compoundID !=  block.focus_particles[i].compoundID) {
 					force_total = force_total + calcLJForce(&particle, &block.focus_particles[i], -i, blockID);
 				}
 			}
@@ -460,7 +471,7 @@ __global__ void stepKernel(Simulation* simulation, int offset) {
 		// Calc all forces from Near bodies
 		//printf("\nActive body here\n");
 		for (int i = 0; i < MAX_NEAR_BODIES; i++) {
-			if (block.near_particles[i].active && !isBonded(&particle, &block.near_particles[i])) {
+			if (block.near_particles[i].active && particle.compoundID != block.near_particles[i].compoundID) {
 				force_total = force_total + calcLJForce(&particle, &block.near_particles[i], i + MAX_FOCUS_BODIES, blockID);
 			}
 			else {

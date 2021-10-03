@@ -146,10 +146,48 @@ __device__ bool Ray::hitsBlock(Float3* blockmin, Float3* blockmax, Float3* focal
 }
 
 __device__ bool Ray::hitsParticle(Particle* particle) {
-    if (distToPoint(particle->pos) < BODY_RADIUS)
+    //if (distToPoint(particle->pos) < BODY_RADIUS)
+    if (distToPoint(particle->pos) < particle->radius)
         return true;
     return false;
 }
+
+__device__ bool Ray::searchBlock(Block* block, MoleculeLibrary* mol_library, uint8_t* image) {
+    Particle* closest_particle;
+    float big_number = 99999;
+    float closest_intersect = big_number;
+    int  index = blockIdx.x * blockDim.x + threadIdx.x;
+
+
+    for (int j = 0; j < MAX_FOCUS_BODIES; j++) {
+        Particle* particle = &block->focus_particles[j];
+        if (!particle->active) {  // We can do this because bodies are loaded from index 0 at each timestep. MIGHT NEED TO CHANGE IN THE FUTURE!
+            break;
+        }
+
+        if (hitsParticle(&block->focus_particles[j])) {
+            
+            float dist = distToSphereIntersect(particle);
+            if (dist < closest_intersect) {
+                closest_intersect = dist;
+                closest_particle = particle;
+            }
+            //if (ray.moleculeCollisionHandling(&block->focus_particles[j], mol_library, image)) {
+             //   return;
+            //}
+        }
+    }
+    if (closest_intersect < big_number) {
+        image[index * 4 + 0] = closest_particle->color[0];
+        image[index * 4 + 1] = closest_particle->color[1];
+        image[index * 4 + 2] = closest_particle->color[2];
+        image[index * 4 + 3] = 255;
+        return true;
+    }
+    return false;
+}
+
+
 
 __device__ bool Ray::moleculeCollisionHandling(Particle* particle, MoleculeLibrary* mol_library, uint8_t* image) {
     Molecule* mol = &mol_library->molecules[0];
@@ -189,6 +227,7 @@ __device__ bool Ray::moleculeCollisionHandling(Particle* particle, MoleculeLibra
     */
 
     int index = blockIdx.x * blockDim.x + threadIdx.x;
+    
 
     image[index * 4 + 0] = closest_atom.color[0];
     image[index * 4 + 1] = closest_atom.color[1];
@@ -211,13 +250,18 @@ __device__ bool Ray::moleculeCollisionHandling(Particle* particle, MoleculeLibra
     return false;
 }
 
-__device__ float Ray::distToSphereIntersect(Atom* atom) {
+/*__device__ float Ray::distToSphereIntersect(Atom* atom) {
     Float3 projection_on_ray = origin + unit_vector * ((atom->pos - origin).dot(unit_vector) / unit_vector.dot(unit_vector));
     float center_to_projection = (projection_on_ray - atom->pos).len();
     float projection_to_intersect = sqrtf(atom->radius * atom->radius - center_to_projection * center_to_projection);
     return (projection_on_ray - origin).len() - projection_to_intersect;
+}*/
+__device__ float Ray::distToSphereIntersect(Particle* particle) {
+    Float3 projection_on_ray = origin + unit_vector * ((particle->pos - origin).dot(unit_vector) / unit_vector.dot(unit_vector));
+    float center_to_projection = (projection_on_ray - particle->pos).len();
+    float projection_to_intersect = sqrtf(particle->radius * particle->radius - center_to_projection * center_to_projection);
+    return (projection_on_ray - origin).len() - projection_to_intersect;
 }
-
 
 __global__ void initRayKernel(Ray* rayptr, Box* box, Float3 focalp, int offset) {
 	int index = blockIdx.x * blockDim.x + threadIdx.x + offset;
@@ -411,23 +455,15 @@ __global__ void renderKernel(Ray* rayptr, uint8_t* image, Box* box, MoleculeLibr
     
 
 
+
+
     for (int i = 0; i < MAX_RAY_BLOCKS; i++) {
         if (ray.block_indexes[i] == -1)
             break;
 
         Block* block = &box->blocks[ray.block_indexes[i]];
-        for (int j = 0; j < MAX_FOCUS_BODIES; j++) {
-
-            if (!block->focus_particles[j].active) {  // We can do this because bodies are loaded from index 0 at each timestep. MIGHT NEED TO CHANGE IN THE FUTURE!
-                break;
-            }
-
-            if (ray.hitsParticle(&block->focus_particles[j])) {
-                if (ray.moleculeCollisionHandling(&block->focus_particles[j], mol_library, image)) {
-                    return;
-                }
-            }
-        }
+        if (ray.searchBlock(block, mol_library, image))
+            break;
     }
 }
     

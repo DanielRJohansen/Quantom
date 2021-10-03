@@ -25,8 +25,10 @@ public:
 
 	__device__ void findBlockHits(Box* box, Float3 focalpoint);
 	__device__ bool hitsParticle(Particle* particle);
+	__device__ bool searchBlock(Block* block, MoleculeLibrary* mol_library, uint8_t* image);
 	__device__ bool moleculeCollisionHandling(Particle* particle, MoleculeLibrary* mol_library, uint8_t* image);
 	__device__ bool hitsBlock(Float3* blockmin, Float3* blockmax, Float3* focalpoint);
+
 
 	__host__ __device__ float distToPoint(Float3 point) {
 		Float3 far_ray_point = origin + unit_vector * 99999999;	////BAAAAAAAAAAAAAD
@@ -45,7 +47,8 @@ public:
 
 
 private:
-	__device__ float Ray::distToSphereIntersect(Atom* atom);
+	//__device__ float Ray::distToSphereIntersect(Atom* atom);
+	__device__ float Ray::distToSphereIntersect(Particle* particle);
 
 	__device__ bool hitsBlock(Block* Block, Float3 focalpoint);
 };
