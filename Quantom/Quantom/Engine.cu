@@ -154,11 +154,11 @@ int Engine::fillBox() {
 
 	//simulation->box->compounds[10] = Compound_H2O();
 
-	int index = 0;
+	int solvate_cnt = 0;
 	for (int z_index = 0; z_index < bodies_per_dim; z_index++) {
 		for (int y_index = 0; y_index < bodies_per_dim; y_index++) {
 			for (int x_index = 0; x_index < bodies_per_dim; x_index++) {
-				if (index == simulation->n_bodies)
+				if (solvate_cnt == N_BODIES_START)
 					break;
 
 				float r1 = rand() % p / (float)p - 0.5;
@@ -171,6 +171,9 @@ int Engine::fillBox() {
 				Float3 compound_united_vel = Float3(r1, r2, r3).norm() * mean_velocity;
 
 				compoundPlacer(compound_base_pos, compound_united_vel);
+
+
+				solvate_cnt++;
 
 				/*
 				simulation->bodies[index].pos = 
@@ -207,7 +210,7 @@ int Engine::fillBox() {
 			//printf("%d\t", simulation->box->particles[i].bondpair_ids[j]);
 	}	
 	//exit(1);
-	return index;
+	return solvate_cnt;
 }	
 	
 bool Engine::placeParticle(Particle* particle) {
