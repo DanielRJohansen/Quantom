@@ -418,12 +418,12 @@ __global__ void renderKernel(Ray* rayptr, uint8_t* image, Box* box, MoleculeLibr
         Block* block = &box->blocks[ray.block_indexes[i]];
         for (int j = 0; j < MAX_FOCUS_BODIES; j++) {
 
-            if (block->focus_bodies[j].molecule_type == UNUSED_BODY) {  // We can do this because bodies are loaded from index 0 at each timestep. MIGHT NEED TO CHANGE IN THE FUTURE!
+            if (!block->focus_particles[j].active) {  // We can do this because bodies are loaded from index 0 at each timestep. MIGHT NEED TO CHANGE IN THE FUTURE!
                 break;
             }
 
-            if (ray.hitsBody(&block->focus_bodies[j])) {
-                if (ray.moleculeCollisionHandling(&block->focus_bodies[j], mol_library, image)) {
+            if (ray.hitsParticle(&block->focus_particles[j])) {
+                if (ray.moleculeCollisionHandling(&block->focus_particles[j], mol_library, image)) {
                     return;
                 }
             }
