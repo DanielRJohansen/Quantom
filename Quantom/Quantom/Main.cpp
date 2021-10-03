@@ -4,7 +4,13 @@
 
 
 
+
+struct Test {
+	int arr[4];
+};
+
 int main() {
+
 
 	std::printf("Program starting...\n");
 	Environment Env;

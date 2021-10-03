@@ -257,6 +257,20 @@ void Engine::step() {
 
 	auto t0 = std::chrono::high_resolution_clock::now();
 
+
+	int compounds_per_sm = 1000;
+	Box* box = simulation->box;	// Why the fuck do i have to do this, VisualStudio???!
+	for (int i = 0; i < N_STREAMS; i++) {
+		int offset = i * compounds_per_sm;
+		intramolforceKernel <<< compounds_per_sm, 2, 0, stream[i] >>> (box, offset);
+	}
+
+
+
+
+
+
+
 	int blocks_handled = 0;
 	while (blocks_handled < sim_blocks) {
 		for (int i = 0; i < N_STREAMS; i++) {
@@ -405,6 +419,8 @@ __device__ Float3 calcLJForce(Particle* particle0, Particle* particle1, int i, i
 	return force_unit_vector * LJ_pot;
 }
 
+__device__ void calcPairbondForce(PairBond* pairbond) {}
+
 __device__ void integrateTimestep(Simulation* simulation, Particle* particle, Float3 force) {
 	Float3 vel_next = particle->vel_prev + (force * (simulation->dt / particle->mass));
 	particle->pos = particle->pos + vel_next * simulation->dt;
@@ -543,7 +559,36 @@ __global__ void stepKernel(Simulation* simulation, int offset) {
 
 
 
+__global__ void intramolforceKernel(Box* box, int offset) {
 
+	__shared__ Compound_H2O compound;
+	
+	uint32_t compound_index = blockIdx.x + offset;
+	if (compound_index >= box->n_compounds)
+		return;
+
+
+
+	if (threadIdx.x == 0) {
+		compound = box->compounds[compound_index];
+		compound.loadParticles(box->particles);
+	}
+	__syncthreads();
+	
+
+	//CompactParticle* particle = &compound.particles[threadIdx.x];
+	PairBond* pairbond = &compound.pairbonds[threadIdx.x];
+	calcPairbondForce(pairbond);	// This applies the force directly to the particles
+
+
+	
+	for (int i = 0; i < (int) (compound.n_particles / compound.n_pairbonds) + 1; i++) {
+		int rel_index = threadIdx.x + i * compound.n_pairbonds;
+		if (rel_index < compound.n_pairbonds)
+			box->particles[compound.startindex_particle + rel_index].force = compound.particles[rel_index].force;
+	}
+	
+}
 
 
 

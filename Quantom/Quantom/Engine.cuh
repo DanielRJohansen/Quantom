@@ -16,7 +16,7 @@
 
 __global__ void stepKernel(Simulation* simulation, int offset);
 __global__ void updateKernel(Simulation* simulation, int offset);
-
+__global__ void intramolforceKernel(Box* boox, int offset);
 
 class Engine {
 public:

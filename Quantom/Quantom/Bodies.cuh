@@ -114,6 +114,7 @@ struct CompactParticle {
 	CompactParticle(){}
 	CompactParticle(Float3 pos, float mass) : pos(pos), mass(mass) {}
 	Float3 pos;
+	Float3 force;	// Sum all intramol forces here before pushing to box!
 	float mass;
 };
 
@@ -144,7 +145,8 @@ struct AngleBond {
 const int H2O_PARTICLES = 3;
 const int H2O_PAIRBONDS = 2;
 struct Compound_H2O {	// Entire molecule for small < 500 atoms molcules, or part of large molecule
-	Compound_H2O() {};	// {O, H, H}
+	__host__ __device__ Compound_H2O() {};	// {O, H, H}
+	/*
 	Compound_H2O(Particle* global_particle_table, uint32_t startindex_particle, uint32_t startindex_bond) : 
 		global_particle_table(global_particle_table), startindex_particle(startindex_particle) {
 		pairbonds[0] = PairBond(0.095, 0, 1);
@@ -160,8 +162,8 @@ struct Compound_H2O {	// Entire molecule for small < 500 atoms molcules, or part
 				particle_bond_count[rel_p_index]++;
 			}
 		}
-	}
-	void init(uint32_t startindex_particle, uint32_t compoundID) {
+	}*/
+	__host__ void init(uint32_t startindex_particle, uint32_t compoundID) {
 		startindex_particle = startindex_particle;
 		pairbonds[0] = PairBond(0.095, 0, 1);
 		pairbonds[1] = PairBond(0.095, 0, 2);
@@ -173,21 +175,21 @@ struct Compound_H2O {	// Entire molecule for small < 500 atoms molcules, or part
 	
 
 
-	void loadParticles(Particle* global_particle_table) {
+	__device__ void loadParticles(Particle* global_particle_table) {
 		for (int i = 0; i < n_particles ; i++) {
 			particles[i].pos = global_particle_table[startindex_particle + i].pos;
 		}
 	}
 
-	const uint16_t n_particles = H2O_PARTICLES;
+	uint16_t n_particles = H2O_PARTICLES;
 	CompactParticle particles[H2O_PARTICLES];
 
 	uint32_t startindex_particle = 0;
 	
-	const uint16_t n_pairbonds = H2O_PAIRBONDS;
+	uint16_t n_pairbonds = H2O_PAIRBONDS;
 	PairBond pairbonds[H2O_PAIRBONDS];
 	
-	Particle* global_particle_table;	// Host address, only usable when creating compound
+	//Particle* global_particle_table;	// Host address, only usable when creating compound
 
 };
 
