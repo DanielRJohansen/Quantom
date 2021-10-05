@@ -50,7 +50,6 @@ struct Float3 {
 
 
 	__host__ __device__ Float3 cross(Float3 a) const { return Float3(y * a.z - z * a.y, z * a.x - x * a.z, x * a.y - y * a.x); }
-
 	__host__ __device__ float dot(Float3 a) const { return (x * a.x + y * a.y + z * a.z); }
 	__host__ __device__ Float3 abs() const { return Float3(
 		std::abs(x),
@@ -71,9 +70,6 @@ struct Float3 {
 
 		return v;
 	}
-
-
-
 	__host__ __device__ Float3 rotateAroundVector(Float3 pitch_yaw_roll, Float3 k) {	// k=normal = z-pointing		
 		Float3 v = rodriguesRotatation(*this, Float3(1,0,0), pitch_yaw_roll.x);
 
@@ -81,7 +77,6 @@ struct Float3 {
 		v = rodriguesRotatation(v, k, pitch_yaw_roll.z);
 		return v;
 	}
-
 	__host__ __device__ static Float3 rodriguesRotatation(Float3 v, Float3 k, float theta) {
 		return v * cos(theta) + k.cross(v) * sin(theta) + k * (k.dot(v)) * (1 - cos(theta));
 	}

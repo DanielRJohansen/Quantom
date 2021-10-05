@@ -15,19 +15,22 @@ Simulation* Engine::prepSimulation(Simulation* simulation) {
 	//prepareEdgeBlocks();
 
 	srand(290128301);
-	int n_bodies = fillBox();
+	int n_solvate_compounds = fillBox();
 
 	int update_bytesize = sizeof(Block) + sizeof(Int3) + sizeof(int) + sizeof(char) * 27 * 3 + sizeof(char) + sizeof(Particle) * 27 + sizeof(unsigned short int) * 27 * 2 + sizeof(char) * 27 *MAX_FOCUS_BODIES;
 
 	printf("\nParticle size: %d bytes\n", sizeof(Particle));
-	printf("Block size: %d\n", sizeof(Block));
-	printf("Simulation configured with %d blocks, and %d bodies. Approximately %02.2f bodies per block. \n", n_blocks, n_bodies, ((float)n_bodies/n_blocks));
+	printf("Block size: %d bytes\n", sizeof(Block));
+	printf("Simulation configured with %d blocks, %d particles and %d solvate compounds. Approximately %02.2f compounds per block. \n", n_blocks, simulation->box->n_particles, n_solvate_compounds, ((float)n_solvate_compounds /n_blocks));
 	printf("Required shared mem per block for stepKernel: %d KB\n", (int) ((sizeof(Block)) / 1000.f));
 	printf("Required shared mem per block for updateKernel: %d KB\n", (int) (update_bytesize/1000.f));
 	printf("Required global mem for Box: %d MB\n", (int) (sizeof(Block) * n_blocks / 1000000.f));
 
 
 	prepareCudaScheduler();
+
+
+	//exit(1);
 
 	return simToDevice();
 }
@@ -113,12 +116,13 @@ void Engine::compoundPlacer(Float3 center_pos, Float3 united_vel) {
 	uint32_t bondpairs[2][2] = { {1,2}, {2,3} };
 	uint32_t molecule_start_index = simulation->box->n_particles; // index of first atom
 	uint32_t compound_index = simulation->box->n_compounds++;
-	
+	//printf("Compouind index %d\n", compound_index);
 	// First place all particles in blocks and global table
 	for (int i = 0; i < molecule.n_atoms; i++) {
 		uint32_t abs_index = simulation->box->n_particles++;
 		Particle particle(abs_index, center_pos + molecule.atoms[i].pos, united_vel, molecule.atoms[i].mass, compound_index);
 		particle.radius = molecule.atoms[i].radius;
+		//particle.color = molecule.atoms[i].color;
 		for (int j = 0; j < 3; j++)
 			particle.color[j] = molecule.atoms[i].color[j];
 
@@ -131,6 +135,8 @@ void Engine::compoundPlacer(Float3 center_pos, Float3 united_vel) {
 	// Now create all compounds, which link to the created particles!
 	//Compound_H2O compound(simulation->box->particles, simulation->box->n_particles, simulation->box->n_compounds);
 	uint32_t particle_startindex = simulation->box->n_particles - molecule.n_atoms;
+	//printf("Compound %d startindex %d\n", compound_index, particle_startindex);
+
 	simulation->box->compounds[compound_index].init(particle_startindex, compound_index);
 
 }
@@ -172,7 +178,7 @@ int Engine::fillBox() {
 
 				compoundPlacer(compound_base_pos, compound_united_vel);
 
-
+				//printf("Solvate cnt %d\n", solvate_cnt);
 				solvate_cnt++;
 
 				/*
@@ -209,7 +215,6 @@ int Engine::fillBox() {
 		//for (int j = 0; j < 4; j++)
 			//printf("%d\t", simulation->box->particles[i].bondpair_ids[j]);
 	}	
-	//exit(1);
 	return solvate_cnt;
 }	
 	
@@ -419,7 +424,24 @@ __device__ Float3 calcLJForce(Particle* particle0, Particle* particle1, int i, i
 	return force_unit_vector * LJ_pot;
 }
 
-__device__ void calcPairbondForce(PairBond* pairbond) {}
+__device__ void calcPairbondForce(Compound_H2O* compound, BondPair* bondpair) {
+	float kb = 10;
+	Float3 direction = compound->particles[bondpair->atom_indexes[0]].pos - compound->particles[bondpair->atom_indexes[1]].pos;
+	float dist = direction.len();
+	float dif = dist - bondpair->reference_dist;
+	float force = 0.5 * kb * (dif * dif);
+	direction = direction.norm();
+	float inv = -1 + (2 * (dist > bondpair->reference_dist));
+
+	if (dif > 0.1) {
+		printf("\n%d %d\n", compound->startindex_particle + bondpair->atom_indexes[0], compound->startindex_particle + bondpair->atom_indexes[1]);
+		printf("dist %f dif: %f FORCE %f\n", dist, dif, force);
+	}
+		
+
+	compound->particles[bondpair->atom_indexes[0]].force = direction * force * inv;
+	compound->particles[bondpair->atom_indexes[1]].force = direction * force * inv * -1;
+}
 
 __device__ void integrateTimestep(Simulation* simulation, Particle* particle, Float3 force) {
 	Float3 vel_next = particle->vel_prev + (force * (simulation->dt / particle->mass));
@@ -443,6 +465,43 @@ __device__ bool isBonded(Particle* a, Particle* b) {
 */
 
 // ------------------------------------------------------------------------------------------- KERNELS -------------------------------------------------------------------------------------------//
+
+__global__ void intramolforceKernel(Box* box, int offset) {
+
+	__shared__ Compound_H2O compound;
+
+	uint32_t compound_index = blockIdx.x + offset;
+	if (compound_index >= box->n_compounds)
+		return;
+
+
+
+	if (threadIdx.x == 0) {
+		compound = box->compounds[compound_index];
+		compound.loadParticles(box->particles);
+	}
+	__syncthreads();
+
+
+	//CompactParticle* particle = &compound.particles[threadIdx.x];
+	BondPair* bondpair = &compound.bondpairs[threadIdx.x];
+	calcPairbondForce(&compound, bondpair);	// This applies the force directly to the particles
+
+
+
+	for (int i = 0; i < (compound.n_particles / compound.n_bondpairs) + 1; i++) {
+		int rel_index = threadIdx.x + i * compound.n_bondpairs;
+		
+		if (rel_index < compound.n_particles) {
+			box->particles[compound.startindex_particle + rel_index].force = compound.particles[rel_index].force;
+		}
+			
+	}
+	//box->particles[compound.startindex_particle + threadIdx.x].force = Float3(1, 1, 3);
+	//printf("\nFOrce to index %d\n", compound.startindex_particle + threadIdx.x);
+}
+
+
 
 
 
@@ -502,6 +561,10 @@ __global__ void stepKernel(Simulation* simulation, int offset) {
 			simulation->finished = true;*/
 
 
+		particle.force = simulation->box->particles[particle.id].force;
+		//printf("\n ID %d\tInter: %f %f %f\tIntra %f %f %f\n", particle.id, force_total.x, force_total.y, force_total.z, particle.force.x, particle.force.y, particle.force.z);
+		force_total = force_total + particle.force;
+
 
 
 
@@ -541,6 +604,7 @@ __global__ void stepKernel(Simulation* simulation, int offset) {
 
 	// Publish new positions for the focus bodies
 	accesspoint.particles[bodyID] = particle;
+	simulation->box->particles[particle.id].pos = particle.pos;
 
 	// Mark all bodies as obsolete
 	simulation->box->blocks[blockID].focus_particles[bodyID].active = false;
@@ -555,40 +619,6 @@ __global__ void stepKernel(Simulation* simulation, int offset) {
 
 
 
-
-
-
-
-__global__ void intramolforceKernel(Box* box, int offset) {
-
-	__shared__ Compound_H2O compound;
-	
-	uint32_t compound_index = blockIdx.x + offset;
-	if (compound_index >= box->n_compounds)
-		return;
-
-
-
-	if (threadIdx.x == 0) {
-		compound = box->compounds[compound_index];
-		compound.loadParticles(box->particles);
-	}
-	__syncthreads();
-	
-
-	//CompactParticle* particle = &compound.particles[threadIdx.x];
-	PairBond* pairbond = &compound.pairbonds[threadIdx.x];
-	calcPairbondForce(pairbond);	// This applies the force directly to the particles
-
-
-	
-	for (int i = 0; i < (int) (compound.n_particles / compound.n_pairbonds) + 1; i++) {
-		int rel_index = threadIdx.x + i * compound.n_pairbonds;
-		if (rel_index < compound.n_pairbonds)
-			box->particles[compound.startindex_particle + rel_index].force = compound.particles[rel_index].force;
-	}
-	
-}
 
 
 
