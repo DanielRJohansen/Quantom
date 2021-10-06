@@ -269,7 +269,7 @@ void Engine::step() {
 		int offset = i * compounds_per_sm;
 		intramolforceKernel <<< compounds_per_sm, 2, 0, stream[i] >>> (box, offset);
 	}
-
+	cudaDeviceSynchronize();
 
 
 
@@ -391,7 +391,7 @@ __device__ Float3 getHyperPosition(Float3 pos) {
 	return pos - Float3(BOX_LEN, BOX_LEN, BOX_LEN) * 0.5;
 }
 
-__device__ Float3 getClosestMirrorPos(Float3 pos, Float3 block_center) {
+__device__ Float3 getClosestMirrorPos(Float3 pos, Float3 block_center) {	// Block center can also just be whatever particle you want the pos to be close to...
 	Float3 dists = block_center - pos;
 	Float3 abs_dists = dists.abs();
 	abs_dists = abs_dists + Float3(0.000001 * !(abs_dists.x), 0.000001 * !(abs_dists.y), 0.000001 * !(abs_dists.z));
@@ -403,14 +403,15 @@ __device__ Float3 getClosestMirrorPos(Float3 pos, Float3 block_center) {
 	return pos + directional_hotencoded_vector * Float3(BOX_LEN, BOX_LEN, BOX_LEN);
 }
 
-__device__ Float3 calcLJForce(Particle* particle0, Particle* particle1, int i, int bid) {
+__device__ Float3 calcLJForce(Particle* particle0, Particle* particle1, int i, int bid) {	// Applying force to p0 only!
 	float dist_pow2 = (particle0->pos - particle1->pos).lenSquared();
 	float dist_pow2_inv = 1.f / dist_pow2;
 	float dist_pow6_inv = dist_pow2_inv * dist_pow2_inv * dist_pow2_inv;
 
 	float LJ_pot = 48 * dist_pow2_inv * dist_pow6_inv * (dist_pow6_inv - 0.5f);
 	Float3 force_unit_vector = (particle0->pos - particle1->pos).norm();
-	
+	//printf("repulsion: %f\n", LJ_pot);
+	//force_unit_vector.print();
 	if (LJ_pot > 10e+9) {
 		//body0->molecule_type = 99;
 		printf("\n\n GIGAFORCE! Block %d thread %d\n", bid, threadIdx.x);
@@ -426,16 +427,21 @@ __device__ Float3 calcLJForce(Particle* particle0, Particle* particle1, int i, i
 
 __device__ void calcPairbondForce(Compound_H2O* compound, BondPair* bondpair) {
 	float kb = 10;
-	Float3 direction = compound->particles[bondpair->atom_indexes[0]].pos - compound->particles[bondpair->atom_indexes[1]].pos;
+	Float3 particle1_mirrorpos = getClosestMirrorPos(compound->particles[bondpair->atom_indexes[1]].pos, compound->particles[bondpair->atom_indexes[0]].pos);
+	Float3 direction = compound->particles[bondpair->atom_indexes[0]].pos - particle1_mirrorpos;
+	//Float3 direction = compound->particles[bondpair->atom_indexes[0]].pos - compound->particles[bondpair->atom_indexes[1]].pos;
 	float dist = direction.len();
 	float dif = dist - bondpair->reference_dist;
 	float force = 0.5 * kb * (dif * dif);
 	direction = direction.norm();
 	float inv = -1 + (2 * (dist > bondpair->reference_dist));
 
-	if (dif > 0.1) {
-		printf("\n%d %d\n", compound->startindex_particle + bondpair->atom_indexes[0], compound->startindex_particle + bondpair->atom_indexes[1]);
-		printf("dist %f dif: %f FORCE %f\n", dist, dif, force);
+	if (dif > 0.1 && bondpair->atom_indexes[1] == 1) {
+		printf("\ndist %f dif: %f FORCE %f\n", dist, dif, force);
+		//compound->particles[bondpair->atom_indexes[0]].pos.print();
+		//compound->particles[bondpair->atom_indexes[1]].pos.print();
+		for (int i = 0; i < 3; i++)
+			compound->particles[i].pos.print();
 	}
 		
 
@@ -493,7 +499,7 @@ __global__ void intramolforceKernel(Box* box, int offset) {
 		int rel_index = threadIdx.x + i * compound.n_bondpairs;
 		
 		if (rel_index < compound.n_particles) {
-			box->particles[compound.startindex_particle + rel_index].force = compound.particles[rel_index].force;
+			//box->particles[compound.startindex_particle + rel_index].force = compound.particles[rel_index].force;
 		}
 			
 	}
@@ -547,7 +553,6 @@ __global__ void stepKernel(Simulation* simulation, int offset) {
 		}
 
 		// Calc all forces from Near bodies
-		//printf("\nActive body here\n");
 		for (int i = 0; i < MAX_NEAR_BODIES; i++) {
 			if (block.near_particles[i].active && particle.compoundID != block.near_particles[i].compoundID) {
 				force_total = force_total + calcLJForce(&particle, &block.near_particles[i], i + MAX_FOCUS_BODIES, blockID);
@@ -557,11 +562,9 @@ __global__ void stepKernel(Simulation* simulation, int offset) {
 			}
 		}
 		
-		/*if (body.molecule_type == 99)
-			simulation->finished = true;*/
 
 
-		particle.force = simulation->box->particles[particle.id].force;
+		//particle.force = simulation->box->particles[particle.id].force;
 		//printf("\n ID %d\tInter: %f %f %f\tIntra %f %f %f\n", particle.id, force_total.x, force_total.y, force_total.z, particle.force.x, particle.force.y, particle.force.z);
 		force_total = force_total + particle.force;
 
@@ -570,7 +573,6 @@ __global__ void stepKernel(Simulation* simulation, int offset) {
 
 		// Integrate position  AFTER ALL BODIES IN BLOCK HAVE BEEN CALCULATED? No should not be a problem as all update their local body, 
 		// before moving to shared?? Although make the local just a pointer might be faster, since a SimBody might not fit in thread registers!!!!!
-		//body.pos = body.pos + body.vel * simulation->dt;
 		integrateTimestep(simulation, &particle, force_total);
 
 
@@ -581,14 +583,14 @@ __global__ void stepKernel(Simulation* simulation, int offset) {
 
 
 
-
+		
 		// Swap with mirror image if body has moved out of box
 		Float3 hyper_pos = getHyperPosition(particle.pos);
 		if ((hyper_pos - particle.pos).len() > 1) {	// If the hyperposition is different, the body is out, and we import the mirror body
 			//printf("\nSwapping Body %f %f %f to hyperpos %f %f %f\n\n", body.pos.x, body.pos.y, body.pos.z, hyper_pos.x, hyper_pos.y, hyper_pos.z);
 			particle.pos = hyper_pos;
-		}
-
+		}	
+		simulation->box->particles[particle.id].pos = particle.pos;
 
 	}
 	
@@ -604,7 +606,6 @@ __global__ void stepKernel(Simulation* simulation, int offset) {
 
 	// Publish new positions for the focus bodies
 	accesspoint.particles[bodyID] = particle;
-	simulation->box->particles[particle.id].pos = particle.pos;
 
 	// Mark all bodies as obsolete
 	simulation->box->blocks[blockID].focus_particles[bodyID].active = false;

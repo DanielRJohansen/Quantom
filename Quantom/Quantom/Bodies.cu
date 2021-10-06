@@ -38,7 +38,6 @@ Molecule::Molecule() {	// Always returns a h2o molecule rn
 		0
 	);
 	Float3 molecule_normal = Float3(0, 0, 1).rotateAroundOrigin(pitch_yaw_roll * -1);
-
 	for (int i = 0; i < n_atoms; i++) {
 		atoms[i].pos = atoms[i].pos.rotateAroundVector(pitch_yaw_roll, molecule_normal);
 		//printf("Atom %d pos: %f %f %f\n",i,  atoms[i].pos.x, atoms[i].pos.y, atoms[i].pos.z);
@@ -46,6 +45,10 @@ Molecule::Molecule() {	// Always returns a h2o molecule rn
 	//printf("molecule normal: %f %f %f\n", molecule_normal.x, molecule_normal.y, molecule_normal.z);
 	//printf("pyr: %f %f %f\n", pitch_yaw_roll.x, pitch_yaw_roll.y, pitch_yaw_roll.z);
 	
+	// Noncritical rotation to make it look nice
+	for (int i = 0; i < n_atoms; i++) {
+		atoms[i].pos = atoms[i].pos.rotateAroundVector(Float3(0, PI/2.f, 0), Float3(0,1,0));
+	}
 
 }
 
