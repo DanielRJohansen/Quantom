@@ -32,7 +32,10 @@ struct Float3 {
 	__host__ __device__ inline bool operator == (const Float3 a) const { return (a.x == x && a.y == y && a.z == z); }
 
 	//__host__ __device__ static Float3 norm(Float3 a) { return a * (1.f / a.len()); }	// Remove this at some point..
-	__host__ __device__ Float3 norm() { return *this * (1.f / len()); }
+	__host__ __device__ Float3 norm() {
+		float l = len();
+		if (l)
+			return *this * (1.f / l); }
 	__host__ __device__ Float3 square() {return Float3(x * x, y * y, z * z);}
 	__host__ __device__ inline float len() {return (float)sqrtf(x * x + y * y + z * z); }
 	__host__ __device__ inline float lenSquared() { return (float)(x * x + y * y + z * z); }
@@ -58,7 +61,7 @@ struct Float3 {
 		); }
 
 
-	__host__ __device__ void print() { printf("%f %f %f\n", x, y, z); }
+	__host__ __device__ void print(char c='_') { printf("%c %f %f %f\n", c, x, y, z); }
 
 	__host__ __device__ Float3 rotateAroundOrigin(Float3 pitch_yaw_roll) {	//pitch around x, yaw around z, tilt around y
 		// pitch and yaw is relative to global coordinates. Tilt is relative to body direction

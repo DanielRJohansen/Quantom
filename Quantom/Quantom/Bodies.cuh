@@ -58,7 +58,7 @@ struct Particle {
 	Float3 vel_prev;
 
 
-	float mass = 0;
+	float mass = 0;		// g/mol
 
 	// Cosmetic variables
 	float radius = 0;
@@ -144,6 +144,7 @@ struct AngleBond {
 // A shell script will automate writing these compounds
 const int H2O_PARTICLES = 3;
 const int H2O_PAIRBONDS = 2;
+const float OH_refdist = 0.095;
 struct Compound_H2O {	// Entire molecule for small < 500 atoms molcules, or part of large molecule
 	__host__ __device__ Compound_H2O() {};	// {O, H, H}
 	/*
@@ -165,8 +166,8 @@ struct Compound_H2O {	// Entire molecule for small < 500 atoms molcules, or part
 	}*/
 	__host__ void init(uint32_t startindex_particle, uint32_t compoundID) {
 		this->startindex_particle = startindex_particle;
-		bondpairs[0] = BondPair(0.095, 0, 1);
-		bondpairs[1] = BondPair(0.095, 0, 2);
+		bondpairs[0] = BondPair(OH_refdist, 0, 1);
+		bondpairs[1] = BondPair(OH_refdist, 0, 2);
 	}
 
 	/*Compound_H2O operator = (const Compound_H2O a) {

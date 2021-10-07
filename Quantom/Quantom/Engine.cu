@@ -152,13 +152,13 @@ int Engine::fillBox() {
 	double m = 18.01528;		// g/mol
 	double k_B = 8.617333262145 * 10e-5;
 	double T = 293;	// Kelvin
-	float mean_velocity = m / (2 * k_B * T);
+	//float mean_velocity = m / (2 * k_B * T);
+	float mean_velocity = 0;
 	int p = 10000;
 
 	simulation->box->particles = new Particle[1'000'000];
 	simulation->box->compounds = new Compound_H2O[1'000'000];
 
-	//simulation->box->compounds[10] = Compound_H2O();
 
 	int solvate_cnt = 0;
 	for (int z_index = 0; z_index < bodies_per_dim; z_index++) {
@@ -178,33 +178,7 @@ int Engine::fillBox() {
 
 				compoundPlacer(compound_base_pos, compound_united_vel);
 
-				//printf("Solvate cnt %d\n", solvate_cnt);
 				solvate_cnt++;
-
-				/*
-				simulation->bodies[index].pos = 
-
-				//printf("Body pos: ");
-				//simulation->bodies[index].pos.print();
-
-				simulation->bodies[index].id = index;	// 
-
-				simulation->bodies[index].molecule_type = 0;
-				simulation->bodies[index].mass = m;
-
-				simulation->bodies[index].vel_prev = Float3(r1, r2, r3).norm() * mean_velocity;
-				simulation->bodies[index].rotation = Float3(r1 * 2 * PI, r2 * 2 * PI, r3 * 2 * PI);
-				simulation->bodies[index].rot_vel = Float3(r1*r2, 4*PI, 0);
-
-				/*
-				simulation->bodies[index].pos = Float3(0.5 + 2 - (0.5*2 * x_index), 0, 0);
-				simulation->bodies[index].vel_prev = Float3(0, 0, 0);
-				simulation->bodies[index].pos.print();
-				
-
-				//if (placeBody(&simulation->bodies[index]))
-					//index++;
-				moleculePlacer(&simulation->bodies[index]); */
 			}
 		}
 	}
@@ -403,7 +377,7 @@ __device__ Float3 getClosestMirrorPos(Float3 pos, Float3 block_center) {	// Bloc
 	return pos + directional_hotencoded_vector * Float3(BOX_LEN, BOX_LEN, BOX_LEN);
 }
 
-__device__ Float3 calcLJForce(Particle* particle0, Particle* particle1, int i, int bid) {	// Applying force to p0 only!
+__device__ Float3 calcLJForceReducedUnits(Particle* particle0, Particle* particle1, int i, int bid) {	// Applying force to p0 only! - THIS METHOD USES REDUCED UNITS, WHERE DIST(1) MEANS DIST(Vdw RADIUS)
 	float dist_pow2 = (particle0->pos - particle1->pos).lenSquared();
 	float dist_pow2_inv = 1.f / dist_pow2;
 	float dist_pow6_inv = dist_pow2_inv * dist_pow2_inv * dist_pow2_inv;
@@ -412,9 +386,21 @@ __device__ Float3 calcLJForce(Particle* particle0, Particle* particle1, int i, i
 	Float3 force_unit_vector = (particle0->pos - particle1->pos).norm();
 	//printf("repulsion: %f\n", LJ_pot);
 	//force_unit_vector.print();
-	if (LJ_pot > 10e+9) {
+	if (particle0->id == 0) {
+		printf("\nLJ Pot %f\n", LJ_pot);
+		if (LJ_pot > 0) {
+			particle0->pos.print('0');
+			particle1->pos.print('1');
+			printf("len %f\n", (particle0->pos - particle1->pos).len());
+			printf("len2 %f\n", dist_pow2);
+		}
+
+			//printf("p1 id %d\n", particle1->id);
+	}
+		
+	if (LJ_pot > 10e+3) {
 		//body0->molecule_type = 99;
-		printf("\n\n GIGAFORCE! Block %d thread %d\n", bid, threadIdx.x);
+		printf("\n\n KILOFORCE! Block %d thread %d\n", bid, threadIdx.x);
 		printf("other body index: %d\n", i);
 		printf("Body 0 id: %d     %f %f %f\n", particle0->id, particle0->pos.x, particle0->pos.y, particle0->pos.z);
 		printf("Body 1 id: %d     %f %f %f\n", particle1->id, particle1->pos.x, particle1->pos.y, particle1->pos.z);
@@ -425,8 +411,50 @@ __device__ Float3 calcLJForce(Particle* particle0, Particle* particle1, int i, i
 	return force_unit_vector * LJ_pot;
 }
 
+
+constexpr float sigma = 0.3923;	//nm
+constexpr float epsilon = 0.5986 * 1'000; //kJ/mol | J/mol
+__device__ Float3 calcLJForce(Particle* particle0, Particle* particle1, int i, int bid) {	// Applying force to p0 only! 
+	float dist = (particle0->pos - particle1->pos).len();
+	float fraction = sigma / dist;
+
+	float f2 = fraction * fraction;
+	float f6 = f2 * f2 * f2;
+	float f12 = f6 * f6;
+
+	float LJ_pot = 4 * epsilon * (f12 - f6);
+	Float3 force_unit_vector = (particle0->pos - particle1->pos).norm();	// + is repulsive, - is attractive
+	//printf("repulsion: %f\n", LJ_pot);
+	//force_unit_vector.print();
+	if (particle0->id == 0) {
+		printf("\nLJ Pot %f\n", LJ_pot);
+		if (LJ_pot > 0) {
+			particle0->pos.print('0');
+			particle1->pos.print('1');
+			printf("len %f\n", (particle0->pos - particle1->pos).len());
+			//printf("len2 %f\n", dist_pow2);
+		}
+
+		//printf("p1 id %d\n", particle1->id);
+	}
+
+	if (LJ_pot > 10e+3) {
+		//body0->molecule_type = 99;
+		printf("\n\n KILOFORCE! Block %d thread %d\n", bid, threadIdx.x);
+		printf("other body index: %d\n", i);
+		printf("Body 0 id: %d     %f %f %f\n", particle0->id, particle0->pos.x, particle0->pos.y, particle0->pos.z);
+		printf("Body 1 id: %d     %f %f %f\n", particle1->id, particle1->pos.x, particle1->pos.y, particle1->pos.z);
+		printf("Distance: %f\n", (particle0->pos - particle1->pos).len());
+		//printf("Force: %f\n\n\n", LJ_pot);
+		//force_unit_vector.print();
+	}
+	return force_unit_vector * LJ_pot;
+}
+
+
+
 __device__ void calcPairbondForce(Compound_H2O* compound, BondPair* bondpair) {
-	float kb = 10;
+	float kb = 17.5 * 1e+6;		//	J/(mol*nm^2)
 	Float3 particle1_mirrorpos = getClosestMirrorPos(compound->particles[bondpair->atom_indexes[1]].pos, compound->particles[bondpair->atom_indexes[0]].pos);
 	Float3 direction = compound->particles[bondpair->atom_indexes[0]].pos - particle1_mirrorpos;
 	//Float3 direction = compound->particles[bondpair->atom_indexes[0]].pos - compound->particles[bondpair->atom_indexes[1]].pos;
@@ -449,8 +477,16 @@ __device__ void calcPairbondForce(Compound_H2O* compound, BondPair* bondpair) {
 	compound->particles[bondpair->atom_indexes[1]].force = direction * force * inv * -1;
 }
 
-__device__ void integrateTimestep(Simulation* simulation, Particle* particle, Float3 force) {
-	Float3 vel_next = particle->vel_prev + (force * (simulation->dt / particle->mass));
+__device__ void integrateTimestep(Simulation* simulation, Particle* particle, Float3 force) {	// Kinetic formula: v = sqrt(2*K/m), m in kg
+	float force_scalar = force.len();
+	Float3 force_vector = force.norm();
+	float kin_to_vel = sqrtf(2000 * force_scalar / particle->mass);	//	2000 instead of 2, to account using g instead of kg
+	Float3 vel_next = particle->vel_prev + (force_vector * (simulation->dt * kin_to_vel));
+	//printf("ktv %f\n", kin_to_vel);
+	//Float3 vel_next = Float3(0, 0, 0);
+	//force.print();
+	//force_vector.print();
+	//vel_next.print();
 	particle->pos = particle->pos + vel_next * simulation->dt;
 	particle->vel_prev = vel_next;
 }
