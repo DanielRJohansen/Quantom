@@ -46,7 +46,7 @@ int Engine::countBodies() {
 			count++;
 		}
 	}
-	printf("\nBody count: %d\n\n", count);
+	printf("\nAtom count: %d\n\n", count);
 	return count;
 }
 
@@ -152,8 +152,8 @@ int Engine::fillBox() {
 	double m = 18.01528;		// g/mol
 	double k_B = 8.617333262145 * 10e-5;
 	double T = 293;	// Kelvin
-	//float mean_velocity = m / (2 * k_B * T);
-	float mean_velocity = 0;
+	float mean_velocity = m / (2 * k_B * T);
+	//float mean_velocity = 0;
 	int p = 10000;
 
 	simulation->box->particles = new Particle[1'000'000];
@@ -386,17 +386,7 @@ __device__ Float3 calcLJForceReducedUnits(Particle* particle0, Particle* particl
 	Float3 force_unit_vector = (particle0->pos - particle1->pos).norm();
 	//printf("repulsion: %f\n", LJ_pot);
 	//force_unit_vector.print();
-	if (particle0->id == 0) {
-		printf("\nLJ Pot %f\n", LJ_pot);
-		if (LJ_pot > 0) {
-			particle0->pos.print('0');
-			particle1->pos.print('1');
-			printf("len %f\n", (particle0->pos - particle1->pos).len());
-			printf("len2 %f\n", dist_pow2);
-		}
 
-			//printf("p1 id %d\n", particle1->id);
-	}
 		
 	if (LJ_pot > 10e+3) {
 		//body0->molecule_type = 99;
@@ -424,29 +414,16 @@ __device__ Float3 calcLJForce(Particle* particle0, Particle* particle1, int i, i
 
 	float LJ_pot = 4 * epsilon * (f12 - f6);
 	Float3 force_unit_vector = (particle0->pos - particle1->pos).norm();	// + is repulsive, - is attractive
-	//printf("repulsion: %f\n", LJ_pot);
-	//force_unit_vector.print();
-	if (particle0->id == 0) {
-		printf("\nLJ Pot %f\n", LJ_pot);
-		if (LJ_pot > 0) {
-			particle0->pos.print('0');
-			particle1->pos.print('1');
-			printf("len %f\n", (particle0->pos - particle1->pos).len());
-			//printf("len2 %f\n", dist_pow2);
-		}
 
-		//printf("p1 id %d\n", particle1->id);
-	}
 
-	if (LJ_pot > 10e+3) {
+	if (LJ_pot > 10e+9) {
 		//body0->molecule_type = 99;
-		printf("\n\n KILOFORCE! Block %d thread %d\n", bid, threadIdx.x);
+		printf("\n\n GIGAFORCE! Block %d thread %d\n", bid, threadIdx.x);
 		printf("other body index: %d\n", i);
 		printf("Body 0 id: %d     %f %f %f\n", particle0->id, particle0->pos.x, particle0->pos.y, particle0->pos.z);
 		printf("Body 1 id: %d     %f %f %f\n", particle1->id, particle1->pos.x, particle1->pos.y, particle1->pos.z);
 		printf("Distance: %f\n", (particle0->pos - particle1->pos).len());
-		//printf("Force: %f\n\n\n", LJ_pot);
-		//force_unit_vector.print();
+
 	}
 	return force_unit_vector * LJ_pot;
 }
@@ -462,7 +439,7 @@ __device__ void calcPairbondForce(Compound_H2O* compound, BondPair* bondpair) {
 	float dif = dist - bondpair->reference_dist;
 	float force = 0.5 * kb * (dif * dif);
 	direction = direction.norm();
-	float inv = -1 + (2 * (dist > bondpair->reference_dist));
+	float inv = -1 + (2 * (dif < 0));
 
 	if (dif > 0.1 && bondpair->atom_indexes[1] == 1) {
 		printf("\ndist %f dif: %f FORCE %f\n", dist, dif, force);
@@ -482,29 +459,9 @@ __device__ void integrateTimestep(Simulation* simulation, Particle* particle, Fl
 	Float3 force_vector = force.norm();
 	float kin_to_vel = sqrtf(2000 * force_scalar / particle->mass);	//	2000 instead of 2, to account using g instead of kg
 	Float3 vel_next = particle->vel_prev + (force_vector * (simulation->dt * kin_to_vel));
-	//printf("ktv %f\n", kin_to_vel);
-	//Float3 vel_next = Float3(0, 0, 0);
-	//force.print();
-	//force_vector.print();
-	//vel_next.print();
 	particle->pos = particle->pos + vel_next * simulation->dt;
 	particle->vel_prev = vel_next;
 }
-
-/*
-__device__ bool isBonded(Particle* a, Particle* b) {
-	for (int i = 0; i < 4; i++) {
-		for (int j = 0; j < 4; j++) {
-			if (a->bondpair_ids[i] == UINT32_MAX)
-				return false;
-
-			if (a->bondpair_ids[i] == b->bondpair_ids[j])
-				return true;
-		}
-	}
-	return false;
-}
-*/
 
 // ------------------------------------------------------------------------------------------- KERNELS -------------------------------------------------------------------------------------------//
 
@@ -535,12 +492,10 @@ __global__ void intramolforceKernel(Box* box, int offset) {
 		int rel_index = threadIdx.x + i * compound.n_bondpairs;
 		
 		if (rel_index < compound.n_particles) {
-			//box->particles[compound.startindex_particle + rel_index].force = compound.particles[rel_index].force;
-		}
-			
+			//compound.particles[rel_index].force.print('B');
+			box->particles[compound.startindex_particle + rel_index].force = compound.particles[rel_index].force;
+		}			
 	}
-	//box->particles[compound.startindex_particle + threadIdx.x].force = Float3(1, 1, 3);
-	//printf("\nFOrce to index %d\n", compound.startindex_particle + threadIdx.x);
 }
 
 
@@ -572,11 +527,12 @@ __global__ void stepKernel(Simulation* simulation, int offset) {
 
 
 	// --------------------------------- ACTUAL MOLECULAR DYNAMICS HAPPENING HERE! --------------------------------- //
-	Float3 force_total = Float3(0, 0, 0);
-
 	// Calc all Lennard-Jones forces from focus bodies
 	if (particle.active) {						// This part acounts for about 2/5 of compute time
 		// I assume that all present molecules come in order!!!!!!
+
+
+		Float3 force_total = simulation->box->particles[particle.id].force;
 		for (int i = 0; i < MAX_FOCUS_BODIES; i++) {
 			if (block.focus_particles[i].active) {
 				if (i != bodyID && particle.compoundID !=  block.focus_particles[i].compoundID) {
@@ -629,11 +585,6 @@ __global__ void stepKernel(Simulation* simulation, int offset) {
 		simulation->box->particles[particle.id].pos = particle.pos;
 
 	}
-	
-
-
-
-	//body.rotation = body.rotation + body.rot_vel * simulation->dt;				
 
 
 

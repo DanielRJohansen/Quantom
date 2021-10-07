@@ -147,23 +147,7 @@ const int H2O_PAIRBONDS = 2;
 const float OH_refdist = 0.095;
 struct Compound_H2O {	// Entire molecule for small < 500 atoms molcules, or part of large molecule
 	__host__ __device__ Compound_H2O() {};	// {O, H, H}
-	/*
-	Compound_H2O(Particle* global_particle_table, uint32_t startindex_particle, uint32_t startindex_bond) : 
-		global_particle_table(global_particle_table), startindex_particle(startindex_particle) {
-		bondpairs[0] = BondPair(0.095, 0, 1);
-		bondpairs[1] = BondPair(0.095, 0, 2);
 
-		uint8_t particle_bond_count[H2O_PARTICLES] = { 0 };
-		for (int i = 0; i < H2O_PAIRBONDS; i++) {	
-			for (int j = 0; j < 2; j++) {		// Iterate over both particles in bond
-				uint32_t rel_p_index = bondpairs[i].atom_indexes[j];
-				uint32_t abs_p_index = startindex_particle + rel_p_index;
-				uint8_t p_bond_cnt = particle_bond_count[rel_p_index];
-				//global_particle_table[abs_p_index].bondpair_ids[p_bond_cnt] = 5;
-				particle_bond_count[rel_p_index]++;
-			}
-		}
-	}*/
 	__host__ void init(uint32_t startindex_particle, uint32_t compoundID) {
 		this->startindex_particle = startindex_particle;
 		bondpairs[0] = BondPair(OH_refdist, 0, 1);
