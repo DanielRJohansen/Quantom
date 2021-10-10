@@ -161,8 +161,7 @@ struct Compound_H2O {	// Entire molecule for small < 500 atoms molcules, or part
 
 
 	__device__ void loadParticles(Particle* global_particle_table) {
-		int x = blockIdx.x;
-		//printf("\nCompund %d\n", x);
+
 		for (int i = 0; i < n_particles ; i++) {
 			particles[i].pos = global_particle_table[startindex_particle + i].pos;
 			//particles[i].pos.print();

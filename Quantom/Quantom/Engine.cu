@@ -241,7 +241,7 @@ void Engine::step() {
 	Box* box = simulation->box;	// Why the fuck do i have to do this, VisualStudio???!
 	for (int i = 0; i < N_STREAMS; i++) {
 		int offset = i * compounds_per_sm;
-		intramolforceKernel <<< compounds_per_sm, 2, 0, stream[i] >>> (box, offset);
+		intramolforceKernel <<< compounds_per_sm, 3, 0, stream[i] >>> (box, offset);
 	}
 	cudaDeviceSynchronize();
 
@@ -429,44 +429,48 @@ __device__ Float3 calcLJForce(Particle* particle0, Particle* particle1, int i, i
 }
 
 
-
+constexpr float kb = 17.5 * 10e+6;		//	J/(mol*nm^2)
 __device__ void calcPairbondForce(Compound_H2O* compound, BondPair* bondpair) {
-	float kb = 17.5 * 1e+6;		//	J/(mol*nm^2)
 	Float3 particle1_mirrorpos = getClosestMirrorPos(compound->particles[bondpair->atom_indexes[1]].pos, compound->particles[bondpair->atom_indexes[0]].pos);
 	Float3 direction = compound->particles[bondpair->atom_indexes[0]].pos - particle1_mirrorpos;
-	//Float3 direction = compound->particles[bondpair->atom_indexes[0]].pos - compound->particles[bondpair->atom_indexes[1]].pos;
+	int focus_index = bondpair->atom_indexes[1] == threadIdx.x;	// If it is not pos 1 we get false, meaning pos 0... Not beautiful but it works.
+	direction = direction - direction * 2 * (1 * focus_index);	// Flip dir if focusatom is at index 1
+
+
 	float dist = direction.len();
 	float dif = dist - bondpair->reference_dist;
 	float force = 0.5 * kb * (dif * dif);
 	direction = direction.norm();
-	float inv = -1 + (2 * (dif < 0));
+	float invert_if_attraction = -1 + (2 * (dif < 0));
 
-	if (dif > 0.1 && bondpair->atom_indexes[1] == 1) {
-		printf("\ndist %f dif: %f FORCE %f\n", dist, dif, force);
-		//compound->particles[bondpair->atom_indexes[0]].pos.print();
-		//compound->particles[bondpair->atom_indexes[1]].pos.print();
-		for (int i = 0; i < 3; i++)
-			compound->particles[i].pos.print();
+
+	
+	if (force > 80'000'000) {
+		printf("\n Atom id %d dist %f dif: %f FORCE %f inverted %f len %f\n",threadIdx.x, dist, dif, force, invert_if_attraction, (direction * force * invert_if_attraction).len());
+		//(direction * force * invert_if_attraction).print('f');
+		//printf("\n");
 	}
-		
+	
 
-	compound->particles[bondpair->atom_indexes[0]].force = direction * force * inv;
-	compound->particles[bondpair->atom_indexes[1]].force = direction * force * inv * -1;
+	compound->particles[threadIdx.x].force = direction * force * invert_if_attraction;
 }
 
-__device__ void integrateTimestep(Simulation* simulation, Particle* particle, Float3 force) {	// Kinetic formula: v = sqrt(2*K/m), m in kg
-	float force_scalar = force.len();
-	Float3 force_vector = force.norm();
+__device__ void integrateTimestep(Simulation* simulation, Particle* particle) {	// Kinetic formula: v = sqrt(2*K/m), m in kg
+	float force_scalar = particle->force.len();
+	Float3 force_vector = particle->force.norm();
 	float kin_to_vel = sqrtf(2000 * force_scalar / particle->mass);	//	2000 instead of 2, to account using g instead of kg
 	Float3 vel_next = particle->vel_prev + (force_vector * (simulation->dt * kin_to_vel));
+	if (force_scalar > 80'000'000) {
+		particle->vel_prev.print('v');
+		vel_next.print('n');
+	}
 	particle->pos = particle->pos + vel_next * simulation->dt;
 	particle->vel_prev = vel_next;
 }
 
 // ------------------------------------------------------------------------------------------- KERNELS -------------------------------------------------------------------------------------------//
 
-__global__ void intramolforceKernel(Box* box, int offset) {
-
+__global__ void intramolforceKernel(Box* box, int offset) {	// 1 thread per particle in compound
 	__shared__ Compound_H2O compound;
 
 	uint32_t compound_index = blockIdx.x + offset;
@@ -477,17 +481,27 @@ __global__ void intramolforceKernel(Box* box, int offset) {
 
 	if (threadIdx.x == 0) {
 		compound = box->compounds[compound_index];
-		compound.loadParticles(box->particles);
 	}
 	__syncthreads();
+	compound.particles[threadIdx.x].pos = box->particles[compound.startindex_particle + threadIdx.x].pos;
+	__syncthreads();
 
-
+	for (int i = 0; i < compound.n_bondpairs; i++) {
+		BondPair* bond = &compound.bondpairs[i];
+		if (bond->atom_indexes[0] == threadIdx.x || bond->atom_indexes[1] == threadIdx.x) {
+			calcPairbondForce(&compound, bond);
+		}
+	}
 	//CompactParticle* particle = &compound.particles[threadIdx.x];
-	BondPair* bondpair = &compound.bondpairs[threadIdx.x];
-	calcPairbondForce(&compound, bondpair);	// This applies the force directly to the particles
+	//BondPair* bondpair = &compound.bondpairs[threadIdx.x];
+	//calcPairbondForce(&compound, bondpair);	// This applies the force directly to the particles
 
+	box->particles[compound.startindex_particle + threadIdx.x].force = compound.particles[threadIdx.x].force;
+	if (compound.particles[threadIdx.x].force.len() > 80'000'000) {
+		box->particles[compound.startindex_particle + threadIdx.x].force.print('O');
+	}
 
-
+	/*
 	for (int i = 0; i < (compound.n_particles / compound.n_bondpairs) + 1; i++) {
 		int rel_index = threadIdx.x + i * compound.n_bondpairs;
 		
@@ -496,6 +510,7 @@ __global__ void intramolforceKernel(Box* box, int offset) {
 			box->particles[compound.startindex_particle + rel_index].force = compound.particles[rel_index].force;
 		}			
 	}
+	*/
 }
 
 
@@ -532,11 +547,12 @@ __global__ void stepKernel(Simulation* simulation, int offset) {
 		// I assume that all present molecules come in order!!!!!!
 
 
-		Float3 force_total = simulation->box->particles[particle.id].force;
+		particle.force = simulation->box->particles[particle.id].force;
+		Float3 force_total;
 		for (int i = 0; i < MAX_FOCUS_BODIES; i++) {
 			if (block.focus_particles[i].active) {
 				if (i != bodyID && particle.compoundID !=  block.focus_particles[i].compoundID) {
-					force_total = force_total + calcLJForce(&particle, &block.focus_particles[i], -i, blockID);
+					//force_total = force_total + calcLJForce(&particle, &block.focus_particles[i], -i, blockID);
 				}
 			}
 			else {
@@ -547,7 +563,7 @@ __global__ void stepKernel(Simulation* simulation, int offset) {
 		// Calc all forces from Near bodies
 		for (int i = 0; i < MAX_NEAR_BODIES; i++) {
 			if (block.near_particles[i].active && particle.compoundID != block.near_particles[i].compoundID) {
-				force_total = force_total + calcLJForce(&particle, &block.near_particles[i], i + MAX_FOCUS_BODIES, blockID);
+				//force_total = force_total + calcLJForce(&particle, &block.near_particles[i], i + MAX_FOCUS_BODIES, blockID);
 			}
 			else {
 				break;
@@ -558,14 +574,18 @@ __global__ void stepKernel(Simulation* simulation, int offset) {
 
 		//particle.force = simulation->box->particles[particle.id].force;
 		//printf("\n ID %d\tInter: %f %f %f\tIntra %f %f %f\n", particle.id, force_total.x, force_total.y, force_total.z, particle.force.x, particle.force.y, particle.force.z);
-		force_total = force_total + particle.force;
-
+		if (particle.force.len() > 80'000'000) {
+			force_total.print('S');
+			//printf("\n\n");
+		}
+		//force_total = force_total + particle.force;
+		//particle.force = particle.force + force_total;
 
 
 
 		// Integrate position  AFTER ALL BODIES IN BLOCK HAVE BEEN CALCULATED? No should not be a problem as all update their local body, 
 		// before moving to shared?? Although make the local just a pointer might be faster, since a SimBody might not fit in thread registers!!!!!
-		integrateTimestep(simulation, &particle, force_total);
+		integrateTimestep(simulation, &particle);
 
 
 

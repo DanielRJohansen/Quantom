@@ -152,7 +152,7 @@ __device__ bool Ray::hitsParticle(Particle* particle) {
     return false;
 }
 
-__device__ bool Ray::searchBlock(Block* block, MoleculeLibrary* mol_library, uint8_t* image) {
+__device__ bool Ray::searchBlock(Block* block, uint8_t* image) {
     Particle* closest_particle;
     float big_number = 99999;
     float closest_intersect = big_number;
@@ -449,7 +449,7 @@ __device__ void colorRay(Ray* ray, uint8_t* image, int index) {
 
 }
 
-__global__ void renderKernel(Ray* rayptr, uint8_t* image, Box* box, MoleculeLibrary* mol_library) {
+__global__ void renderKernel(Ray* rayptr, uint8_t* image, Box* box) {
     int  index = blockIdx.x * blockDim.x + threadIdx.x;
     Ray ray = rayptr[index];
     
@@ -462,7 +462,7 @@ __global__ void renderKernel(Ray* rayptr, uint8_t* image, Box* box, MoleculeLibr
             break;
 
         Block* block = &box->blocks[ray.block_indexes[i]];
-        if (ray.searchBlock(block, mol_library, image))
+        if (ray.searchBlock(block, image))
             break;
     }
 }
@@ -488,7 +488,7 @@ uint8_t* Raytracer::render(Simulation* simulation) {
     cudaMallocManaged(&cuda_image, im_bytesize);
 
 
-    renderKernel << < RAYS_PER_DIM, RAYS_PER_DIM, 0>>> ( rayptr, cuda_image, simulation->box, simulation->mol_library);
+    renderKernel << < RAYS_PER_DIM, RAYS_PER_DIM, 0>>> ( rayptr, cuda_image, simulation->box);
     uint8_t* image = new uint8_t[NUM_RAYS * 4];
     cudaMemcpy(image, cuda_image, im_bytesize, cudaMemcpyDeviceToHost);
 

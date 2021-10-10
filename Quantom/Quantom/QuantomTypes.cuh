@@ -2,6 +2,11 @@
 
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
+
+#include <cuda.h>
+#include <device_atomic_functions.h>
+#include <device_functions.h>
+
 #include "math.h"
 #include <iostream>
 
@@ -102,142 +107,23 @@ struct Float3 {
 	float x = 0, y = 0, z = 0;
 };
 
-
-
-
-
-
-
-
-
 /*
-struct cudaBody {
-	cudaBody(){}
-	cudaBody(SimBody* simbody) : simbody(simbody) {
+struct BlockMutex {
+	__device__ BlockMutex(){}
+	int mutex = 0;
 
+	
+
+	__device__ void lock() {
+		while (atomicCAS(mutex, 0, 1) != 0) {}
 	}
-
-
-	float pos[3];
-	SimBody* simbody;
+	__device__ void unlock() {
+		atomicExch(mutex, 0);
+	}
 };
-
-class KdTree {
-	class Node;
-	void swap(Node parent, Node child);
-
-
-
-public:
-	KdTree(){}
-	KdTree(Float3 block_center) : block_center(block_center) {}
-
-	void addNode(SimBody* body) {
-		float pos[3] = { body->pos.x, body->pos.y,	body->pos.z };
-
-		if (root == NULL)
-			root = new Node(body, NULL);
-		else
-			root->addNode(body, pos);
-	}
-
-	void balance() {
-		if (root != NULL) {
-			root->rootBalance(block_center);
-
-		}
-	}
-
-private:
-	Node* root = NULL;
-	Float3 block_center;
-
-
-	// Helper functions
-	static void swap(Node* parent, Node* child) {
-		Node* temp = parent;
-		parent = child;
-		parent->dim = child->dim;
-
-		child = temp;
-		child->dim = temp->dim;
-	}
-
-	// Structs
-
-	struct Dim {
-		Dim(){}
-		Dim(uint8_t val) : val(val) {}
-		uint8_t val = 0;
-		Dim next() {
-			if (val == 2)
-				return Dim(0);
-			return Dim(val + 1);
-		}
-	};
-
-
-	class Node {
-	public:
-		Node() {}
-		Node(SimBody* body, Node* parent, float pos[3]) : body(body), parent(parent) {
-			for (int i = 0; i < 3; i++)
-				this->pos[i] = pos[i];
-			dim = parent->dim.next();
-		}
-		Dim dim;
-
-		void addNode(SimBody* body, float* pos) {
-			if (pos[dim.val] > this->pos[dim.val]) {
-				if (right == NULL)
-					right = new Node(body, this, pos);
-				else
-					right->addNode(body, pos);
-			}
-			else {
-				if (left == NULL)
-					left = new Node(body, this, pos);
-				else
-					left->addNode(body, pos);
-			}
-		}
-
-		void rootBalance(Float3 block_center) {
-			float left_dist = 99999;
-			float right_dist = 99999;
-			float root_dist = (body->pos - block_center).len();
-			if (left != NULL)
-				left_dist = (left->body->pos - block_center).len();
-			if (right != NULL)
-				right_dist = (right->body->pos - block_center).len();
-
-			if (left_dist < right_dist) {
-				if (left_dist < root_dist)
-					swap(left, this);
-			}
-			else {
-				if (right_dist < root_dist)
-					swap(right, this);
-			}
-				
-
-
-			if (left != NULL)
-				left->nodeBalance();
-			if (right != NULL)
-				right->nodeBalance();
-		}
-		void nodeBalance();
-
-
-	private:
-		float pos[3];
-		SimBody* body;
-		Node* parent;
-		Node* right = NULL;
-		Node* left = NULL;
-
-	};
-};
-
 */
+
+
+
+
+

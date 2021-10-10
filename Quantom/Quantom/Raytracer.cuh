@@ -25,7 +25,7 @@ public:
 
 	__device__ void findBlockHits(Box* box, Float3 focalpoint);
 	__device__ bool hitsParticle(Particle* particle);
-	__device__ bool searchBlock(Block* block, MoleculeLibrary* mol_library, uint8_t* image);
+	__device__ bool searchBlock(Block* block, uint8_t* image);
 	__device__ bool moleculeCollisionHandling(Particle* particle, MoleculeLibrary* mol_library, uint8_t* image);
 	__device__ bool hitsBlock(Float3* blockmin, Float3* blockmax, Float3* focalpoint);
 
