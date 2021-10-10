@@ -378,6 +378,11 @@ __device__ Float3 getClosestMirrorPos(Float3 pos, Float3 block_center) {	// Bloc
 	return pos + directional_hotencoded_vector * Float3(BOX_LEN, BOX_LEN, BOX_LEN);
 }
 
+
+__device__ float getAngle(Float3 v1, Float3 v2) {
+	return acos((v1.dot(v2)) / (v1.len() * v2.len()));
+}
+
 __device__ Float3 calcLJForceReducedUnits(Particle* particle0, Particle* particle1, int i, int bid) {	// Applying force to p0 only! - THIS METHOD USES REDUCED UNITS, WHERE DIST(1) MEANS DIST(Vdw RADIUS)
 	float dist_pow2 = (particle0->pos - particle1->pos).lenSquared();
 	float dist_pow2_inv = 1.f / dist_pow2;
@@ -451,6 +456,31 @@ __device__ void calcPairbondForce(Compound_H2O* compound, BondPair* bondpair) {
 	}
 }
 
+constexpr float ktheta = 65 * 10e+3;	// J/mol
+__device__ void calcAngleForce(Compound_H2O* compound, AngleBond* anglebond) {
+	Float3 v1 = compound->particles[anglebond->atom_indexes[0]].pos - compound->particles[anglebond->atom_indexes[1]].pos;
+	Float3 v2 = compound->particles[anglebond->atom_indexes[2]].pos - compound->particles[anglebond->atom_indexes[1]].pos;
+	Float3 force_direction = compound->particles[anglebond->atom_indexes[0]].pos - compound->particles[anglebond->atom_indexes[2]].pos;
+	force_direction = force_direction - force_direction * 2 * (threadIdx.x == 2);
+	force_direction = force_direction.norm();
+
+	float angle = getAngle(v1, v2);
+	float dif = angle - anglebond->reference_theta;
+	float force_scalar = 0.5 * ktheta * (dif * dif);
+
+	float invert_if_attraction = -1 + (2 * (dif < 0));
+	//v1.print('1');
+	//v2.print('2');
+	compound->particles[threadIdx.x].force = compound->particles[threadIdx.x].force + force_direction * force_scalar * invert_if_attraction;
+	if (force_scalar > 10000) {
+
+		printf("\nAngle %f\n", angle);
+		(force_direction * force_scalar * invert_if_attraction).print('A');
+	}
+		
+	
+}
+
 __device__ void integrateTimestep(Simulation* simulation, Particle* particle) {	// Kinetic formula: v = sqrt(2*K/m), m in kg
 	float force_scalar = particle->force.len();
 	Float3 force_vector = particle->force.norm();
@@ -489,10 +519,17 @@ __global__ void intramolforceKernel(Box* box, int offset) {	// 1 thread per part
 	compound.particles[threadIdx.x].pos = box->particles[compound.startindex_particle + threadIdx.x].pos;
 	__syncthreads();
 
-	for (int i = 0; i < compound.n_bondpairs; i++) {
+	for (int i = 0; i < compound.n_bondpairs; i++) {	// Bond forces
 		BondPair* bond = &compound.bondpairs[i];
 		if (bond->atom_indexes[0] == threadIdx.x || bond->atom_indexes[1] == threadIdx.x) {
 			calcPairbondForce(&compound, bond);
+		}
+	}
+
+	for (int i = 0; i < compound.n_anglebonds; i++) {	// Angle forces
+		AngleBond* bond = &compound.anglebonds[i];
+		if (bond->atom_indexes[0] == threadIdx.x || bond->atom_indexes[2] == threadIdx.x) {
+			calcAngleForce(&compound, bond);
 		}
 	}
 	//CompactParticle* particle = &compound.particles[threadIdx.x];
@@ -500,7 +537,13 @@ __global__ void intramolforceKernel(Box* box, int offset) {	// 1 thread per part
 	//calcPairbondForce(&compound, bondpair);	// This applies the force directly to the particles
 
 	box->particles[compound.startindex_particle + threadIdx.x].force = compound.particles[threadIdx.x].force;
-
+	
+	if (box->particles[compound.startindex_particle + threadIdx.x].force.len() > 10000) {
+		printf("\npaintjob!\n");
+		box->particles[compound.startindex_particle + threadIdx.x].color[0] = 0;
+		box->particles[compound.startindex_particle + threadIdx.x].color[2] = 220;
+	}
+		
 
 	/*
 	for (int i = 0; i < (compound.n_particles / compound.n_bondpairs) + 1; i++) {
@@ -548,6 +591,7 @@ __global__ void stepKernel(Simulation* simulation, int offset) {
 		// I assume that all present molecules come in order!!!!!!
 
 		particle.force = simulation->box->particles[particle.id].force;
+		simulation->box->blocks[blockID].focus_particles[bodyID].color[2] = simulation->box->particles[particle.id].color[2];
 		Float3 force_total;
 		for (int i = 0; i < MAX_FOCUS_BODIES; i++) {
 			if (block.focus_particles[i].active) {
@@ -613,7 +657,7 @@ __global__ void stepKernel(Simulation* simulation, int offset) {
 	accesspoint.particles[bodyID] = particle;
 
 	// Mark all bodies as obsolete
-	simulation->box->blocks[blockID].focus_particles[bodyID].active = false;
+	simulation->box->blocks[blockID].focus_particles[bodyID].active = false;	// This should break rendering but it doesn't`???
 
 
 	__syncthreads();

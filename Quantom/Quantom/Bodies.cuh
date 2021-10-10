@@ -132,6 +132,14 @@ struct BondPair {	// IDS and indexes are used interchangeably here!
 };
 
 struct AngleBond {
+	AngleBond() {}
+	AngleBond(float ref_t, uint32_t particleindex_l, uint32_t particleindex_m, uint32_t particleindex_r) :
+		reference_theta(ref_t) {
+		atom_indexes[0] = particleindex_l;
+		atom_indexes[1] = particleindex_m;
+		atom_indexes[2] = particleindex_r;
+	}
+
 	float reference_theta;
 	uint32_t atom_indexes[3]; // i,j,k angle between i and k
 };
@@ -144,7 +152,9 @@ struct AngleBond {
 // A shell script will automate writing these compounds
 const int H2O_PARTICLES = 3;
 const int H2O_PAIRBONDS = 2;
-const float OH_refdist = 0.095;
+const int H2O_ANGLEBONDS = 1;
+const float OH_refdist = 0.095;	//
+const float HOH_refangle = 1.822996; // radians
 struct Compound_H2O {	// Entire molecule for small < 500 atoms molcules, or part of large molecule
 	__host__ __device__ Compound_H2O() {};	// {O, H, H}
 
@@ -152,6 +162,8 @@ struct Compound_H2O {	// Entire molecule for small < 500 atoms molcules, or part
 		this->startindex_particle = startindex_particle;
 		bondpairs[0] = BondPair(OH_refdist, 0, 1);
 		bondpairs[1] = BondPair(OH_refdist, 0, 2);
+
+		anglebonds[0] = AngleBond(HOH_refangle, 1, 0, 2);
 	}
 
 	/*Compound_H2O operator = (const Compound_H2O a) {
@@ -177,6 +189,8 @@ struct Compound_H2O {	// Entire molecule for small < 500 atoms molcules, or part
 	uint16_t n_bondpairs = H2O_PAIRBONDS;
 	BondPair bondpairs[H2O_PAIRBONDS];
 	
+	uint16_t n_anglebonds = H2O_ANGLEBONDS;
+	AngleBond anglebonds[H2O_ANGLEBONDS];
 	//Particle* global_particle_table;	// Host address, only usable when creating compound
 
 };

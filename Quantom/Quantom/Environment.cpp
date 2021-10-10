@@ -49,6 +49,7 @@ void Environment::run() {
 		for (int i = 0; i < simulation->steps_per_render; i++) {
 			engine->step();
 			printf("\r\tStep #%05d", simulation->step);
+			//simulation->finished = true;
 			//exit(1);
 			if (simulation->finished)
 				break;
