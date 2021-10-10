@@ -246,7 +246,7 @@ void Engine::step() {
 	cudaDeviceSynchronize();
 
 
-
+	auto t1 = std::chrono::high_resolution_clock::now();
 
 
 
@@ -269,7 +269,7 @@ void Engine::step() {
 
 
 
-	auto t1 = std::chrono::high_resolution_clock::now();
+	auto t2 = std::chrono::high_resolution_clock::now();
 
 	blocks_handled = 0;
 	while (blocks_handled < sim_blocks) {
@@ -287,13 +287,14 @@ void Engine::step() {
 		}
 	}
 
-	auto t2 = std::chrono::high_resolution_clock::now();
+	auto t3 = std::chrono::high_resolution_clock::now();
 
 	bool verbose = true;
 	if (verbose) {
-		int step_duration = (int)std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
-		int update_duration = (int)std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
-		timings = timings + Int3(step_duration, update_duration, 0);
+		int intra_duration = (int)std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
+		int inter_duration = (int)std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
+		int update_duration = (int)std::chrono::duration_cast<std::chrono::microseconds>(t3 - t2).count();
+		timings = timings + Int3(intra_duration, inter_duration, update_duration);
 		//printf("\nStep %d ys.\tUpdate: %d\n\n", step_duration, update_duration);
 	}
 
@@ -443,24 +444,26 @@ __device__ void calcPairbondForce(Compound_H2O* compound, BondPair* bondpair) {
 	direction = direction.norm();
 	float invert_if_attraction = -1 + (2 * (dif < 0));
 
+	compound->particles[threadIdx.x].force = compound->particles[threadIdx.x].force + direction * force * invert_if_attraction;
 
-	
-	if (force > 80'000'000) {
-		printf("\n Atom id %d dist %f dif: %f FORCE %f inverted %f len %f\n",threadIdx.x, dist, dif, force, invert_if_attraction, (direction * force * invert_if_attraction).len());
-		//(direction * force * invert_if_attraction).print('f');
-		//printf("\n");
+	if (force > 800'000) {
+		printf("\n Atom id %d dist %f dif: %f FORCE %f inverted %f len %f\n", compound->startindex_particle + threadIdx.x, dist, dif, force, invert_if_attraction, compound->particles[threadIdx.x].force.len());
 	}
-	
-
-	compound->particles[threadIdx.x].force = direction * force * invert_if_attraction;
 }
 
 __device__ void integrateTimestep(Simulation* simulation, Particle* particle) {	// Kinetic formula: v = sqrt(2*K/m), m in kg
 	float force_scalar = particle->force.len();
 	Float3 force_vector = particle->force.norm();
-	float kin_to_vel = sqrtf(2000 * force_scalar / particle->mass);	//	2000 instead of 2, to account using g instead of kg
-	Float3 vel_next = particle->vel_prev + (force_vector * (simulation->dt * kin_to_vel));
-	if (force_scalar > 80'000'000) {
+	//float kin_to_vel = sqrtf(2000 * force_scalar / particle->mass);	//	2000 instead of 2, to account using g instead of kg
+
+	//Float3 vel_next = particle->vel_prev + (force_vector * (simulation->dt * kin_to_vel));
+	Float3 vel_next = particle->vel_prev + (particle->force * (1000.f/particle->mass) * simulation->dt);
+	if (force_scalar > 800'000) {
+		printf("\n");
+		if (threadIdx.x == 0)
+			printf("O:\n");
+		else
+			printf("H:\n");
 		particle->vel_prev.print('v');
 		vel_next.print('n');
 	}
@@ -497,9 +500,7 @@ __global__ void intramolforceKernel(Box* box, int offset) {	// 1 thread per part
 	//calcPairbondForce(&compound, bondpair);	// This applies the force directly to the particles
 
 	box->particles[compound.startindex_particle + threadIdx.x].force = compound.particles[threadIdx.x].force;
-	if (compound.particles[threadIdx.x].force.len() > 80'000'000) {
-		box->particles[compound.startindex_particle + threadIdx.x].force.print('O');
-	}
+
 
 	/*
 	for (int i = 0; i < (compound.n_particles / compound.n_bondpairs) + 1; i++) {
@@ -539,20 +540,19 @@ __global__ void stepKernel(Simulation* simulation, int offset) {
 	__syncthreads();
 	Particle particle = block.focus_particles[bodyID];
 
-
+	
 
 	// --------------------------------- ACTUAL MOLECULAR DYNAMICS HAPPENING HERE! --------------------------------- //
 	// Calc all Lennard-Jones forces from focus bodies
 	if (particle.active) {						// This part acounts for about 2/5 of compute time
 		// I assume that all present molecules come in order!!!!!!
 
-
 		particle.force = simulation->box->particles[particle.id].force;
 		Float3 force_total;
 		for (int i = 0; i < MAX_FOCUS_BODIES; i++) {
 			if (block.focus_particles[i].active) {
 				if (i != bodyID && particle.compoundID !=  block.focus_particles[i].compoundID) {
-					//force_total = force_total + calcLJForce(&particle, &block.focus_particles[i], -i, blockID);
+					force_total = force_total + calcLJForce(&particle, &block.focus_particles[i], -i, blockID);
 				}
 			}
 			else {
@@ -563,7 +563,7 @@ __global__ void stepKernel(Simulation* simulation, int offset) {
 		// Calc all forces from Near bodies
 		for (int i = 0; i < MAX_NEAR_BODIES; i++) {
 			if (block.near_particles[i].active && particle.compoundID != block.near_particles[i].compoundID) {
-				//force_total = force_total + calcLJForce(&particle, &block.near_particles[i], i + MAX_FOCUS_BODIES, blockID);
+				force_total = force_total + calcLJForce(&particle, &block.near_particles[i], i + MAX_FOCUS_BODIES, blockID);
 			}
 			else {
 				break;
@@ -574,10 +574,8 @@ __global__ void stepKernel(Simulation* simulation, int offset) {
 
 		//particle.force = simulation->box->particles[particle.id].force;
 		//printf("\n ID %d\tInter: %f %f %f\tIntra %f %f %f\n", particle.id, force_total.x, force_total.y, force_total.z, particle.force.x, particle.force.y, particle.force.z);
-		if (particle.force.len() > 80'000'000) {
-			force_total.print('S');
-			//printf("\n\n");
-		}
+		
+
 		//force_total = force_total + particle.force;
 		//particle.force = particle.force + force_total;
 
@@ -706,22 +704,14 @@ __global__ void updateKernel(Simulation* simulation, int offset) {
 			near_cnt += (relation_type == 1);
 			focus_cnt += (relation_type > 1);
 		}
-		
-		/*
-		while (true) {
-			if (element_sum_near[threadID1] > -1) {
-				element_sum_focus[array_index] = element_sum_focus[threadID1] + focus_cnt;
-				element_sum_near[array_index] = element_sum_near[threadID1] + near_cnt;
-				break;
-			}
-		}*/
-		// Safer solution below, with no while true!
-		for (int i = 0; i < 27; i++) {
+
+		for (int i = 0; i < 27; i++) {	// Reserve spaces 
 			if (threadID1 == i) {
-				element_sum_focus[array_index] = element_sum_focus[i] + focus_cnt;
-				element_sum_near[array_index] = element_sum_near[i] + near_cnt;
-				if (element_sum_focus[array_index] > MAX_FOCUS_BODIES || element_sum_near[i+1] > MAX_NEAR_BODIES) {
+				element_sum_focus[array_index] = element_sum_focus[array_index-1] + focus_cnt;
+				element_sum_near[array_index] = element_sum_near[array_index-1] + near_cnt;
+				if (element_sum_focus[array_index] >= MAX_FOCUS_BODIES || element_sum_near[array_index] >= MAX_NEAR_BODIES) {
 					printf("Block %d overflowing! near %d    focus %d\n", blockID1, element_sum_near[i + 1], element_sum_focus[i + 1]);
+					simulation->finished = true;
 					break;
 				}
 			}

@@ -5,7 +5,7 @@
 
 
 
-constexpr float BOX_LEN = 8.0;	// Multiple of FOCUS_LEN please!
+constexpr float BOX_LEN = 14.0;	// Multiple of FOCUS_LEN please!
 
 constexpr float BOX_LEN_HALF = BOX_LEN/2.f;
 constexpr float BOX_BASE = -BOX_LEN_HALF;
@@ -21,14 +21,14 @@ constexpr float edgeforce_scalar_half = edgeforce_scalar/2.f;
 //constexpr auto CUTOFF_LEN = 0.8f;		// nm
 //constexpr float BLOCK_OVERLAP = 0.3f;	// nm, must be > 2* vdw radius of largest atom.
 
-const int MAX_FOCUS_BODIES = 32;
+const int MAX_FOCUS_BODIES = 64;
 const int MAX_NEAR_BODIES = 256 - MAX_FOCUS_BODIES;
 //constexpr float SOLOBLOCK_DIST = BLOCK_LEN - BLOCK_OVERLAP;
 
 
 const int INDEXA = 100900;
 //const int N_BODIES_START = BOX_LEN*BOX_LEN*BOX_LEN/(FOCUS_LEN*FOCUS_LEN*FOCUS_LEN) * 25;
-const int N_BODIES_START = 120;
+const int N_BODIES_START = 1200;
 const int BLOCKS_PER_SM = 512;
 //const int GRIDBLOCKS_PER_BODY = 16;
 //const int THREADS_PER_GRIDBLOCK = MAX_BLOCK_BODIES / GRIDBLOCKS_PER_BODY;

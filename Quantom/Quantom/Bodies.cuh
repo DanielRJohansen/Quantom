@@ -73,7 +73,7 @@ struct Particle {
 	//Float3 charge_unit_vector;
 	//float charge_magnitude = 0.f;
 
-	Float3 force;
+	Float3 force;	// J/mol
 };
 		
 
