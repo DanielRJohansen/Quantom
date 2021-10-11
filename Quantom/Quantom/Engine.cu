@@ -436,7 +436,7 @@ __device__ Float3 calcLJForce(Particle* particle0, Particle* particle1, int i, i
 
 
 constexpr float kb = 17.5 * 10e+6;		//	J/(mol*nm^2)
-__device__ void calcPairbondForce(Compound_H2O* compound, BondPair* bondpair) {
+__device__ void calcPairbondForce(Compound_H2O* compound, BondPair* bondpair, float* dataptr) {
 	Float3 particle1_mirrorpos = getClosestMirrorPos(compound->particles[bondpair->atom_indexes[1]].pos, compound->particles[bondpair->atom_indexes[0]].pos);
 	Float3 direction = compound->particles[bondpair->atom_indexes[0]].pos - particle1_mirrorpos;
 	int focus_index = bondpair->atom_indexes[1] == threadIdx.x;	// If it is not pos 1 we get false, meaning pos 0... Not beautiful but it works.
@@ -451,15 +451,24 @@ __device__ void calcPairbondForce(Compound_H2O* compound, BondPair* bondpair) {
 
 	compound->particles[threadIdx.x].force = compound->particles[threadIdx.x].force + direction * force * invert_if_attraction;
 
+	if (threadIdx.x * blockIdx.x == 1) {
+		*dataptr = dist;
+	}
+		
+
 	if (force > 800'000) {
 		printf("\n Atom id %d dist %f dif: %f FORCE %f inverted %f len %f\n", compound->startindex_particle + threadIdx.x, dist, dif, force, invert_if_attraction, compound->particles[threadIdx.x].force.len());
 	}
 }
 
 constexpr float ktheta = 65 * 10e+3;	// J/mol
-__device__ void calcAngleForce(Compound_H2O* compound, AngleBond* anglebond) {
-	Float3 v1 = compound->particles[anglebond->atom_indexes[0]].pos - compound->particles[anglebond->atom_indexes[1]].pos;
-	Float3 v2 = compound->particles[anglebond->atom_indexes[2]].pos - compound->particles[anglebond->atom_indexes[1]].pos;
+__device__ void calcAngleForce(Compound_H2O* compound, AngleBond* anglebond, float* dataptr) {
+	Float3 p1_mirrorpos = getClosestMirrorPos(compound->particles[anglebond->atom_indexes[1]].pos, compound->particles[anglebond->atom_indexes[0]].pos);
+	Float3 p2_mirrorpos = getClosestMirrorPos(compound->particles[anglebond->atom_indexes[2]].pos, compound->particles[anglebond->atom_indexes[0]].pos);
+
+	Float3 v1 = compound->particles[anglebond->atom_indexes[0]].pos - p1_mirrorpos;
+	Float3 v2 = p2_mirrorpos - p1_mirrorpos;
+
 	Float3 force_direction = compound->particles[anglebond->atom_indexes[0]].pos - compound->particles[anglebond->atom_indexes[2]].pos;
 	force_direction = force_direction - force_direction * 2 * (threadIdx.x == 2);
 	force_direction = force_direction.norm();
@@ -477,8 +486,11 @@ __device__ void calcAngleForce(Compound_H2O* compound, AngleBond* anglebond) {
 		printf("\nAngle %f\n", angle);
 		(force_direction * force_scalar * invert_if_attraction).print('A');
 	}
+
+	if (threadIdx.x * blockIdx.x == 1) {
+		*dataptr = angle;
+	}
 		
-	
 }
 
 __device__ void integrateTimestep(Simulation* simulation, Particle* particle) {	// Kinetic formula: v = sqrt(2*K/m), m in kg
@@ -522,14 +534,18 @@ __global__ void intramolforceKernel(Box* box, int offset) {	// 1 thread per part
 	for (int i = 0; i < compound.n_bondpairs; i++) {	// Bond forces
 		BondPair* bond = &compound.bondpairs[i];
 		if (bond->atom_indexes[0] == threadIdx.x || bond->atom_indexes[1] == threadIdx.x) {
-			calcPairbondForce(&compound, bond);
+			calcPairbondForce(&compound, bond, &box->outdata1[box->data1_cnt]);
+			if (threadIdx.x * blockIdx.x == 1)
+				box->data1_cnt++;
 		}
 	}
 
 	for (int i = 0; i < compound.n_anglebonds; i++) {	// Angle forces
 		AngleBond* bond = &compound.anglebonds[i];
 		if (bond->atom_indexes[0] == threadIdx.x || bond->atom_indexes[2] == threadIdx.x) {
-			calcAngleForce(&compound, bond);
+			calcAngleForce(&compound, bond, &box->outdata2[box->data2_cnt]);
+			if (threadIdx.x * blockIdx.x == 1)
+				box->data2_cnt++;
 		}
 	}
 	//CompactParticle* particle = &compound.particles[threadIdx.x];
@@ -539,12 +555,14 @@ __global__ void intramolforceKernel(Box* box, int offset) {	// 1 thread per part
 	box->particles[compound.startindex_particle + threadIdx.x].force = compound.particles[threadIdx.x].force;
 	
 	if (box->particles[compound.startindex_particle + threadIdx.x].force.len() > 10000) {
-		printf("\npaintjob!\n");
+		//printf("\npaintjob!\n");
 		box->particles[compound.startindex_particle + threadIdx.x].color[0] = 0;
 		box->particles[compound.startindex_particle + threadIdx.x].color[2] = 220;
 	}
 		
 
+	//box->outdata[box->data_cnt++] = (box->particles[0].pos - box->particles[1].pos).len();
+	//box->outdata[box->data_cnt++] = 2;
 	/*
 	for (int i = 0; i < (compound.n_particles / compound.n_bondpairs) + 1; i++) {
 		int rel_index = threadIdx.x + i * compound.n_bondpairs;

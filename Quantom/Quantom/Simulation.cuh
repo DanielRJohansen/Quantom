@@ -28,7 +28,7 @@ const int MAX_NEAR_BODIES = 256 - MAX_FOCUS_BODIES;
 
 const int INDEXA = 100900;
 //const int N_BODIES_START = BOX_LEN*BOX_LEN*BOX_LEN/(FOCUS_LEN*FOCUS_LEN*FOCUS_LEN) * 25;
-const int N_BODIES_START = 120;
+const int N_BODIES_START = 60;
 const int BLOCKS_PER_SM = 512;
 //const int GRIDBLOCKS_PER_BODY = 16;
 //const int THREADS_PER_GRIDBLOCK = MAX_BLOCK_BODIES / GRIDBLOCKS_PER_BODY;
@@ -92,6 +92,10 @@ public:
 	uint32_t n_compounds = 0;
 
 	uint32_t n_bondpairs = 0;	//Need to record this so we can avoid LJ pot for bonded particles
+	float* outdata1;
+	int data1_cnt = 0;
+	float* outdata2;
+	int data2_cnt = 0;
 
 	void moveToDevice() {	// Loses pointer to RAM location!
 		//printf("Block 38: %.1f %.1f %.1f\n", blocks[38].center.x, blocks[38].center.y, blocks[38].center.z);
@@ -131,10 +135,14 @@ public:
 		//printf("Block 38: %.1f %.1f %.1f\n", blocks[38].center.x, blocks[38].center.y, blocks[38].center.z);
 		//printf("Block 38: %.1f %.1f %.1f\n", blocks_temp[38].center.x, blocks_temp[38].center.y, blocks_temp[38].center.z);
 		printf("Box transferred to device\n\n");
+
+
+		cudaMallocManaged(&outdata1, sizeof(float) * 10000);
+		cudaMallocManaged(&outdata2, sizeof(float) * 10000);
+
+		cudaDeviceSynchronize();
 	}
-
-
-
+	
 };
 
 	
@@ -174,7 +182,7 @@ public:
 
 	float box_size = BOX_LEN;	//nm
 	int blocks_per_dim;
-	int n_steps = 100000;
+	int n_steps = 4000;
 
 	const double dt = 1 *	10.0e-6;		// ns, so first val corresponds to fs
 	int steps_per_render = 100;
