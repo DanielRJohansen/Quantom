@@ -27,7 +27,7 @@ private:
 	Interface* interface;
 	Engine* engine;
 
-	void printOut(float* data1, float* data2, int n_datapoints);
+	void printOut(float* data1, float* data2, float* data3, int n_datapoints);
 
 };
 

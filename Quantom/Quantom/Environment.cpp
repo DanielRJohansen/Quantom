@@ -56,7 +56,7 @@ void Environment::run() {
 		}
 		float duration = (float) std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - t0).count();
 		int remaining_seconds = (int) (1.f/1000 * duration/simulation->steps_per_render * (simulation->n_steps - simulation->step));
-		printf("\tAverage step time: %.1fms (%d/%d/%d)  Remaining: %d s\t",  duration/simulation->steps_per_render, engine->timings.x/simulation->steps_per_render, engine->timings.y / simulation->steps_per_render, engine->timings.z / simulation->steps_per_render, remaining_seconds);
+		printf("\tAverage step time: %.1fms (%d/%d/%d)  Remaining: %ds",  duration/simulation->steps_per_render, engine->timings.x/simulation->steps_per_render, engine->timings.y / simulation->steps_per_render, engine->timings.z / simulation->steps_per_render, remaining_seconds);
 		engine->timings = Int3(0, 0, 0);
 
 		if (!(simulation->step % simulation->steps_per_render)) {
@@ -98,17 +98,18 @@ void Environment::run() {
 
 	printf("\n\n\n########################## SIMULATION FINISHED ##########################\n");
 	engine->countBodies();
-	printOut(simulation->box->outdata1, simulation->box->outdata2, simulation->box->data1_cnt);
+	printOut(simulation->box->outdata1, simulation->box->outdata2, simulation->box->outdata3,simulation->box->data1_cnt);
 }
 
 
-void Environment::printOut(float* data1, float* data2, int n_datapoints) {
+void Environment::printOut(float* data1, float* data2, float* data3, int n_datapoints) {
 	std::ofstream myfile("D:\\Quantom\\log.csv");
-	myfile << "Data1;Data2\n";
+	myfile << "Data1;Data2;Data3\n";
 	for (int i = 0; i < n_datapoints; i++) {
 		//printf("%d %f\n", i, data[i]);
 		myfile << data1[i] << ';';
-		myfile << data2[i] << '\n';
+		myfile << data2[i] << ';';
+		myfile << data3[i] << '\n';
 	}
 		
 	myfile.close();

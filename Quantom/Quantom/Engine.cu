@@ -445,31 +445,32 @@ __device__ void calcPairbondForce(Compound_H2O* compound, BondPair* bondpair, fl
 
 	float dist = direction.len();
 	float dif = dist - bondpair->reference_dist;
-	float force = 0.5 * kb * (dif * dif);
+	float force_scalar = 0.5 * kb * (dif * dif) * 0.0000001;
 	direction = direction.norm();
 	float invert_if_attraction = -1 + (2 * (dif < 0));
 
-	compound->particles[threadIdx.x].force = compound->particles[threadIdx.x].force + direction * force * invert_if_attraction;
+	compound->particles[threadIdx.x].force = compound->particles[threadIdx.x].force + direction * force_scalar * invert_if_attraction;
 
-	if (threadIdx.x * blockIdx.x == 1) {
+	if (compound->startindex_particle + threadIdx.x == 59) {
 		*dataptr = dist;
 	}
 		
 
-	if (force > 800'000) {
-		printf("\n Atom id %d dist %f dif: %f FORCE %f inverted %f len %f\n", compound->startindex_particle + threadIdx.x, dist, dif, force, invert_if_attraction, compound->particles[threadIdx.x].force.len());
+	if (force_scalar > 2'000) {
+		printf("\n\n Atom id %d dist %f dif: %f FORCE %f inverted %f len %f\n", compound->startindex_particle + threadIdx.x, dist, dif, force_scalar, invert_if_attraction, compound->particles[threadIdx.x].force.len());
+		compound->particles[threadIdx.x].force.print('b');
 	}
 }
 
 constexpr float ktheta = 65 * 10e+3;	// J/mol
-__device__ void calcAngleForce(Compound_H2O* compound, AngleBond* anglebond, float* dataptr) {
-	Float3 p1_mirrorpos = getClosestMirrorPos(compound->particles[anglebond->atom_indexes[1]].pos, compound->particles[anglebond->atom_indexes[0]].pos);
-	Float3 p2_mirrorpos = getClosestMirrorPos(compound->particles[anglebond->atom_indexes[2]].pos, compound->particles[anglebond->atom_indexes[0]].pos);
+__device__ void calcAngleForce(Compound_H2O* compound, AngleBond* anglebond, float* dataptr) {	// We fix the middle particle and move the other particles so they are closest as possible
+	Float3 p0_mirrorpos = getClosestMirrorPos(compound->particles[anglebond->atom_indexes[0]].pos, compound->particles[anglebond->atom_indexes[1]].pos);
+	Float3 p2_mirrorpos = getClosestMirrorPos(compound->particles[anglebond->atom_indexes[2]].pos, compound->particles[anglebond->atom_indexes[1]].pos);
 
-	Float3 v1 = compound->particles[anglebond->atom_indexes[0]].pos - p1_mirrorpos;
-	Float3 v2 = p2_mirrorpos - p1_mirrorpos;
+	Float3 v1 = p0_mirrorpos - compound->particles[anglebond->atom_indexes[1]].pos;
+	Float3 v2 = p2_mirrorpos - compound->particles[anglebond->atom_indexes[1]].pos;
 
-	Float3 force_direction = compound->particles[anglebond->atom_indexes[0]].pos - compound->particles[anglebond->atom_indexes[2]].pos;
+	Float3 force_direction = p0_mirrorpos-p2_mirrorpos;
 	force_direction = force_direction - force_direction * 2 * (threadIdx.x == 2);
 	force_direction = force_direction.norm();
 
@@ -478,16 +479,27 @@ __device__ void calcAngleForce(Compound_H2O* compound, AngleBond* anglebond, flo
 	float force_scalar = 0.5 * ktheta * (dif * dif);
 
 	float invert_if_attraction = -1 + (2 * (dif < 0));
-	//v1.print('1');
-	//v2.print('2');
+
 	compound->particles[threadIdx.x].force = compound->particles[threadIdx.x].force + force_direction * force_scalar * invert_if_attraction;
-	if (force_scalar > 10000) {
 
-		printf("\nAngle %f\n", angle);
-		(force_direction * force_scalar * invert_if_attraction).print('A');
+	/*
+	if (compound->startindex_particle + threadIdx.x == 59 && false) {
+		printf("\n");
+		p0_mirrorpos.print('0');
+		printf("0-ori %f mirror %f\n", compound->particles[anglebond->atom_indexes[0]].pos.x, p0_mirrorpos.x);
+
+		compound->particles[anglebond->atom_indexes[1]].pos.print('1');
+
+		p2_mirrorpos.print('2');
+		printf("2-ori %f mirror %f\n", compound->particles[anglebond->atom_indexes[2]].pos.x, p2_mirrorpos.x);
 	}
+	if (force_scalar > 20 && compound->startindex_particle + threadIdx.x == 59) {
+		printf("\nParticle ID %d Angle %f Force %f\n", compound->startindex_particle + threadIdx.x, angle, force_scalar);
+		(force_direction * force_scalar * invert_if_attraction).print('a');
+	}
+	*/
 
-	if (threadIdx.x * blockIdx.x == 1) {
+	if (compound->startindex_particle + threadIdx.x == 59) {
 		*dataptr = angle;
 	}
 		
@@ -496,19 +508,22 @@ __device__ void calcAngleForce(Compound_H2O* compound, AngleBond* anglebond, flo
 __device__ void integrateTimestep(Simulation* simulation, Particle* particle) {	// Kinetic formula: v = sqrt(2*K/m), m in kg
 	float force_scalar = particle->force.len();
 	Float3 force_vector = particle->force.norm();
-	//float kin_to_vel = sqrtf(2000 * force_scalar / particle->mass);	//	2000 instead of 2, to account using g instead of kg
 
-	//Float3 vel_next = particle->vel_prev + (force_vector * (simulation->dt * kin_to_vel));
 	Float3 vel_next = particle->vel_prev + (particle->force * (1000.f/particle->mass) * simulation->dt);
-	if (force_scalar > 800'000) {
-		printf("\n");
-		if (threadIdx.x == 0)
-			printf("O:\n");
-		else
-			printf("H:\n");
+
+	/*
+	if (particle->id == 58) {
 		particle->vel_prev.print('v');
 		vel_next.print('n');
+		particle->pos.print('8');
 	}
+	if (particle->id == 59) {
+		particle->vel_prev.print('V');
+		vel_next.print('N');
+		particle->pos.print('9');
+	}
+	*/
+
 	particle->pos = particle->pos + vel_next * simulation->dt;
 	particle->vel_prev = vel_next;
 }
@@ -529,13 +544,14 @@ __global__ void intramolforceKernel(Box* box, int offset) {	// 1 thread per part
 	}
 	__syncthreads();
 	compound.particles[threadIdx.x].pos = box->particles[compound.startindex_particle + threadIdx.x].pos;
+	compound.particles[threadIdx.x].force = Float3(0, 0, 0);
 	__syncthreads();
 
 	for (int i = 0; i < compound.n_bondpairs; i++) {	// Bond forces
 		BondPair* bond = &compound.bondpairs[i];
 		if (bond->atom_indexes[0] == threadIdx.x || bond->atom_indexes[1] == threadIdx.x) {
 			calcPairbondForce(&compound, bond, &box->outdata1[box->data1_cnt]);
-			if (threadIdx.x * blockIdx.x == 1)
+			if (compound.startindex_particle + threadIdx.x == 59)
 				box->data1_cnt++;
 		}
 	}
@@ -544,7 +560,7 @@ __global__ void intramolforceKernel(Box* box, int offset) {	// 1 thread per part
 		AngleBond* bond = &compound.anglebonds[i];
 		if (bond->atom_indexes[0] == threadIdx.x || bond->atom_indexes[2] == threadIdx.x) {
 			calcAngleForce(&compound, bond, &box->outdata2[box->data2_cnt]);
-			if (threadIdx.x * blockIdx.x == 1)
+			if (compound.startindex_particle + threadIdx.x == 59)
 				box->data2_cnt++;
 		}
 	}
@@ -553,26 +569,6 @@ __global__ void intramolforceKernel(Box* box, int offset) {	// 1 thread per part
 	//calcPairbondForce(&compound, bondpair);	// This applies the force directly to the particles
 
 	box->particles[compound.startindex_particle + threadIdx.x].force = compound.particles[threadIdx.x].force;
-	
-	if (box->particles[compound.startindex_particle + threadIdx.x].force.len() > 10000) {
-		//printf("\npaintjob!\n");
-		box->particles[compound.startindex_particle + threadIdx.x].color[0] = 0;
-		box->particles[compound.startindex_particle + threadIdx.x].color[2] = 220;
-	}
-		
-
-	//box->outdata[box->data_cnt++] = (box->particles[0].pos - box->particles[1].pos).len();
-	//box->outdata[box->data_cnt++] = 2;
-	/*
-	for (int i = 0; i < (compound.n_particles / compound.n_bondpairs) + 1; i++) {
-		int rel_index = threadIdx.x + i * compound.n_bondpairs;
-		
-		if (rel_index < compound.n_particles) {
-			//compound.particles[rel_index].force.print('B');
-			box->particles[compound.startindex_particle + rel_index].force = compound.particles[rel_index].force;
-		}			
-	}
-	*/
 }
 
 
@@ -608,6 +604,8 @@ __global__ void stepKernel(Simulation* simulation, int offset) {
 	if (particle.active) {						// This part acounts for about 2/5 of compute time
 		// I assume that all present molecules come in order!!!!!!
 
+
+
 		particle.force = simulation->box->particles[particle.id].force;
 		simulation->box->blocks[blockID].focus_particles[bodyID].color[2] = simulation->box->particles[particle.id].color[2];
 		Float3 force_total;
@@ -640,7 +638,16 @@ __global__ void stepKernel(Simulation* simulation, int offset) {
 
 		//force_total = force_total + particle.force;
 		//particle.force = particle.force + force_total;
-
+		
+		if (particle.id == 59) {
+			simulation->box->outdata3[simulation->box->data3_cnt++] = force_total.len();
+		}
+/*
+		if (particle.id == 59 && particle.force.len() > 100'000) {
+			particle.force.print('I');
+			force_total.print('T');
+		}*/
+			
 
 
 		// Integrate position  AFTER ALL BODIES IN BLOCK HAVE BEEN CALCULATED? No should not be a problem as all update their local body, 
@@ -675,7 +682,7 @@ __global__ void stepKernel(Simulation* simulation, int offset) {
 	accesspoint.particles[bodyID] = particle;
 
 	// Mark all bodies as obsolete
-	simulation->box->blocks[blockID].focus_particles[bodyID].active = false;	// This should break rendering but it doesn't`???
+	simulation->box->blocks[blockID].focus_particles[bodyID].active = false;	// Need to run update kernel before rendering, or no particle will be rendered.
 
 
 	__syncthreads();
