@@ -422,9 +422,9 @@ __device__ Float3 calcLJForce(Particle* particle0, Particle* particle1, int i, i
 	Float3 force_unit_vector = (particle0->pos - particle1->pos).norm();	// + is repulsive, - is attractive
 
 
-	if (LJ_pot > 10e+9) {
+	if (LJ_pot > 20'000) {
 		//body0->molecule_type = 99;
-		printf("\n\n GIGAFORCE! Block %d thread %d\n", bid, threadIdx.x);
+		printf("\n\n KILOFORCE! Block %d thread %d\n", bid, threadIdx.x);
 		printf("other body index: %d\n", i);
 		printf("Body 0 id: %d     %f %f %f\n", particle0->id, particle0->pos.x, particle0->pos.y, particle0->pos.z);
 		printf("Body 1 id: %d     %f %f %f\n", particle1->id, particle1->pos.x, particle1->pos.y, particle1->pos.z);
@@ -439,28 +439,37 @@ constexpr float kb = 17.5 * 10e+6;		//	J/(mol*nm^2)
 __device__ void calcPairbondForce(Compound_H2O* compound, BondPair* bondpair, float* dataptr) {
 	Float3 particle1_mirrorpos = getClosestMirrorPos(compound->particles[bondpair->atom_indexes[1]].pos, compound->particles[bondpair->atom_indexes[0]].pos);
 	Float3 direction = compound->particles[bondpair->atom_indexes[0]].pos - particle1_mirrorpos;
-	int focus_index = bondpair->atom_indexes[1] == threadIdx.x;	// If it is not pos 1 we get false, meaning pos 0... Not beautiful but it works.
-	direction = direction - direction * 2 * (1 * focus_index);	// Flip dir if focusatom is at index 1
+	//int focus_index = bondpair->atom_indexes[1] == threadIdx.x;	// If it is not pos 1 we get false, meaning pos 0... Not beautiful but it works.
+	//direction = direction - direction * 2 * (1 * focus_index);	// Flip dir if focusatom is at index 1
 
+	if (bondpair->atom_indexes[1] == threadIdx.x)	// Flip so we repel the particle in focus
+		direction = direction * -1;
+	
 
 	float dist = direction.len();
 	float dif = dist - bondpair->reference_dist;
-	float force_scalar = 0.5 * kb * (dif * dif) * 0.0000001;
+	if (dif > 0)	// Flip to attraction
+		direction = direction * -1;
+
+	float force_scalar = 0.5 * kb * (dif * dif);
 	direction = direction.norm();
-	float invert_if_attraction = -1 + (2 * (dif < 0));
+	//float invert_if_attraction = -1 + (2 * (dif < 0));
 
-	compound->particles[threadIdx.x].force = compound->particles[threadIdx.x].force + direction * force_scalar * invert_if_attraction;
+	compound->particles[threadIdx.x].force = compound->particles[threadIdx.x].force + direction * force_scalar;
 
-	if (compound->startindex_particle + threadIdx.x == 59) {
+	if (compound->startindex_particle + threadIdx.x == LOG_P_ID) {
 		*dataptr = dist;
 	}
 		
-
-	if (force_scalar > 2'000) {
-		printf("\n\n Atom id %d dist %f dif: %f FORCE %f inverted %f len %f\n", compound->startindex_particle + threadIdx.x, dist, dif, force_scalar, invert_if_attraction, compound->particles[threadIdx.x].force.len());
-		compound->particles[threadIdx.x].force.print('b');
+	Float3 p0p = compound->particles[bondpair->atom_indexes[0]].pos;
+	if (force_scalar > WARN_FORCE) {
+		printf("\n\n Atom id %d dist %f dif: %f FORCE %f Repulsive %d\n", compound->startindex_particle + threadIdx.x, dist, dif, force_scalar, dif < 0);
+		(direction * force_scalar).print('b');
+		compound->particles[threadIdx.x].force.print('B');
+		//printf("p0 %f %f %f \tp1_mirror %f %f %f\n", p0p.x, p0p.y, p0p.z, particle1_mirrorpos.x, particle1_mirrorpos.y, particle1_mirrorpos.z);
 	}
 }
+
 
 constexpr float ktheta = 65 * 10e+3;	// J/mol
 __device__ void calcAngleForce(Compound_H2O* compound, AngleBond* anglebond, float* dataptr) {	// We fix the middle particle and move the other particles so they are closest as possible
@@ -475,8 +484,12 @@ __device__ void calcAngleForce(Compound_H2O* compound, AngleBond* anglebond, flo
 	force_direction = force_direction.norm();
 
 	float angle = getAngle(v1, v2);
+	//printf("\nangle %f\n", angle);
 	float dif = angle - anglebond->reference_theta;
 	float force_scalar = 0.5 * ktheta * (dif * dif);
+
+
+
 
 	float invert_if_attraction = -1 + (2 * (dif < 0));
 
@@ -492,17 +505,17 @@ __device__ void calcAngleForce(Compound_H2O* compound, AngleBond* anglebond, flo
 
 		p2_mirrorpos.print('2');
 		printf("2-ori %f mirror %f\n", compound->particles[anglebond->atom_indexes[2]].pos.x, p2_mirrorpos.x);
-	}
-	if (force_scalar > 20 && compound->startindex_particle + threadIdx.x == 59) {
+	}*/
+	if (force_scalar > WARN_FORCE || abs(angle) < 0.1) {
+		printf("\n####################\n####################\n####################");
 		printf("\nParticle ID %d Angle %f Force %f\n", compound->startindex_particle + threadIdx.x, angle, force_scalar);
 		(force_direction * force_scalar * invert_if_attraction).print('a');
 	}
-	*/
+	
 
-	if (compound->startindex_particle + threadIdx.x == 59) {
+	if (compound->startindex_particle + threadIdx.x == LOG_P_ID) {
 		*dataptr = angle;
-	}
-		
+	}		
 }
 
 __device__ void integrateTimestep(Simulation* simulation, Particle* particle) {	// Kinetic formula: v = sqrt(2*K/m), m in kg
@@ -551,7 +564,7 @@ __global__ void intramolforceKernel(Box* box, int offset) {	// 1 thread per part
 		BondPair* bond = &compound.bondpairs[i];
 		if (bond->atom_indexes[0] == threadIdx.x || bond->atom_indexes[1] == threadIdx.x) {
 			calcPairbondForce(&compound, bond, &box->outdata1[box->data1_cnt]);
-			if (compound.startindex_particle + threadIdx.x == 59)
+			if (compound.startindex_particle + threadIdx.x == LOG_P_ID)
 				box->data1_cnt++;
 		}
 	}
@@ -560,7 +573,7 @@ __global__ void intramolforceKernel(Box* box, int offset) {	// 1 thread per part
 		AngleBond* bond = &compound.anglebonds[i];
 		if (bond->atom_indexes[0] == threadIdx.x || bond->atom_indexes[2] == threadIdx.x) {
 			calcAngleForce(&compound, bond, &box->outdata2[box->data2_cnt]);
-			if (compound.startindex_particle + threadIdx.x == 59)
+			if (compound.startindex_particle + threadIdx.x == LOG_P_ID)
 				box->data2_cnt++;
 		}
 	}
@@ -637,17 +650,23 @@ __global__ void stepKernel(Simulation* simulation, int offset) {
 		
 
 		//force_total = force_total + particle.force;
-		//particle.force = particle.force + force_total;
+		particle.force = particle.force + force_total;
 		
-		if (particle.id == 59) {
+		if (particle.id == LOG_P_ID) {
+			//simulation->box->outdata3[simulation->box->data3_cnt++] = force_total.len();
 			simulation->box->outdata3[simulation->box->data3_cnt++] = force_total.len();
+			simulation->box->outdata4[simulation->box->data4_cnt++] = particle.force.len();
 		}
-/*
-		if (particle.id == 59 && particle.force.len() > 100'000) {
+
+		if (particle.force.len() > WARN_FORCE) {
+			printf("\n");
 			particle.force.print('I');
 			force_total.print('T');
-		}*/
-			
+		}
+		if (particle.force.len() > END_SIM_FORCE) {
+			simulation->finished = true;
+			printf("Ending due to particle %d\n", particle.id);
+		}
 
 
 		// Integrate position  AFTER ALL BODIES IN BLOCK HAVE BEEN CALCULATED? No should not be a problem as all update their local body, 

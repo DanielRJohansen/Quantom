@@ -5,7 +5,7 @@
 
 
 
-constexpr float BOX_LEN = 16.0;	// Multiple of FOCUS_LEN please!
+constexpr float BOX_LEN = 8.0;	// Multiple of FOCUS_LEN please!
 
 constexpr float BOX_LEN_HALF = BOX_LEN/2.f;
 constexpr float BOX_BASE = -BOX_LEN_HALF;
@@ -28,14 +28,16 @@ const int MAX_NEAR_BODIES = 256 - MAX_FOCUS_BODIES;
 
 const int INDEXA = 100900;
 //const int N_BODIES_START = BOX_LEN*BOX_LEN*BOX_LEN/(FOCUS_LEN*FOCUS_LEN*FOCUS_LEN) * 25;
-const int N_BODIES_START = 800;
+const int N_BODIES_START = 100;
 const int BLOCKS_PER_SM = 512;
 //const int GRIDBLOCKS_PER_BODY = 16;
 //const int THREADS_PER_GRIDBLOCK = MAX_BLOCK_BODIES / GRIDBLOCKS_PER_BODY;
 const int N_STREAMS = 50;			// 68 total, 0 is general purpose, 1 is for rendering.
 
 
-
+constexpr float WARN_FORCE = 80'000;
+constexpr float END_SIM_FORCE = 10'500'000;
+const int LOG_P_ID = 17;
 
 // USEFUL VALUES
 
@@ -98,6 +100,8 @@ public:
 	int data2_cnt = 0;
 	float* outdata3;
 	int data3_cnt = 0;
+	float* outdata4;
+	int data4_cnt = 0;
 
 	void moveToDevice() {	// Loses pointer to RAM location!
 		//printf("Block 38: %.1f %.1f %.1f\n", blocks[38].center.x, blocks[38].center.y, blocks[38].center.z);
@@ -142,6 +146,7 @@ public:
 		cudaMallocManaged(&outdata1, sizeof(float) * 10000);
 		cudaMallocManaged(&outdata2, sizeof(float) * 10000);
 		cudaMallocManaged(&outdata3, sizeof(float) * 10000);
+		cudaMallocManaged(&outdata4, sizeof(float) * 10000);
 
 		cudaDeviceSynchronize();
 	}
@@ -185,9 +190,9 @@ public:
 
 	float box_size = BOX_LEN;	//nm
 	int blocks_per_dim;
-	int n_steps = 4000;
+	int n_steps = 10000;
 
-	const double dt = 1 *	10.0e-6;		// ns, so first val corresponds to fs
+	const double dt = 0.5 *	10.0e-6;		// ns, so first val corresponds to fs
 	int steps_per_render = 50;
 
 	int n_bodies = N_BODIES_START;

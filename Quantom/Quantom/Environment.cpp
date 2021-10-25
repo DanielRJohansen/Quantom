@@ -98,18 +98,19 @@ void Environment::run() {
 
 	printf("\n\n\n########################## SIMULATION FINISHED ##########################\n");
 	engine->countBodies();
-	printOut(simulation->box->outdata1, simulation->box->outdata2, simulation->box->outdata3,simulation->box->data1_cnt);
+	printOut(simulation->box->outdata1, simulation->box->outdata2, simulation->box->outdata3, simulation->box->outdata4, simulation->box->data1_cnt);
 }
 
 
-void Environment::printOut(float* data1, float* data2, float* data3, int n_datapoints) {
+void Environment::printOut(float* data1, float* data2, float* data3, float* data4, int n_datapoints) {
 	std::ofstream myfile("D:\\Quantom\\log.csv");
-	myfile << "Data1;Data2;Data3\n";
+	myfile << "Data1;Data2;Data3;Data4\n";
 	for (int i = 0; i < n_datapoints; i++) {
 		//printf("%d %f\n", i, data[i]);
 		myfile << data1[i] << ';';
 		myfile << data2[i] << ';';
-		myfile << data3[i] << '\n';
+		myfile << data3[i] << ';';
+		myfile << data4[i] << '\n';
 	}
 		
 	myfile.close();
