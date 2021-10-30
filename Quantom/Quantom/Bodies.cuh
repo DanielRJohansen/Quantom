@@ -56,6 +56,7 @@ struct Particle {
 
 	Float3 pos;	//CoM - nm
 	Float3 vel_prev;
+	Float3 force;	// J/mol
 
 
 	float mass = 0;		// g/mol
@@ -73,7 +74,6 @@ struct Particle {
 	//Float3 charge_unit_vector;
 	//float charge_magnitude = 0.f;
 
-	Float3 force;	// J/mol
 };
 		
 
@@ -143,7 +143,6 @@ struct AngleBond {
 	float reference_theta;
 	uint32_t atom_indexes[3]; // i,j,k angle between i and k
 };
-
 
 
 

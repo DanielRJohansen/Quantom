@@ -3,8 +3,6 @@
 
 
 
-
-
 Simulation* Engine::prepSimulation(Simulation* simulation) {
 	this->simulation = simulation;
 	//simulation->bodies = new SimBody[simulation->n_bodies];
@@ -218,6 +216,10 @@ void Engine::prepareCudaScheduler() {
 
 	printf("%d kernel launches necessary to step\n", (int) ceil((float)simulation->box->n_blocks / (float)(BLOCKS_PER_SM * N_STREAMS)));
 	//gridblock_size = dim3(GRIDBLOCKS_PER_BODY, BLOCKS_PER_SM, 1);
+
+
+
+
 }
 
 
@@ -524,18 +526,6 @@ __device__ void integrateTimestep(Simulation* simulation, Particle* particle) {	
 
 	Float3 vel_next = particle->vel_prev + (particle->force * (1000.f/particle->mass) * simulation->dt);
 
-	/*
-	if (particle->id == 58) {
-		particle->vel_prev.print('v');
-		vel_next.print('n');
-		particle->pos.print('8');
-	}
-	if (particle->id == 59) {
-		particle->vel_prev.print('V');
-		vel_next.print('N');
-		particle->pos.print('9');
-	}
-	*/
 
 	particle->pos = particle->pos + vel_next * simulation->dt;
 	particle->vel_prev = vel_next;
@@ -572,7 +562,7 @@ __global__ void intramolforceKernel(Box* box, int offset) {	// 1 thread per part
 	for (int i = 0; i < compound.n_anglebonds; i++) {	// Angle forces
 		AngleBond* bond = &compound.anglebonds[i];
 		if (bond->atom_indexes[0] == threadIdx.x || bond->atom_indexes[2] == threadIdx.x) {
-			calcAngleForce(&compound, bond, &box->outdata2[box->data2_cnt]);
+			//calcAngleForce(&compound, bond, &box->outdata2[box->data2_cnt]);
 			if (compound.startindex_particle + threadIdx.x == LOG_P_ID)
 				box->data2_cnt++;
 		}
