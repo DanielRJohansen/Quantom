@@ -79,76 +79,34 @@ struct AccessPoint {
 
 class Box {	// Should each GPU block have a copy of the box?
 public:
-	int n_blocks;
-	Block* blocks;
-	
-	AccessPoint* accesspoint;
 
-	int blocks_per_dim;
-
-	Particle* particles;
-	uint32_t n_particles = 0;
-	//CompactParticle* all_particles;	// Used for communation between inter and intra-molecular kernels
-	
 	Compound_H2O* compounds;
 	uint32_t n_compounds = 0;
 
-	uint32_t n_pairbonds = 0;	//Need to record this so we can avoid LJ pot for bonded particles
-	float* outdata1;
-	int data1_cnt = 0;
-	float* outdata2;
-	int data2_cnt = 0;
-	float* outdata3;
-	int data3_cnt = 0;
-	float* outdata4;
-	int data4_cnt = 0;
+	// These are shared for all compounds, MUST be allocated before adding any compounds to box, so not in moveToDevice //
+	CompoundState* compound_state_buffer;	
+	CompoundNeighborInfo* compound_neighborinfo_buffer;
+	//------------------------------------//
+
+	float* outdata;
+	uint32_t step = 0;
+
 
 	void moveToDevice() {	// Loses pointer to RAM location!
-		//printf("Block 38: %.1f %.1f %.1f\n", blocks[38].center.x, blocks[38].center.y, blocks[38].center.z);
-
-		Block* blocks_temp;
-		int blocks_bytesize = n_blocks * sizeof(Block);
-		cudaMallocManaged(&blocks_temp, blocks_bytesize);
-		cudaMemcpy(blocks_temp, blocks, blocks_bytesize, cudaMemcpyHostToDevice);
-		cudaDeviceSynchronize();
-		delete blocks;
-		blocks = blocks_temp;
-
-
-		Particle* particles_temp;
-		int bytesize = n_particles * sizeof(Particle);
-		cudaMalloc(&particles_temp, bytesize);
-		cudaMemcpy(particles_temp, particles, bytesize, cudaMemcpyHostToDevice);
-		delete particles;
-		particles = particles_temp;
-
 		Compound_H2O* compounds_temp;
-		bytesize = n_compounds * sizeof(Compound_H2O);
+		int bytesize = n_compounds * sizeof(Compound_H2O);
 		cudaMalloc(&compounds_temp, bytesize);
 		cudaMemcpy(compounds_temp, compounds, bytesize, cudaMemcpyHostToDevice);
 		delete compounds;
 		compounds = compounds_temp;
 
 
-		AccessPoint* ap_temp = new AccessPoint[n_blocks];
-		for (int i = 0; i < n_blocks; i++) {
-			ap_temp[i] = AccessPoint();
-		}
-		int ap_bytesize = n_blocks * sizeof(AccessPoint);
-		cudaMalloc(&accesspoint, ap_bytesize);
-		cudaMemcpy(accesspoint, ap_temp, ap_bytesize, cudaMemcpyHostToDevice);
-		delete ap_temp;
-		//printf("Block 38: %.1f %.1f %.1f\n", blocks[38].center.x, blocks[38].center.y, blocks[38].center.z);
-		//printf("Block 38: %.1f %.1f %.1f\n", blocks_temp[38].center.x, blocks_temp[38].center.y, blocks_temp[38].center.z);
-		printf("Box transferred to device\n\n");
 
+		cudaMallocManaged(&outdata, sizeof(float) * 10000 * 10);	// 10 data streams for 10k steps. 1 stream at a time.
 
-		cudaMallocManaged(&outdata1, sizeof(float) * 10000);
-		cudaMallocManaged(&outdata2, sizeof(float) * 10000);
-		cudaMallocManaged(&outdata3, sizeof(float) * 10000);
-		cudaMallocManaged(&outdata4, sizeof(float) * 10000);
 
 		cudaDeviceSynchronize();
+		printf("Box transferred to device\n\n");
 	}
 	
 };
