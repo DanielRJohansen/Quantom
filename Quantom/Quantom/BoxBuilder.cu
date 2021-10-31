@@ -1,7 +1,10 @@
 #include "BoxBuilder.cuh"
 
 
-
+BoxBuilder::BoxBuilder(Simulation* simulation) : simulation(simulation) {
+	solvateBox();
+	simulation->box->moveToDevice();
+}
 
 
 int BoxBuilder::solvateBox()
@@ -18,8 +21,11 @@ int BoxBuilder::solvateBox()
 	double T = 293;	// Kelvin
 	float mean_velocity = m / (2 * k_B * T);
 
-
-	simulation->box->compounds = new Compound_H2O[1'000'000];
+	const int max_compounds = 1'000'000;
+	simulation->box->compounds = new Compound_H2O[max_compounds];
+	cudaMalloc(&simulation->box->compound_state_buffer, sizeof(CompoundState) * max_compounds);
+	cudaMalloc(&simulation->box->compound_neighborinfo_buffer, sizeof(CompoundNeighborInfo) * max_compounds);
+	
 
 
 	int solvate_cnt = 0;
@@ -28,14 +34,13 @@ int BoxBuilder::solvateBox()
 			for (int x_index = 0; x_index < bodies_per_dim; x_index++) {
 				if (solvate_cnt == N_BODIES_START)
 					break;
-				Float3 random = get3Random(10000);
 
-				Float3 compound_base_pos = Float3(base + dist_between_compounds * (float)x_index, base + dist_between_compounds * (float)y_index, base + dist_between_compounds * (float)z_index);
-				int compound_first_index = simulation->box->n_particles;
-				Float3 compound_united_vel = Float3(random.x, random.y, random.z).norm() * mean_velocity;
-				
-				if (spaceAvailable(compound_base_pos, 0.2)) {
-					Compound_H2O compound = createCompound(compound_base_pos);
+				Float3 compound_center = Float3(base + dist_between_compounds * (float)x_index, base + dist_between_compounds * (float)y_index, base + dist_between_compounds * (float)z_index);
+				Float3 compound_united_vel = Float3(random(), random(), random()).norm() * mean_velocity;
+				float compound_radius = 0.2;
+
+				if (spaceAvailable(compound_center, compound_radius)) {
+					Compound_H2O compound = createCompound(compound_center, solvate_cnt, &simulation->box->compound_state_buffer[solvate_cnt], &simulation->box->compound_neighborinfo_buffer[solvate_cnt]);
 					placeCompound(compound);
 					solvate_cnt++;
 				}
@@ -45,7 +50,12 @@ int BoxBuilder::solvateBox()
 	return solvate_cnt;
 }
 
-Compound_H2O BoxBuilder::createCompound(Float3 com)
+Compound_H2O BoxBuilder::createCompound(Float3 com, int compound_index, CompoundState* statebuffer_node, CompoundNeighborInfo* neighborinfo_node)	// Nodes obv. points to addresses in device global memory.
 {
+	Molecule water;
+	Compound_H2O compound(compound_index, neighborinfo_node, statebuffer_node);
+	for (int i = 0; i < water.n_atoms; i++) {
+		compound.particles[i] = CompactParticle(com + water.atoms[i].pos, water.atoms[i].mass);
+	}
 	return Compound_H2O();
 }

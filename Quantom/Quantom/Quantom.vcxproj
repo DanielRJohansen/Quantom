@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|x64">
@@ -79,6 +79,7 @@
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="BoxBuilder.cu" />
     <ClCompile Include="Display.cpp" />
     <ClCompile Include="Environment.cpp" />
     <ClCompile Include="Interface.cpp" />
@@ -86,6 +87,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Bodies.cuh" />
+    <ClInclude Include="BoxBuilder.cuh" />
     <ClInclude Include="Display.h" />
     <ClInclude Include="Engine.cuh" />
     <ClInclude Include="Environment.h" />
