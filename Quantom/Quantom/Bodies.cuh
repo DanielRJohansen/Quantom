@@ -40,6 +40,10 @@ struct Molecule {
 		atoms = atoms_temp;
 	}
 };
+struct RenderMolecule {	// Just temporary, dont know howq to properly implement functionality for rendering.
+	uint8_t colors[3][3];
+	float radii[3];
+};
 
 constexpr float BODY_RADIUS = 0.2;		// CRITICAL VALUE!
 constexpr unsigned char UNUSED_BODY = 255;

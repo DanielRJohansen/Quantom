@@ -22,35 +22,31 @@ class Ray {
 public:
 	Ray(){}
 	Ray(Float3 unit_vector, Float3 origin);
+	__device__ void reset();
 
-	__device__ void findBlockHits(Box* box, Float3 focalpoint);
-	__device__ bool hitsParticle(Particle* particle);
-	__device__ bool searchBlock(Block* block, uint8_t* image);
+	__device__ bool hitsParticle(CompactParticle* particle, float particle_radius);
 	__device__ bool moleculeCollisionHandling(Particle* particle, MoleculeLibrary* mol_library, uint8_t* image);
-	__device__ bool hitsBlock(Float3* blockmin, Float3* blockmax, Float3* focalpoint);
 
+	__device__ void searchCompound(CompoundState* compoundstate, Box* box);
 
-	__host__ __device__ float distToPoint(Float3 point) {
-		Float3 far_ray_point = origin + unit_vector * 99999999;	////BAAAAAAAAAAAAAD
-		return (
-			((far_ray_point - origin).cross(origin - point)).len()
-			/
-			(far_ray_point - origin).len()
-			);
-	}
+	__device__ float distToPoint(Float3 point);
+	
 
 	Float3 origin;
 	Float3 unit_vector;
 
-	int block_indexes[MAX_RAY_BLOCKS];	// BAD. each ray can only hit 20 boxes, before it fades
 
+
+	// Changing with each render step
+	float closest_collision = 0;
+	int atom_type = -1;
+	
 
 
 private:
-	//__device__ float Ray::distToSphereIntersect(Atom* atom);
-	__device__ float Ray::distToSphereIntersect(Particle* particle);
+	__device__ float distToSphereIntersect(CompactParticle* particle, float particle_radius);
 
-	__device__ bool hitsBlock(Block* Block, Float3 focalpoint);
+	
 };
 
 

@@ -5,6 +5,7 @@
 
 #include "Bodies.cuh"
 #include "Simulation.cuh"
+#include "BoxBuilder.cuh"
 
 #include <cuda.h>
 #include "cuda_runtime.h"
@@ -24,11 +25,7 @@ public:
 
 	Simulation* prepSimulation(Simulation* simulation);
 
-	int countBodies();
 	void step();
-	void compoundPlacer(Float3 center_pos, Float3 united_vel);
-
-	bool placeSingleCompound(Particle* particles, uint32_t n_particles);
 
 	Int3 timings = Int3(0, 0, 0);
 
@@ -38,43 +35,11 @@ public:
 			cudaStreamDestroy(stream[i]);
 	}
 private:
+	BoxBuilder boxbuilder;
 	Simulation* simulation;
-	int fillBox();		// Returns # of bodies placed
 
-
-	int initBlocks();	// returns # of blocks created
-	void linkBlocks();
-	void prepareEdgeBlocks();
-
-	bool placeParticle(Particle* particle);
-	void prepareCudaScheduler();
-
+	void updateNeighborLists();
 	Simulation* simToDevice();
-
-
-
-
-
-	// Helper functions
-	/*Int3 posToBlockIndex(Float3* pos) {
-		return Int3(
-			floor((pos->x + simulation->box_size / 2.f) / simulation->box_size * simulation->blocks_per_dim),
-			floor((pos->y + simulation->box_size / 2.f) / simulation->box_size * simulation->blocks_per_dim),
-			floor((pos->z + simulation->box_size / 2.f) / simulation->box_size * simulation->blocks_per_dim)
-			);
-	}*/
-	Int3 posToBlockIndex(Float3* pos) {
-		return Int3(
-			floor((pos->x - box_base) / (bpd * block_dist) * simulation->blocks_per_dim),
-			floor((pos->y - box_base) / (bpd * block_dist) * simulation->blocks_per_dim),
-			floor((pos->z - box_base) / (bpd * block_dist) * simulation->blocks_per_dim)
-		);
-	}
-	inline int block3dIndexTo1dIndex(Int3 index_3d) {// NOTICE THAT X IS THE "GRANDPARENT" ITERATOR
-		return (index_3d.x + 
-			index_3d.y * bpd + 
-			index_3d.z * bpd*bpd);
-	}
 
 
 

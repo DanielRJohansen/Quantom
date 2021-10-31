@@ -5,27 +5,12 @@
 
 Simulation* Engine::prepSimulation(Simulation* simulation) {
 	this->simulation = simulation;
-	//simulation->bodies = new SimBody[simulation->n_bodies];
-
-
-	int n_blocks = initBlocks();
-	//linkBlocks();
-	//prepareEdgeBlocks();
-
 	srand(290128301);
-	int n_solvate_compounds = fillBox();
+	boxbuilder.build(simulation);
 
-	int update_bytesize = sizeof(Block) + sizeof(Int3) + sizeof(int) + sizeof(char) * 27 * 3 + sizeof(char) + sizeof(Particle) * 27 + sizeof(unsigned short int) * 27 * 2 + sizeof(char) * 27 *MAX_FOCUS_BODIES;
-
-	printf("\nParticle size: %d bytes\n", sizeof(Particle));
-	printf("Block size: %d bytes\n", sizeof(Block));
-	printf("Simulation configured with %d blocks, %d particles and %d solvate compounds. Approximately %02.2f compounds per block. \n", n_blocks, simulation->box->n_particles, n_solvate_compounds, ((float)n_solvate_compounds /n_blocks));
-	printf("Required shared mem per block for stepKernel: %d KB\n", (int) ((sizeof(Block)) / 1000.f));
-	printf("Required shared mem per block for updateKernel: %d KB\n", (int) (update_bytesize/1000.f));
-	printf("Required global mem for Box: %d MB\n", (int) (sizeof(Block) * n_blocks / 1000000.f));
+	updateNeighborLists();
 
 
-	prepareCudaScheduler();
 
 
 	//exit(1);
@@ -34,19 +19,7 @@ Simulation* Engine::prepSimulation(Simulation* simulation) {
 }
 
 
-int Engine::countBodies() {
-	int count = 0;
-	for (int i = 0; i < simulation->box->n_blocks; i++) {
-		for (int j = 0; j < MAX_FOCUS_BODIES; j++) {
-			//if (simulation->box->blocks[i].focus_bodies[j].molecule_type == UNUSED_BODY)
-			if (!simulation->box->blocks[i].focus_particles[j].active)
-				break;
-			count++;
-		}
-	}
-	printf("\nAtom count: %d\n\n", count);
-	return count;
-}
+
 
 Simulation* Engine::simToDevice() {
 	simulation->moveToDevice();	// Must be done before initiating raytracer!
@@ -62,165 +35,35 @@ Simulation* Engine::simToDevice() {
 	return simulation;
 }
 
-int Engine::initBlocks() {
+void Engine::updateNeighborLists() {	// Write actual function later;
+	int maxc = 1'000'000; // this is temporary!
+	CompoundState* statebuffer_host = new CompoundState[maxc];
+	CompoundNeighborInfo* neighborlists_host = new CompoundNeighborInfo[maxc];
+	cudaMemcpy(statebuffer_host, simulation->box->compound_state_buffer, sizeof(CompoundState) * maxc, cudaMemcpyDeviceToHost);
 	
 
-	block_dist = FOCUS_LEN;
-	bpd = simulation->box_size/ FOCUS_LEN;		// Otherwise no block focus on edge particles
-	box_base = - (BOX_LEN/2.f);			// Is the left-down-back-most edge of first block!
-
-	block_center_base = box_base + FOCUS_LEN_HALF;	// Center of first block
-
-
-	printf("Blocks per dim: %d\n", bpd);
-
-	int n_blocks = pow(bpd, 3);
-	simulation->blocks_per_dim = bpd;
-	simulation->box->blocks_per_dim = bpd;
-	simulation->box->n_blocks = n_blocks;
-	simulation->box->blocks = new Block[n_blocks];
-	//simulation->box->accesspoint = new AccessPoint[n_blocks];
-	//printf("N blocks %d", n_blocks);
-	//exit(1);
-
-	int index = 0;
-	for (int z = 0; z < bpd; z++) {
-		for (int y = 0; y < bpd; y++) {
-			for (int x = 0; x < bpd; x++) {
-				Float3 center(x * block_dist + block_center_base, y * block_dist + block_center_base, z * block_dist + block_center_base);
-				//center.print();
-				simulation->box->blocks[index] = Block(center);
+	// This only needs to be done the first time... Or does it????
+	for (int i = 0; i < maxc; i++) {
+		neighborlists_host[i].n_neighbors = 0;
+	}
+		
 
 
-
-				for (int i = 0; i < MAX_FOCUS_BODIES; i++) {
-					simulation->box->blocks[index].focus_particles[i] = Particle();
-				}
-				for (int i = 0; i < MAX_NEAR_BODIES; i++) {
-					simulation->box->blocks[index].near_particles[i] = Particle();
-				}
-				index++;
+	// This is the temp func //
+	for (int i = 0; i < simulation->box->n_compounds; i++) {
+		for (int j = 0; j < simulation->box->n_compounds; j++) {
+			if (i != j) {
+				CompoundNeighborInfo* nlist = &simulation->box->compound_neighborinfo_buffer[i];
+				nlist->neighborcompound_indexes[nlist->n_neighbors++] = j;
 			}
 		}
 	}
-	//exit(1);
-	return index;
+	// --------------------- //
+
+	cudaMemcpy(simulation->box->compound_neighborinfo_buffer, neighborlists_host, sizeof(CompoundNeighborInfo) * maxc, cudaMemcpyHostToDevice);
 }
 
 
-void Engine::compoundPlacer(Float3 center_pos, Float3 united_vel) {
-	Molecule molecule = simulation->mol_library->molecules[0];	// Make a copy of the molecule
-
-	uint32_t pairbonds[2][2] = { {1,2}, {2,3} };
-	uint32_t molecule_start_index = simulation->box->n_particles; // index of first atom
-	uint32_t compound_index = simulation->box->n_compounds++;
-	//printf("Compouind index %d\n", compound_index);
-	// First place all particles in blocks and global table
-	for (int i = 0; i < molecule.n_atoms; i++) {
-		uint32_t abs_index = simulation->box->n_particles++;
-		Particle particle(abs_index, center_pos + molecule.atoms[i].pos, united_vel, molecule.atoms[i].mass, compound_index);
-		particle.radius = molecule.atoms[i].radius;
-		//particle.color = molecule.atoms[i].color;
-		for (int j = 0; j < 3; j++)
-			particle.color[j] = molecule.atoms[i].color[j];
-
-		if (!placeParticle(&particle))											// Copy into appropriate block!
-			printf("\nFUck\n");
-
-		simulation->box->particles[abs_index] = particle;	// Copy to global communication channel!
-	}
-
-	// Now create all compounds, which link to the created particles!
-	//Compound_H2O compound(simulation->box->particles, simulation->box->n_particles, simulation->box->n_compounds);
-	uint32_t particle_startindex = simulation->box->n_particles - molecule.n_atoms;
-	//printf("Compound %d startindex %d\n", compound_index, particle_startindex);
-
-	simulation->box->compounds[compound_index].init(particle_startindex, compound_index);
-
-}
-
-int Engine::fillBox() {
-	int bodies_per_dim = ceil(cbrt((float)simulation->n_bodies));
-	float dist = (BOX_LEN) / (float)bodies_per_dim;	// dist_per_index
-	printf("Bodies per dim: %d. Dist per dim: %.3f\n", bodies_per_dim, dist);
-
-	float base = box_base + dist/2.f ;
-	
-
-	double m = 18.01528;		// g/mol
-	double k_B = 8.617333262145 * 10e-5;
-	double T = 293;	// Kelvin
-	float mean_velocity = m / (2 * k_B * T);
-	//float mean_velocity = 0;
-	int p = 10000;
-
-	simulation->box->particles = new Particle[1'000'000];
-	simulation->box->compounds = new Compound_H2O[1'000'000];
-
-
-	int solvate_cnt = 0;
-	for (int z_index = 0; z_index < bodies_per_dim; z_index++) {
-		for (int y_index = 0; y_index < bodies_per_dim; y_index++) {
-			for (int x_index = 0; x_index < bodies_per_dim; x_index++) {
-				if (solvate_cnt == N_BODIES_START)
-					break;
-
-				float r1 = rand() % p / (float)p - 0.5;
-				float r2 = rand() % p / (float)p - 0.5;
-				float r3 = rand() % p / (float)p - 0.5;
-
-
-				Float3 compound_base_pos = Float3(base + dist * (float)x_index, base + dist * (float)y_index, base + dist * (float)z_index);
-				int compound_first_index = simulation->box->n_particles;
-				Float3 compound_united_vel = Float3(r1, r2, r3).norm() * mean_velocity;
-
-				compoundPlacer(compound_base_pos, compound_united_vel);
-
-				solvate_cnt++;
-			}
-		}
-	}
-
-	for (int i = 0; i < simulation->box->n_particles; i++) {
-		//simulation->box->particles[i].pos.print();
-		//printf("\nParticle %d bond ids:\n", i);
-		//for (int j = 0; j < 4; j++)
-			//printf("%d\t", simulation->box->particles[i].pairbond_ids[j]);
-	}	
-	return solvate_cnt;
-}	
-	
-bool Engine::placeParticle(Particle* particle) {
-	Int3 block_index = posToBlockIndex(&particle->pos);
-	//printf("Block index: %d %d %d\n", block_index.x, block_index.y, block_index.z);
-	int block_index_1d = block3dIndexTo1dIndex(block_index);
-	Block* block = &simulation->box->blocks[block_index_1d];
-	if (block_index_1d < 0)
-		printf("Rebuild All you twat\n");
-
-	return block->addParticle(particle);
-
-	//printf("Block index1: %d\n", block_index_1d);
-	//printf("BLock center:");
-	//simulation->box->blocks[block_index_1d].center.print();
-	//printf("\n");
-
-}
-
-
-void Engine::prepareCudaScheduler() {
-	sim_blocks = simulation->box->n_blocks;
-
-	for (int i = 0; i < N_STREAMS; i++)
-		cudaStreamCreate(&stream[i]);
-
-	printf("%d kernel launches necessary to step\n", (int) ceil((float)simulation->box->n_blocks / (float)(BLOCKS_PER_SM * N_STREAMS)));
-	//gridblock_size = dim3(GRIDBLOCKS_PER_BODY, BLOCKS_PER_SM, 1);
-
-
-
-
-}
 
 
 

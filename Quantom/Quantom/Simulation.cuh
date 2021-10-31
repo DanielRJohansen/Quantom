@@ -83,6 +83,8 @@ public:
 	Compound_H2O* compounds;
 	uint32_t n_compounds = 0;
 
+	RenderMolecule rendermolecule;	// Not proud, TEMP
+
 	// These are shared for all compounds, MUST be allocated before adding any compounds to box, so not in moveToDevice //
 	CompoundState* compound_state_buffer;	
 	CompoundNeighborInfo* compound_neighborinfo_buffer;
@@ -159,8 +161,7 @@ public:
 	MoleculeLibrary* mol_library;
 
 	~Simulation() {
-		//delete box->blocks;
-		//delete box;
+
 	}
 
 

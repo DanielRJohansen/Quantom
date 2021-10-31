@@ -1,8 +1,18 @@
 #include "BoxBuilder.cuh"
 
 
-BoxBuilder::BoxBuilder(Simulation* simulation) : simulation(simulation) {
-	solvateBox();
+
+void BoxBuilder::build(Simulation* simulation) {
+	this->simulation = simulation;
+	simulation->box->n_compounds = solvateBox();
+
+	Molecule water;
+	for (int i = 0; i < water.n_atoms; i++) {
+		simulation->box->rendermolecule.radii[i] = water.atoms[i].radius;
+		for (int j = 0; j < 3; j++)
+			simulation->box->rendermolecule.colors[i][j] = water.atoms[i].color[j];
+	}
+
 	simulation->box->moveToDevice();
 }
 

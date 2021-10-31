@@ -6,7 +6,8 @@
 class BoxBuilder
 {
 public:
-	BoxBuilder(Simulation* simulation);
+	BoxBuilder() {};
+	void build(Simulation* simulation);
 
 private:
 	int solvateBox();					// Returns # of solvate compounds placed
