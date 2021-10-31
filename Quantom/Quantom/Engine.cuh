@@ -15,9 +15,8 @@
 
 	
 
-__global__ void stepKernel(Simulation* simulation, int offset);
-__global__ void updateKernel(Simulation* simulation, int offset);
-__global__ void intramolforceKernel(Box* boox, int offset);
+
+__global__ void forceKernel(Box* box);
 
 class Engine {
 public:
@@ -39,7 +38,6 @@ private:
 	Simulation* simulation;
 
 	void updateNeighborLists();
-	Simulation* simToDevice();
 
 
 

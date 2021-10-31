@@ -25,10 +25,7 @@ public:
 	__device__ void reset();
 
 	__device__ bool hitsParticle(CompactParticle* particle, float particle_radius);
-	__device__ bool moleculeCollisionHandling(Particle* particle, MoleculeLibrary* mol_library, uint8_t* image);
-
 	__device__ void searchCompound(CompoundState* compoundstate, Box* box);
-
 	__device__ float distToPoint(Float3 point);
 	
 

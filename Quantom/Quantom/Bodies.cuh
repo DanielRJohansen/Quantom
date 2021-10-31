@@ -48,28 +48,6 @@ struct RenderMolecule {	// Just temporary, dont know howq to properly implement 
 constexpr float BODY_RADIUS = 0.2;		// CRITICAL VALUE!
 constexpr unsigned char UNUSED_BODY = 255;
 
-struct Particle {
-	__host__ __device__ Particle() {}
-	__host__ Particle(uint32_t id, Float3 pos, Float3 vel_prev, float mass, uint32_t compoundID) :
-		id(id), pos(pos), vel_prev(vel_prev), mass(mass), compoundID(compoundID) {
-		active = true;
-	}
-
-	uint32_t id = UINT32_MAX;
-
-	Float3 pos;	//CoM - nm
-	Float3 vel_prev;
-	Float3 force;	// J/mol
-
-	float mass = 0;		// g/mol
-
-	// Cosmetic variables
-	float radius = 0;
-	uint8_t color[3] = { 255, 100, 0 };
-	bool active = false;
-	uint32_t compoundID = UINT32_MAX;
-
-};
 
 struct CompactParticle {
 	CompactParticle() {}
@@ -153,7 +131,7 @@ struct CompoundNeighborInfo {
 	uint8_t n_neighbors;					// adjust too?
 };
 struct CompoundState {
-	CompactParticle particles[128];
+	Float3 positions[128];
 	uint8_t particle_cnt;
 };
 

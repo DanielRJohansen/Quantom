@@ -28,7 +28,7 @@ const int MAX_NEAR_BODIES = 256 - MAX_FOCUS_BODIES;
 
 const int INDEXA = 100900;
 //const int N_BODIES_START = BOX_LEN*BOX_LEN*BOX_LEN/(FOCUS_LEN*FOCUS_LEN*FOCUS_LEN) * 25;
-const int N_BODIES_START = 100;
+const int N_BODIES_START = 10;
 const int BLOCKS_PER_SM = 512;
 //const int GRIDBLOCKS_PER_BODY = 16;
 //const int THREADS_PER_GRIDBLOCK = MAX_BLOCK_BODIES / GRIDBLOCKS_PER_BODY;
@@ -39,43 +39,7 @@ constexpr float WARN_FORCE = 80'000;
 constexpr float END_SIM_FORCE = 10'500'000;
 const int LOG_P_ID = 17;
 
-// USEFUL VALUES
 
-
-
-struct Block {	// All boxes are cubic
-
-	__host__ __device__ Block() {}
-	__host__ __device__ Block(Float3 center) : center(center) {}
-	__host__ __device__ bool isInBLock(Float3 point);
-
-	__host__ bool addParticle(Particle* particle) {			// ONLY USED FOR INITIATION 
-		if (n_particles == MAX_FOCUS_BODIES-8) {
-			//printf("Too many particles for this block!");
-			return false;
-		}
-		//printf("Added\n");
-		focus_particles[n_particles] = *particle;
-		n_particles++;
-		return true;
-	}
-
-
-	Float3 center;
-
-	Particle focus_particles[MAX_FOCUS_BODIES];
-	Particle near_particles[MAX_NEAR_BODIES];
-
-	int n_particles = 0;		//  Only used when loading the block
-	bool edge_block = false;
-
-	//signed char edge_type[3] = { 0,0,0 }; // -1 negative edge, 0 non-edge, 1 pos-edge, xyz
-
-};
-
-struct AccessPoint {
-	Particle particles[MAX_FOCUS_BODIES];
-};
 
 class Box {	// Should each GPU block have a copy of the box?
 public:
@@ -120,27 +84,17 @@ __global__ class Simulation {
 
 
 public:
-	Simulation() {}
-	Simulation(MoleculeLibrary* mol_library) : mol_library(mol_library) {
+	Simulation() {
 		box = new Box;
 	}
 
 	void moveToDevice() {
-		box->moveToDevice();
-
 		Box* box_temp;
 		cudaMallocManaged(&box_temp, sizeof(Box));
 		cudaMemcpy(box_temp, box, sizeof(Box), cudaMemcpyHostToDevice);
 		delete box;
 		box = box_temp;
 
-		MoleculeLibrary* lib_temp;
-		cudaMallocManaged(&lib_temp, sizeof(MoleculeLibrary));
-		cudaMemcpy(lib_temp, mol_library, sizeof(MoleculeLibrary), cudaMemcpyHostToDevice);
-		delete mol_library;
-		mol_library = lib_temp;
-
-		
 		printf("Simulation ready for device\n");
 	}
 
@@ -157,8 +111,6 @@ public:
 
 	int n_bodies = N_BODIES_START;
 	Box* box;
-	//SimBody* bodies;	// The bodies of each block is only total copy, not a pointer to its corresponding body here!
-	MoleculeLibrary* mol_library;
 
 	~Simulation() {
 

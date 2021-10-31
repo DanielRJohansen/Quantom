@@ -52,11 +52,11 @@ Raytracer::Raytracer(Simulation* simulation, bool verbose) {
     setGPU();
 
 
-    float base = -(BOX_LEN) / 2.f;
+    float base = 0;
 	float principal_point_increment = (BOX_LEN) / (float)RAYS_PER_DIM;
 
 	Ray* host_rayptr = new Ray[NUM_RAYS];
-	focalpoint = Float3(0, -(BOX_LEN / 2.f) * FOCAL_LEN_RATIO - BOX_LEN, 0);
+	focalpoint = Float3(BOX_LEN/2.f, -(BOX_LEN / 2.f) * FOCAL_LEN_RATIO - BOX_LEN, BOX_LEN / 2.f);
 
     
 

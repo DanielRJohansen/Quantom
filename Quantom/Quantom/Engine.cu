@@ -7,47 +7,35 @@ Simulation* Engine::prepSimulation(Simulation* simulation) {
 	this->simulation = simulation;
 	srand(290128301);
 	boxbuilder.build(simulation);
+	printf("Boxbuild complete!\n");
 
 	updateNeighborLists();
+	printf("Neighborlists ready\n");
 
 
 
-
-	//exit(1);
-
-	return simToDevice();
+	simulation->moveToDevice();
+	return this->simulation;
 }
 
 
 
 
-Simulation* Engine::simToDevice() {
-	simulation->moveToDevice();	// Must be done before initiating raytracer!
-
-	Simulation* temp;
-	int bytesize = sizeof(Simulation);
-	cudaMallocManaged(&temp, bytesize);
-	cudaMemcpy(temp, simulation, bytesize, cudaMemcpyHostToDevice);
-	cudaDeviceSynchronize();
-	delete simulation;
-	simulation = temp;
-
-	return simulation;
-}
 
 void Engine::updateNeighborLists() {	// Write actual function later;
 	int maxc = 1'000'000; // this is temporary!
 	CompoundState* statebuffer_host = new CompoundState[maxc];
 	CompoundNeighborInfo* neighborlists_host = new CompoundNeighborInfo[maxc];
 	cudaMemcpy(statebuffer_host, simulation->box->compound_state_buffer, sizeof(CompoundState) * maxc, cudaMemcpyDeviceToHost);
-	
+	cudaDeviceSynchronize();
+
 
 	// This only needs to be done the first time... Or does it????
 	for (int i = 0; i < maxc; i++) {
 		neighborlists_host[i].n_neighbors = 0;
 	}
 		
-
+	printf("1\n");
 
 	// This is the temp func //
 	for (int i = 0; i < simulation->box->n_compounds; i++) {
@@ -61,6 +49,7 @@ void Engine::updateNeighborLists() {	// Write actual function later;
 	// --------------------- //
 
 	cudaMemcpy(simulation->box->compound_neighborinfo_buffer, neighborlists_host, sizeof(CompoundNeighborInfo) * maxc, cudaMemcpyHostToDevice);
+	cudaDeviceSynchronize();
 }
 
 
@@ -88,6 +77,7 @@ void Engine::step() {
 		int offset = i * compounds_per_sm;
 		//intramolforceKernel <<< compounds_per_sm, 3, 0, stream[i] >>> (box, offset);
 	}
+	forceKernel <<< box->n_compounds, 256 >>> (box);
 	cudaDeviceSynchronize();
 
 
@@ -197,7 +187,7 @@ __device__ float getAngle(Float3 v1, Float3 v2) {
 }
 
 
-
+/*
 constexpr float sigma = 0.3923;	//nm
 constexpr float epsilon = 0.5986 * 1'000; //kJ/mol | J/mol
 __device__ Float3 calcLJForce(Particle* particle0, Particle* particle1, int i, int bid) {	// Applying force to p0 only! 
@@ -223,7 +213,7 @@ __device__ Float3 calcLJForce(Particle* particle0, Particle* particle1, int i, i
 	}
 	return force_unit_vector * LJ_pot;
 }
-
+*/
 
 
 /*
@@ -316,6 +306,18 @@ __global__ void forceKernel(Box* box) {
 		compound = box->compounds[blockIdx.x];
 	}
 	__syncthreads();
+	bool thread_compound_active = (compound.n_particles > threadIdx.x);
+
+
+
+
+	if (thread_compound_active) {
+		if (threadIdx.x == 0)
+			compound.particles[threadIdx.x].pos.print();
+		box->compound_state_buffer[blockIdx.x].positions[threadIdx.x] = compound.particles[threadIdx.x].pos;
+	}
+		
+	//box->compounds[blockIdx.x].particles[threadIdx.x].pos = compound.particles[threadIdx.x].pos;
 }
 
 

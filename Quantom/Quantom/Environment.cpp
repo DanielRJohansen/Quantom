@@ -3,14 +3,11 @@
 
 
 Environment::Environment() {
-	MoleculeLibrary* mol_library = new MoleculeLibrary;
-
-	simulation = new Simulation(mol_library);
-
-
+	simulation = new Simulation();
 
 	engine = new Engine;
 	simulation = engine->prepSimulation(simulation);
+	printf("Engine ready\n");
 	if (!verifySimulationParameters()) {
 		exit(0);
 	}
