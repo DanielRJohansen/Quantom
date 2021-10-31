@@ -68,14 +68,33 @@ struct Particle {
 	//unsigned char molecule_type = UNUSED_BODY;			// 255 is unutilized, 0 is water
 	bool active = false;
 	uint32_t compoundID = UINT32_MAX;
-	//uint32_t bondpair_ids[4] = {UINT32_MAX, UINT32_MAX , UINT32_MAX , UINT32_MAX };		// only to avoid intermol forces between bonded atoms
+	//uint32_t pairbond_ids[4] = {UINT32_MAX, UINT32_MAX , UINT32_MAX , UINT32_MAX };		// only to avoid intermol forces between bonded atoms
 	// these are handled later when we create the compound
 
 	//Float3 charge_unit_vector;
 	//float charge_magnitude = 0.f;
 
 };
-		
+
+struct CompactParticle {
+	CompactParticle() {}
+	CompactParticle(Float3 pos) : pos(pos) {}
+	Float3 pos;
+	Float3 vel_prev;
+	float pot_E_prev = 0;
+};
+
+struct CompoundState {
+	CompactParticle particles[128];
+	uint8_t particle_cnt;
+};
+
+struct Compound {
+	CompactParticle particles[128];
+	PairBond pairbonds[256];
+	AngleBond anglebonds[256];
+	//TorsionBond torsionbonds[256];
+};
 
 struct MoleculeLibrary {
 
@@ -110,17 +129,9 @@ struct MoleculeLibrary {
 
 //--------------------------- THE FOLLOWING IS FOR HANDLING INTRAMOLECULAR FORCES ---------------------------//
 
-struct CompactParticle {
-	CompactParticle(){}
-	CompactParticle(Float3 pos, float mass) : pos(pos), mass(mass) {}
-	Float3 pos;
-	Float3 force;	// Sum all intramol forces here before pushing to box!
-	float mass;
-};
-
-struct BondPair {	// IDS and indexes are used interchangeably here!
-	BondPair(){}
-	BondPair(float ref_dist, uint32_t particleindex_a, uint32_t particleindex_b) : 
+struct PairBond {	// IDS and indexes are used interchangeably here!
+	PairBond(){}
+	PairBond(float ref_dist, uint32_t particleindex_a, uint32_t particleindex_b) : 
 		reference_dist(ref_dist) {
 		atom_indexes[0] = particleindex_a;
 		atom_indexes[1] = particleindex_b;
@@ -147,6 +158,15 @@ struct AngleBond {
 
 
 
+// ------------------------------------------------- COMPOUNDS ------------------------------------------------- //
+
+struct Compound_Info {
+	uint32_t neighborcompound_indexes[256]; // For now so we dont need to track, adjust to 16 or 32 later!!
+	uint8_t n_neighbors;					// adjust too?
+};
+
+
+
 
 // A shell script will automate writing these compounds
 const int H2O_PARTICLES = 3;
@@ -154,43 +174,46 @@ const int H2O_PAIRBONDS = 2;
 const int H2O_ANGLEBONDS = 1;
 const float OH_refdist = 0.095;	//
 const float HOH_refangle = 1.822996; // radians
+const float min_LJ_dist = 1;
 struct Compound_H2O {	// Entire molecule for small < 500 atoms molcules, or part of large molecule
-	__host__ __device__ Compound_H2O() {};	// {O, H, H}
+	__host__ Compound_H2O() {}
+	__host__ __device__ Compound_H2O(uint32_t index, Compound_Info* info) {
+		this->index = index;
+		compound_info = info;
 
-	__host__ void init(uint32_t startindex_particle, uint32_t compoundID) {
-		this->startindex_particle = startindex_particle;
-		bondpairs[0] = BondPair(OH_refdist, 0, 1);
-		bondpairs[1] = BondPair(OH_refdist, 0, 2);
+		pairbonds[0] = PairBond(OH_refdist, 0, 1);
+		pairbonds[1] = PairBond(OH_refdist, 0, 2);
 
 		anglebonds[0] = AngleBond(HOH_refangle, 1, 0, 2);
-	}
 
-	/*Compound_H2O operator = (const Compound_H2O a) {
-		return Compound_H2O(a->global_particle_table, a.startindex_particle, a.s); 
-	}*/
+		for (uint32_t i = 0; i < n_particles; i++)
+			center_of_mass = center_of_mass + particles[i].pos;
+		center_of_mass = center_of_mass * (1.f / n_particles);
+		radius = pairbonds[0].reference_dist * n_particles;					// TODO: Shitty estimate, do better later
+	};	// {O, H, H}
 	
-
-
-	__device__ void loadParticles(Particle* global_particle_table) {
-
-		for (int i = 0; i < n_particles ; i++) {
-			particles[i].pos = global_particle_table[startindex_particle + i].pos;
-			//particles[i].pos.print();
-			//global_particle_table[startindex_particle + i].pos.print();
-		}
+	__host__ bool intersects(Compound_H2O a) {
+		return (a.center_of_mass - center_of_mass).len() < (a.radius + radius + min_LJ_dist);
 	}
 
-	uint16_t n_particles = H2O_PARTICLES;
+	uint32_t index;
+	Compound_Info* compound_info;
+
+	uint8_t n_particles = H2O_PARTICLES;
 	CompactParticle particles[H2O_PARTICLES];
 
-	uint32_t startindex_particle = 0;
-	
-	uint16_t n_bondpairs = H2O_PAIRBONDS;
-	BondPair bondpairs[H2O_PAIRBONDS];
+	Float3 center_of_mass = Float3(0,0,0);
+	float radius;
+
+	uint16_t n_pairbonds = H2O_PAIRBONDS;
+	PairBond pairbonds[H2O_PAIRBONDS];
 	
 	uint16_t n_anglebonds = H2O_ANGLEBONDS;
 	AngleBond anglebonds[H2O_ANGLEBONDS];
-	//Particle* global_particle_table;	// Host address, only usable when creating compound
-
 };
+struct Compound_H2O_Compact {
+	CompactParticle particles[H2O_PARTICLES];
+	uint8_t n_particles = H2O_PARTICLES;
+};
+
 

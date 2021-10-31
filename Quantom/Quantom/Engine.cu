@@ -111,7 +111,7 @@ int Engine::initBlocks() {
 void Engine::compoundPlacer(Float3 center_pos, Float3 united_vel) {
 	Molecule molecule = simulation->mol_library->molecules[0];	// Make a copy of the molecule
 
-	uint32_t bondpairs[2][2] = { {1,2}, {2,3} };
+	uint32_t pairbonds[2][2] = { {1,2}, {2,3} };
 	uint32_t molecule_start_index = simulation->box->n_particles; // index of first atom
 	uint32_t compound_index = simulation->box->n_compounds++;
 	//printf("Compouind index %d\n", compound_index);
@@ -185,7 +185,7 @@ int Engine::fillBox() {
 		//simulation->box->particles[i].pos.print();
 		//printf("\nParticle %d bond ids:\n", i);
 		//for (int j = 0; j < 4; j++)
-			//printf("%d\t", simulation->box->particles[i].bondpair_ids[j]);
+			//printf("%d\t", simulation->box->particles[i].pairbond_ids[j]);
 	}	
 	return solvate_cnt;
 }	
@@ -385,29 +385,6 @@ __device__ float getAngle(Float3 v1, Float3 v2) {
 	return acos((v1.dot(v2)) / (v1.len() * v2.len()));
 }
 
-__device__ Float3 calcLJForceReducedUnits(Particle* particle0, Particle* particle1, int i, int bid) {	// Applying force to p0 only! - THIS METHOD USES REDUCED UNITS, WHERE DIST(1) MEANS DIST(Vdw RADIUS)
-	float dist_pow2 = (particle0->pos - particle1->pos).lenSquared();
-	float dist_pow2_inv = 1.f / dist_pow2;
-	float dist_pow6_inv = dist_pow2_inv * dist_pow2_inv * dist_pow2_inv;
-
-	float LJ_pot = 48 * dist_pow2_inv * dist_pow6_inv * (dist_pow6_inv - 0.5f);
-	Float3 force_unit_vector = (particle0->pos - particle1->pos).norm();
-	//printf("repulsion: %f\n", LJ_pot);
-	//force_unit_vector.print();
-
-		
-	if (LJ_pot > 10e+3) {
-		//body0->molecule_type = 99;
-		printf("\n\n KILOFORCE! Block %d thread %d\n", bid, threadIdx.x);
-		printf("other body index: %d\n", i);
-		printf("Body 0 id: %d     %f %f %f\n", particle0->id, particle0->pos.x, particle0->pos.y, particle0->pos.z);
-		printf("Body 1 id: %d     %f %f %f\n", particle1->id, particle1->pos.x, particle1->pos.y, particle1->pos.z);
-		printf("Distance: %f\n", (particle0->pos - particle1->pos).len());
-		//printf("Force: %f\n\n\n", LJ_pot);
-		//force_unit_vector.print();
-	}
-	return force_unit_vector * LJ_pot;
-}
 
 
 constexpr float sigma = 0.3923;	//nm
@@ -438,18 +415,18 @@ __device__ Float3 calcLJForce(Particle* particle0, Particle* particle1, int i, i
 
 
 constexpr float kb = 17.5 * 10e+6;		//	J/(mol*nm^2)
-__device__ void calcPairbondForce(Compound_H2O* compound, BondPair* bondpair, float* dataptr) {
-	Float3 particle1_mirrorpos = getClosestMirrorPos(compound->particles[bondpair->atom_indexes[1]].pos, compound->particles[bondpair->atom_indexes[0]].pos);
-	Float3 direction = compound->particles[bondpair->atom_indexes[0]].pos - particle1_mirrorpos;
-	//int focus_index = bondpair->atom_indexes[1] == threadIdx.x;	// If it is not pos 1 we get false, meaning pos 0... Not beautiful but it works.
+__device__ void calcPairbondForce(Compound_H2O* compound, PairBond* pairbond, float* dataptr) {
+	Float3 particle1_mirrorpos = getClosestMirrorPos(compound->particles[pairbond->atom_indexes[1]].pos, compound->particles[pairbond->atom_indexes[0]].pos);
+	Float3 direction = compound->particles[pairbond->atom_indexes[0]].pos - particle1_mirrorpos;
+	//int focus_index = pairbond->atom_indexes[1] == threadIdx.x;	// If it is not pos 1 we get false, meaning pos 0... Not beautiful but it works.
 	//direction = direction - direction * 2 * (1 * focus_index);	// Flip dir if focusatom is at index 1
 
-	if (bondpair->atom_indexes[1] == threadIdx.x)	// Flip so we repel the particle in focus
+	if (pairbond->atom_indexes[1] == threadIdx.x)	// Flip so we repel the particle in focus
 		direction = direction * -1;
 	
 
 	float dist = direction.len();
-	float dif = dist - bondpair->reference_dist;
+	float dif = dist - pairbond->reference_dist;
 	if (dif > 0)	// Flip to attraction
 		direction = direction * -1;
 
@@ -463,7 +440,7 @@ __device__ void calcPairbondForce(Compound_H2O* compound, BondPair* bondpair, fl
 		*dataptr = dist;
 	}
 		
-	Float3 p0p = compound->particles[bondpair->atom_indexes[0]].pos;
+	Float3 p0p = compound->particles[pairbond->atom_indexes[0]].pos;
 	if (force_scalar > WARN_FORCE) {
 		printf("\n\n Atom id %d dist %f dif: %f FORCE %f Repulsive %d\n", compound->startindex_particle + threadIdx.x, dist, dif, force_scalar, dif < 0);
 		(direction * force_scalar).print('b');
@@ -533,6 +510,17 @@ __device__ void integrateTimestep(Simulation* simulation, Particle* particle) {	
 
 // ------------------------------------------------------------------------------------------- KERNELS -------------------------------------------------------------------------------------------//
 
+__global__ void forceKernel(Box* box) {
+	__shared__ Compound_H2O compound;
+	__shared__ Compound_H2O_Compact 
+
+	if (threadIdx.x == 0) {
+		compound = box->compounds[blockIdx.x];
+	}
+	__syncthreads();
+}
+
+
 __global__ void intramolforceKernel(Box* box, int offset) {	// 1 thread per particle in compound
 	__shared__ Compound_H2O compound;
 
@@ -550,8 +538,8 @@ __global__ void intramolforceKernel(Box* box, int offset) {	// 1 thread per part
 	compound.particles[threadIdx.x].force = Float3(0, 0, 0);
 	__syncthreads();
 
-	for (int i = 0; i < compound.n_bondpairs; i++) {	// Bond forces
-		BondPair* bond = &compound.bondpairs[i];
+	for (int i = 0; i < compound.n_pairbonds; i++) {	// Bond forces
+		PairBond* bond = &compound.pairbonds[i];
 		if (bond->atom_indexes[0] == threadIdx.x || bond->atom_indexes[1] == threadIdx.x) {
 			calcPairbondForce(&compound, bond, &box->outdata1[box->data1_cnt]);
 			if (compound.startindex_particle + threadIdx.x == LOG_P_ID)
@@ -568,8 +556,8 @@ __global__ void intramolforceKernel(Box* box, int offset) {	// 1 thread per part
 		}
 	}
 	//CompactParticle* particle = &compound.particles[threadIdx.x];
-	//BondPair* bondpair = &compound.bondpairs[threadIdx.x];
-	//calcPairbondForce(&compound, bondpair);	// This applies the force directly to the particles
+	//PairBond* pairbond = &compound.pairbonds[threadIdx.x];
+	//calcPairbondForce(&compound, pairbond);	// This applies the force directly to the particles
 
 	box->particles[compound.startindex_particle + threadIdx.x].force = compound.particles[threadIdx.x].force;
 }

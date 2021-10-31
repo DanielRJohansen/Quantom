@@ -93,7 +93,7 @@ public:
 	Compound_H2O* compounds;
 	uint32_t n_compounds = 0;
 
-	uint32_t n_bondpairs = 0;	//Need to record this so we can avoid LJ pot for bonded particles
+	uint32_t n_pairbonds = 0;	//Need to record this so we can avoid LJ pot for bonded particles
 	float* outdata1;
 	int data1_cnt = 0;
 	float* outdata2;
