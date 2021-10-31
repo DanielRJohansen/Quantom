@@ -53,7 +53,7 @@ void Engine::updateNeighborLists() {	// Write actual function later;
 	for (int i = 0; i < simulation->box->n_compounds; i++) {
 		for (int j = 0; j < simulation->box->n_compounds; j++) {
 			if (i != j) {
-				CompoundNeighborInfo* nlist = &simulation->box->compound_neighborinfo_buffer[i];
+				CompoundNeighborInfo* nlist = neighborlists_host;
 				nlist->neighborcompound_indexes[nlist->n_neighbors++] = j;
 			}
 		}
@@ -86,7 +86,7 @@ void Engine::step() {
 	Box* box = simulation->box;	// Why the fuck do i have to do this, VisualStudio???!
 	for (int i = 0; i < N_STREAMS; i++) {
 		int offset = i * compounds_per_sm;
-		intramolforceKernel <<< compounds_per_sm, 3, 0, stream[i] >>> (box, offset);
+		//intramolforceKernel <<< compounds_per_sm, 3, 0, stream[i] >>> (box, offset);
 	}
 	cudaDeviceSynchronize();
 
@@ -98,7 +98,7 @@ void Engine::step() {
 	int blocks_handled = 0;
 	while (blocks_handled < sim_blocks) {
 		for (int i = 0; i < N_STREAMS; i++) {
-			stepKernel << < BLOCKS_PER_SM, MAX_FOCUS_BODIES, 0, stream[i] >> > (simulation, blocks_handled);
+			//stepKernel << < BLOCKS_PER_SM, MAX_FOCUS_BODIES, 0, stream[i] >> > (simulation, blocks_handled);
 			blocks_handled += BLOCKS_PER_SM;
 			if (blocks_handled >= sim_blocks)
 				break;
@@ -119,7 +119,7 @@ void Engine::step() {
 	blocks_handled = 0;
 	while (blocks_handled < sim_blocks) {
 		for (int i = 0; i < N_STREAMS; i++) {
-			updateKernel << < BLOCKS_PER_SM, dim3(3,3,3), 0, stream[i] >> > (simulation, blocks_handled);
+			//updateKernel << < BLOCKS_PER_SM, dim3(3,3,3), 0, stream[i] >> > (simulation, blocks_handled);
 			blocks_handled += BLOCKS_PER_SM;
 			if (blocks_handled >= sim_blocks)
 				break;
@@ -156,56 +156,24 @@ void Engine::step() {
 
 
 
-__device__ float cudaMax1(float a, float b) {
+__device__ float cudaMax(float a, float b) {
 	if (a > b)
 		return a;
 	return b;
 }
-__device__ float cudaMin1(float a, float b) {
+__device__ float cudaMin(float a, float b) {
 	if (a < b)
 		return a;
 	return b;
 }
 
-__device__ Float3 forceFromDist(Float3 dists) {
-	return Float3(
-		((edgeforce_scalar / dists.x)- edgeforce_scalar),
-		((edgeforce_scalar / dists.y)- edgeforce_scalar),
-		((edgeforce_scalar / dists.z)- edgeforce_scalar)
-	);
-}
 
 
 																				// TODO: MAKE IS SUCH THAT A BODY CAN NEVER BE EXACTLY ON THE EDGE OF FOCUS, THUS APPEARING IN MULTIPLE GROUPS!
-__device__ bool bodyInNear(Float3* body_pos, Float3* block_center) {
-	Float3 dist_from_center = (*body_pos - *block_center).abs();
-	return (dist_from_center.x < FOCUS_LEN && dist_from_center.y < FOCUS_LEN && dist_from_center.z < FOCUS_LEN);
-}
 
-__device__ bool bodyInFocus(Float3* body_pos, Float3* block_center) {
-	Float3 dist_from_center = (*body_pos - *block_center);
 
-	return
-		(dist_from_center.x < FOCUS_LEN_HALF&& dist_from_center.y < FOCUS_LEN_HALF&& dist_from_center.z < FOCUS_LEN_HALF)			// Open upper bound
-		&&
-		((dist_from_center.x >= -FOCUS_LEN_HALF && dist_from_center.y >= -FOCUS_LEN_HALF && dist_from_center.z >= -FOCUS_LEN_HALF));	// Closed lower bound;
 
-	//return (dist_from_center.x < FOCUS_LEN_HALF && dist_from_center.y < FOCUS_LEN_HALF && dist_from_center.z < FOCUS_LEN_HALF);
-}
-
-__device__ int indexConversion(Int3 xyz, int elements_per_dim) {
-	return int(xyz.x + xyz.y * elements_per_dim + xyz.z * elements_per_dim * elements_per_dim);
-}
-
-__device__ Int3 indexConversion(int index, int elements_per_dim) {
-	return Int3(
-		index % elements_per_dim,
-		(index / elements_per_dim) % elements_per_dim,
-		index / (elements_per_dim * elements_per_dim)
-	);
-}
-
-__device__ Float3 getHyperPosition(Float3 pos) {
+__device__ Float3 getHyperPosition(Float3 pos) {			// Dont thjínk this is right anymore??????
 	pos = pos + Float3(BOX_LEN, BOX_LEN, BOX_LEN) * 1.5;
 	pos = pos.elementwiseModulus(BOX_LEN);
 	return pos - Float3(BOX_LEN, BOX_LEN, BOX_LEN) * 0.5;
@@ -257,6 +225,8 @@ __device__ Float3 calcLJForce(Particle* particle0, Particle* particle1, int i, i
 }
 
 
+
+/*
 constexpr float kb = 17.5 * 10e+6;		//	J/(mol*nm^2)
 __device__ void calcPairbondForce(Compound_H2O* compound, PairBond* pairbond, float* dataptr) {
 	Float3 particle1_mirrorpos = getClosestMirrorPos(compound->particles[pairbond->atom_indexes[1]].pos, compound->particles[pairbond->atom_indexes[0]].pos);
@@ -317,17 +287,7 @@ __device__ void calcAngleForce(Compound_H2O* compound, AngleBond* anglebond, flo
 
 	compound->particles[threadIdx.x].force = compound->particles[threadIdx.x].force + force_direction * force_scalar * invert_if_attraction;
 
-	/*
-	if (compound->startindex_particle + threadIdx.x == 59 && false) {
-		printf("\n");
-		p0_mirrorpos.print('0');
-		printf("0-ori %f mirror %f\n", compound->particles[anglebond->atom_indexes[0]].pos.x, p0_mirrorpos.x);
 
-		compound->particles[anglebond->atom_indexes[1]].pos.print('1');
-
-		p2_mirrorpos.print('2');
-		printf("2-ori %f mirror %f\n", compound->particles[anglebond->atom_indexes[2]].pos.x, p2_mirrorpos.x);
-	}*/
 	if (force_scalar > WARN_FORCE || abs(angle) < 0.1) {
 		printf("\n####################\n####################\n####################");
 		printf("\nParticle ID %d Angle %f Force %f\n", compound->startindex_particle + threadIdx.x, angle, force_scalar);
@@ -339,15 +299,10 @@ __device__ void calcAngleForce(Compound_H2O* compound, AngleBond* anglebond, flo
 		*dataptr = angle;
 	}		
 }
-
-__device__ void integrateTimestep(Simulation* simulation, Particle* particle) {	// Kinetic formula: v = sqrt(2*K/m), m in kg
-	float force_scalar = particle->force.len();
-	Float3 force_vector = particle->force.norm();
-
-	Float3 vel_next = particle->vel_prev + (particle->force * (1000.f/particle->mass) * simulation->dt);
-
-
-	particle->pos = particle->pos + vel_next * simulation->dt;
+*/
+__device__ void integrateTimestep(CompactParticle* particle, Float3 force, float dt) {	// Kinetic formula: v = sqrt(2*K/m), m in kg
+	Float3 vel_next = particle->vel_prev + (force * (1000.f/particle->mass) * dt);
+	particle->pos = particle->pos + vel_next * dt;
 	particle->vel_prev = vel_next;
 }
 
@@ -355,7 +310,7 @@ __device__ void integrateTimestep(Simulation* simulation, Particle* particle) {	
 
 __global__ void forceKernel(Box* box) {
 	__shared__ Compound_H2O compound;
-	__shared__ Compound_H2O_Compact 
+	//__shared__ Compound_H2O_
 
 	if (threadIdx.x == 0) {
 		compound = box->compounds[blockIdx.x];
@@ -364,6 +319,40 @@ __global__ void forceKernel(Box* box) {
 }
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*
 __global__ void intramolforceKernel(Box* box, int offset) {	// 1 thread per particle in compound
 	__shared__ Compound_H2O compound;
 
@@ -657,5 +646,5 @@ __global__ void updateKernel(Simulation* simulation, int offset) {
 	}
 }
 
-
+*/
 

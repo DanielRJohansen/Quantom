@@ -8,6 +8,9 @@
 
 // For logging
 #include <fstream>
+#include <string>
+
+
 
 class Environment
 {
@@ -27,7 +30,7 @@ private:
 	Interface* interface;
 	Engine* engine;
 
-	void printOut(float* data1, float* data2, float* data3, float* data4, int n_datapoints);
+	void printOut(float* data);
 
 };
 

@@ -23,11 +23,7 @@ Environment::Environment() {
 
 }
 
-bool Environment::verifySimulationParameters() {
-	if (simulation->box->blocks_per_dim < 3) {
-		printf("\n\n\t\tError: Simulation does not contain a minimum of 27 blocks required for PBC\n");
-		return false;
-	}
+bool Environment::verifySimulationParameters() {	// Not yet implemented
 	return true;
 }
 
@@ -37,7 +33,6 @@ void Environment::run() {
 	Molecule h2o;
 	printf("Simulation started\n\n");
 	int steps = 0;
-	engine->countBodies();
 
 
 	
@@ -77,17 +72,7 @@ void Environment::run() {
 		if (simulation->step >= simulation->n_steps)
 			break;
 
-		//if (simulation->step == 650)
-			//break;
 
-		/*
-		int duration;
-		do {
-			auto stop = std::chrono::high_resolution_clock::now();
-			duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count();
-		} while (duration < 50);
-		*/
-		
 		
 		
 		
@@ -97,20 +82,25 @@ void Environment::run() {
 	}
 
 	printf("\n\n\n########################## SIMULATION FINISHED ##########################\n");
-	engine->countBodies();
-	printOut(simulation->box->outdata1, simulation->box->outdata2, simulation->box->outdata3, simulation->box->outdata4, simulation->box->data1_cnt);
+	printOut(simulation->box->outdata);
 }
 
 
-void Environment::printOut(float* data1, float* data2, float* data3, float* data4, int n_datapoints) {
+void Environment::printOut(float* data) {
 	std::ofstream myfile("D:\\Quantom\\log.csv");
-	myfile << "Data1;Data2;Data3;Data4\n";
+	for (int i = 0; i < 10; i++) {
+		myfile << "Data" << std::to_string(i) << ";";
+	}
+	myfile << "\n";
+
+	int n_datapoints = 10000;
+
 	for (int i = 0; i < n_datapoints; i++) {
-		//printf("%d %f\n", i, data[i]);
-		myfile << data1[i] << ';';
-		myfile << data2[i] << ';';
-		myfile << data3[i] << ';';
-		myfile << data4[i] << '\n';
+		for (int j = 0; j < 10; j++) {
+			myfile << data[i + j * n_datapoints] << ";";
+		}
+		myfile << "\n";
+
 	}
 		
 	myfile.close();

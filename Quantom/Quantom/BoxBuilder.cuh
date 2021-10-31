@@ -13,8 +13,7 @@ private:
 	int solvateBox();					// Returns # of solvate compounds placed
 	Compound_H2O createCompound(Float3 com, int compound_index, CompoundState* statebuffer_node, CompoundNeighborInfo* neighborinfo_node);
 	bool spaceAvailable(Float3 com, float radius);
-	void placeCompound(Compound_H2O compound);	// Simply assigns compounds to block - implement later
-	void prepareCudaScheduler();
+	//void prepareCudaScheduler();	???
 
 	Simulation* simToDevice();
 

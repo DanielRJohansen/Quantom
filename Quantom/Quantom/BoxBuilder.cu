@@ -51,7 +51,7 @@ int BoxBuilder::solvateBox()
 
 				if (spaceAvailable(compound_center, compound_radius)) {
 					Compound_H2O compound = createCompound(compound_center, solvate_cnt, &simulation->box->compound_state_buffer[solvate_cnt], &simulation->box->compound_neighborinfo_buffer[solvate_cnt]);
-					placeCompound(compound);
+					simulation->box->compounds[simulation->box->n_compounds++] = compound;
 					solvate_cnt++;
 				}
 			}
@@ -59,6 +59,17 @@ int BoxBuilder::solvateBox()
 	}
 	return solvate_cnt;
 }
+
+
+
+
+
+
+
+
+
+
+
 
 Compound_H2O BoxBuilder::createCompound(Float3 com, int compound_index, CompoundState* statebuffer_node, CompoundNeighborInfo* neighborinfo_node)	// Nodes obv. points to addresses in device global memory.
 {
@@ -69,3 +80,8 @@ Compound_H2O BoxBuilder::createCompound(Float3 com, int compound_index, Compound
 	}
 	return Compound_H2O();
 }
+
+bool BoxBuilder::spaceAvailable(Float3 com, float radius) {	// Too lazy to implement yet..
+	return true;
+}
+
