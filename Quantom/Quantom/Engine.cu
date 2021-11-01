@@ -312,8 +312,11 @@ __global__ void forceKernel(Box* box) {
 
 
 	if (thread_compound_active) {
-		if (threadIdx.x == 0)
-			compound.particles[threadIdx.x].pos.print();
+		if (threadIdx.x == 0) {
+			//compound.particles[threadIdx.x].pos.print();
+			box->compound_state_buffer[blockIdx.x].particle_cnt = compound.n_particles;
+		}
+			
 		box->compound_state_buffer[blockIdx.x].positions[threadIdx.x] = compound.particles[threadIdx.x].pos;
 	}
 		

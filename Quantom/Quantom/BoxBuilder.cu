@@ -76,9 +76,10 @@ Compound_H2O BoxBuilder::createCompound(Float3 com, int compound_index, Compound
 	Molecule water;
 	Compound_H2O compound(compound_index, neighborinfo_node, statebuffer_node);
 	for (int i = 0; i < water.n_atoms; i++) {
+		(com + water.atoms[i].pos).print('p');
 		compound.particles[i] = CompactParticle(com + water.atoms[i].pos, water.atoms[i].mass);
 	}
-	return Compound_H2O();
+	return compound;
 }
 
 bool BoxBuilder::spaceAvailable(Float3 com, float radius) {	// Too lazy to implement yet..

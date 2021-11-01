@@ -59,9 +59,11 @@ public:
 
 
 	void moveToDevice() {	// Loses pointer to RAM location!
+		compounds[0].particles[0].pos.print('B');
+
 		Compound_H2O* compounds_temp;
 		int bytesize = n_compounds * sizeof(Compound_H2O);
-		cudaMalloc(&compounds_temp, bytesize);
+		cudaMallocManaged(&compounds_temp, bytesize);
 		cudaMemcpy(compounds_temp, compounds, bytesize, cudaMemcpyHostToDevice);
 		delete compounds;
 		compounds = compounds_temp;

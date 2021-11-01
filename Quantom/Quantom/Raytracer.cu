@@ -9,13 +9,14 @@ void Ray::reset() {
     atom_type = -1;
 }
 
-__device__ bool Ray::hitsParticle(CompactParticle* particle, float particle_radius) {
-    return (distToPoint(particle->pos) < particle_radius);
+__device__ bool Ray::hitsParticle(Float3* particle_center, float particle_radius) {
+    //printf("dist: %f \n", distToPoint(*particle_center));
+    return (distToPoint(*particle_center) < particle_radius);
 }
 
-__device__ float Ray::distToSphereIntersect(CompactParticle* particle, float particle_radius) {
-    Float3 projection_on_ray = origin + unit_vector * ((particle->pos - origin).dot(unit_vector) / unit_vector.dot(unit_vector));
-    float center_to_projection = (projection_on_ray - particle->pos).len();
+__device__ float Ray::distToSphereIntersect(Float3* particle_center, float particle_radius) {
+    Float3 projection_on_ray = origin + unit_vector * ((*particle_center - origin).dot(unit_vector) / unit_vector.dot(unit_vector));
+    float center_to_projection = (projection_on_ray - *particle_center).len();
     float projection_to_intersect = sqrtf(particle_radius * particle_radius - center_to_projection * center_to_projection);
     return (projection_on_ray - origin).len() - projection_to_intersect;
 }
@@ -32,8 +33,8 @@ __device__ float Ray::distToPoint(Float3 point) {
     
 __device__ void Ray::searchCompound(CompoundState* state, Box* box) {
     for (int i = 0; i < state->particle_cnt; i++) {
-        if (hitsParticle(&state->particles[i], box->rendermolecule.radii[i])) {
-            if (distToSphereIntersect(&state->particles[i], box->rendermolecule.radii[i]) < closest_collision) {
+        if (hitsParticle(&state->positions[i], box->rendermolecule.radii[i])) {
+            if (distToSphereIntersect(&state->positions[i], box->rendermolecule.radii[i]) < closest_collision) {
                 atom_type = i;
             }
         }
@@ -53,7 +54,7 @@ Raytracer::Raytracer(Simulation* simulation, bool verbose) {
 
 
     float base = 0;
-	float principal_point_increment = (BOX_LEN) / (float)RAYS_PER_DIM;
+	float principal_point_increment = (float) (BOX_LEN) / (float)RAYS_PER_DIM;
 
 	Ray* host_rayptr = new Ray[NUM_RAYS];
 	focalpoint = Float3(BOX_LEN/2.f, -(BOX_LEN / 2.f) * FOCAL_LEN_RATIO - BOX_LEN, BOX_LEN / 2.f);
@@ -82,7 +83,7 @@ Raytracer::Raytracer(Simulation* simulation, bool verbose) {
     int duration = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - t0).count();
     printf("\nRaytracer initiated in %d ms\n\n", duration);
 }
-    
+
 
 __global__ void renderKernel(Ray* rayptr, uint8_t* image, Box* box) {
     int  index = blockIdx.x * blockDim.x + threadIdx.x;

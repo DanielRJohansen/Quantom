@@ -24,7 +24,7 @@ public:
 	Ray(Float3 unit_vector, Float3 origin);
 	__device__ void reset();
 
-	__device__ bool hitsParticle(CompactParticle* particle, float particle_radius);
+	__device__ bool hitsParticle(Float3* particle_center, float particle_radius);
 	__device__ void searchCompound(CompoundState* compoundstate, Box* box);
 	__device__ float distToPoint(Float3 point);
 	
@@ -41,7 +41,7 @@ public:
 
 
 private:
-	__device__ float distToSphereIntersect(CompactParticle* particle, float particle_radius);
+	__device__ float distToSphereIntersect(Float3* particle_center, float particle_radius);
 
 	
 };

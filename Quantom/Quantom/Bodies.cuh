@@ -20,9 +20,6 @@ struct Atom {
 	uint8_t color[3] = { 0,100,0 };
 };
 
-struct RenderBody {
-
-};
 
 struct Molecule {
 	Molecule();
@@ -51,7 +48,7 @@ constexpr unsigned char UNUSED_BODY = 255;
 
 struct CompactParticle {
 	CompactParticle() {}
-	CompactParticle(Float3 pos, float mass) : pos(pos) {}
+	CompactParticle(Float3 pos, float mass) : pos(pos), mass(mass) {}
 	Float3 pos;
 	Float3 vel_prev;
 	float pot_E_prev = 0;
