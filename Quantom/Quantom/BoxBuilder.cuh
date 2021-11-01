@@ -10,13 +10,10 @@ public:
 	void build(Simulation* simulation);
 
 private:
-	int solvateBox();					// Returns # of solvate compounds placed
-	Compound_H2O createCompound(Float3 com, int compound_index, CompoundState* statebuffer_node, CompoundNeighborInfo* neighborinfo_node);
+	int solvateBox(Simulation* simulation);					// Returns # of solvate compounds placed
+	Compound_H2O createCompound(Float3 com, int compound_index, CompoundState* statebuffer_node, CompoundNeighborList* neighborinfo_node);
 	bool spaceAvailable(Float3 com, float radius);
-	//void prepareCudaScheduler();	???
-
-	Simulation* simToDevice();
-
+	void compoundLinker(Simulation* simulation);									// Temp function
 
 
 	
@@ -25,7 +22,18 @@ private:
 	Box box;	// Local host version
 	float box_len = BOX_LEN;
 	float box_base = 0;
-	Simulation* simulation;	//Pointer to actual simulation
+	const int max_compounds = 1'000'000;								// DO we want something const here? Smaller val?
+
+
+
+
+	// We cannot use the pointers in the box, as they must be on device from start, 
+	// since the compounds must know the adresses as they are created.
+	CompoundState* compoundstates_host;		
+	CompoundNeighborList* compoundneighborlists_host;
+	//----------------------------------------------------------------------//
+	
+	
 
 
 

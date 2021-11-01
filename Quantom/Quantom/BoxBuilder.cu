@@ -3,8 +3,17 @@
 
 
 void BoxBuilder::build(Simulation* simulation) {
-	this->simulation = simulation;
-	simulation->box->n_compounds = solvateBox();
+	simulation->box->compounds = new Compound_H2O[max_compounds];
+	compoundneighborlists_host = new CompoundNeighborList[max_compounds];
+	compoundstates_host = new CompoundState[max_compounds];
+
+	cudaMalloc(&simulation->box->compound_state_buffer, sizeof(CompoundState) * max_compounds);
+	cudaMalloc(&simulation->box->compound_neighborlist_buffer, sizeof(CompoundNeighborList) * max_compounds);
+
+	simulation->box->n_compounds = solvateBox(simulation);
+
+	cudaMemcpy(simulation->box->compound_state_buffer, compoundstates_host, sizeof(CompoundState) * max_compounds, cudaMemcpyHostToDevice);
+	cudaMemcpy(simulation->box->compound_neighborlist_buffer, compoundneighborlists_host, sizeof(CompoundNeighborList) * max_compounds, cudaMemcpyHostToDevice);
 
 	Molecule water;
 	for (int i = 0; i < water.n_atoms; i++) {
@@ -17,7 +26,7 @@ void BoxBuilder::build(Simulation* simulation) {
 }
 
 
-int BoxBuilder::solvateBox()
+int BoxBuilder::solvateBox(Simulation* simulation)
 {
 	int bodies_per_dim = ceil(cbrt((float)simulation->n_bodies));
 	float dist_between_compounds = (BOX_LEN) / (float)bodies_per_dim;	// dist_per_index
@@ -31,10 +40,7 @@ int BoxBuilder::solvateBox()
 	double T = 293;	// Kelvin
 	float mean_velocity = m / (2 * k_B * T);
 
-	const int max_compounds = 1'000'000;
-	simulation->box->compounds = new Compound_H2O[max_compounds];
-	cudaMalloc(&simulation->box->compound_state_buffer, sizeof(CompoundState) * max_compounds);
-	cudaMalloc(&simulation->box->compound_neighborinfo_buffer, sizeof(CompoundNeighborInfo) * max_compounds);
+
 	
 
 
@@ -50,7 +56,7 @@ int BoxBuilder::solvateBox()
 				float compound_radius = 0.2;
 
 				if (spaceAvailable(compound_center, compound_radius)) {
-					Compound_H2O compound = createCompound(compound_center, solvate_cnt, &simulation->box->compound_state_buffer[solvate_cnt], &simulation->box->compound_neighborinfo_buffer[solvate_cnt]);
+					Compound_H2O compound = createCompound(compound_center, solvate_cnt, &simulation->box->compound_state_buffer[solvate_cnt], &simulation->box->compound_neighborlist_buffer[solvate_cnt]);
 					simulation->box->compounds[simulation->box->n_compounds++] = compound;
 					solvate_cnt++;
 				}
@@ -68,16 +74,17 @@ int BoxBuilder::solvateBox()
 
 
 
-
-
-
-Compound_H2O BoxBuilder::createCompound(Float3 com, int compound_index, CompoundState* statebuffer_node, CompoundNeighborInfo* neighborinfo_node)	// Nodes obv. points to addresses in device global memory.
+Compound_H2O BoxBuilder::createCompound(Float3 com, int compound_index, CompoundState* statebuffer_node, CompoundNeighborList* neighborinfo_node)	// Nodes obv. points to addresses in device global memory.
 {
 	Molecule water;
-	Compound_H2O compound(compound_index, neighborinfo_node, statebuffer_node);
 	for (int i = 0; i < water.n_atoms; i++) {
 		(com + water.atoms[i].pos).print('p');
-		compound.particles[i] = CompactParticle(com + water.atoms[i].pos, water.atoms[i].mass);
+		compoundstates_host[compound_index].positions[i] = com + water.atoms[i].pos;	// PLACE EACH PARTICLE IN COMPOUNDS STATE, BEFORE CREATING COMPOUNDS, LETS US IMMEDIATELY CALCULATE THE COMPOUNDS CENTER OF MASS.
+	}
+
+	Compound_H2O compound(compound_index, neighborinfo_node, statebuffer_node, compoundstates_host);
+	for (int i = 0; i < water.n_atoms; i++) {
+		compound.particles[i] = CompactParticle(water.atoms[i].mass);
 	}
 	return compound;
 }
@@ -86,3 +93,21 @@ bool BoxBuilder::spaceAvailable(Float3 com, float radius) {	// Too lazy to imple
 	return true;
 }
 
+
+
+
+
+void BoxBuilder::compoundLinker(Simulation* simulation) {
+	for (int i = 0; i < max_compounds; i++) {
+		compoundneighborlists_host[i].n_neighbors = 0;
+	}
+
+	for (int i = 0; i < simulation->box->n_compounds; i++) {
+		for (int j = 0; j < simulation->box->n_compounds; j++) {
+			if (i != j) {
+				CompoundNeighborList* nlist = compoundneighborlists_host;
+				nlist->neighborcompound_indexes[nlist->n_neighbors++] = j;
+			}
+		}
+	}
+}

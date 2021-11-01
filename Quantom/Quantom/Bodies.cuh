@@ -37,27 +37,6 @@ struct Molecule {
 		atoms = atoms_temp;
 	}
 };
-struct RenderMolecule {	// Just temporary, dont know howq to properly implement functionality for rendering.
-	uint8_t colors[3][3];
-	float radii[3];
-};
-
-constexpr float BODY_RADIUS = 0.2;		// CRITICAL VALUE!
-constexpr unsigned char UNUSED_BODY = 255;
-
-
-struct CompactParticle {
-	CompactParticle() {}
-	CompactParticle(Float3 pos, float mass) : pos(pos), mass(mass) {}
-	Float3 pos;
-	Float3 vel_prev;
-	float pot_E_prev = 0;
-	float mass;
-};
-
-
-
-
 
 struct MoleculeLibrary {
 
@@ -87,6 +66,40 @@ struct MoleculeLibrary {
 	Molecule* molecules;
 
 };
+
+
+
+
+
+
+
+
+
+
+
+
+struct RenderMolecule {	// Just temporary, dont know howq to properly implement functionality for rendering.
+	uint8_t colors[3][3];
+	float radii[3];
+};
+
+constexpr float BODY_RADIUS = 0.2;		// CRITICAL VALUE!
+constexpr unsigned char UNUSED_BODY = 255;
+
+
+struct CompactParticle {	// Contains information only needed by the Ownerkernel
+	CompactParticle() {}	
+	CompactParticle(float mass) : mass(mass) {}
+	//Float3 pos;
+	Float3 vel_prev;
+	float pot_E_prev = 0;
+	float mass;
+};
+
+
+
+
+
 
 
 
@@ -123,7 +136,7 @@ struct AngleBond {
 
 // ------------------------------------------------- COMPOUNDS ------------------------------------------------- //
 
-struct CompoundNeighborInfo {
+struct CompoundNeighborList {
 	uint32_t neighborcompound_indexes[256]; // For now so we dont need to track, adjust to 16 or 32 later!!
 	uint8_t n_neighbors;					// adjust too?
 };
@@ -144,10 +157,11 @@ const float max_LJ_dist = 1;			// nm
 
 struct Compound_H2O {			// Entire molecule for small < 500 atoms molcules, or part of large molecule
 	__host__ Compound_H2O() {}	// {O, H, H}
-	__host__ Compound_H2O(uint32_t index, CompoundNeighborInfo* info, CompoundState* state) {
+	__host__ Compound_H2O(uint32_t index, CompoundNeighborList* neighborlist_device, CompoundState* state_device,
+	CompoundState* states_host) {
 		this->index = index;
-		compound_neighborinfo_ptr = info;
-		compound_state_ptr = state;
+		compound_neighborlist_ptr = neighborlist_device;
+		compound_state_ptr = state_device;
 
 		pairbonds[0] = PairBond(OH_refdist, 0, 1);
 		pairbonds[1] = PairBond(OH_refdist, 0, 2);
@@ -155,7 +169,7 @@ struct Compound_H2O {			// Entire molecule for small < 500 atoms molcules, or pa
 		anglebonds[0] = AngleBond(HOH_refangle, 1, 0, 2);
 
 		for (uint32_t i = 0; i < n_particles; i++)
-			center_of_mass = center_of_mass + particles[i].pos;
+			center_of_mass = center_of_mass + states_host->positions[i];
 		center_of_mass = center_of_mass * (1.f / n_particles);
 
 		radius = pairbonds[0].reference_dist * n_particles;					// TODO: Shitty estimate, do better later
@@ -165,9 +179,9 @@ struct Compound_H2O {			// Entire molecule for small < 500 atoms molcules, or pa
 		return (a.center_of_mass - center_of_mass).len() < (a.radius + radius + max_LJ_dist);
 	}
 
-	uint32_t index;
+	uint32_t index;										// Is this necessary
 	CompoundState* compound_state_ptr;
-	CompoundNeighborInfo* compound_neighborinfo_ptr;
+	CompoundNeighborList* compound_neighborlist_ptr;
 
 	uint8_t n_particles = H2O_PARTICLES;
 	CompactParticle particles[H2O_PARTICLES];

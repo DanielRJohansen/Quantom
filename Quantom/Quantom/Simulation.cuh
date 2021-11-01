@@ -51,7 +51,7 @@ public:
 
 	// These are shared for all compounds, MUST be allocated before adding any compounds to box, so not in moveToDevice //
 	CompoundState* compound_state_buffer;	
-	CompoundNeighborInfo* compound_neighborinfo_buffer;
+	CompoundNeighborList* compound_neighborlist_buffer;
 	//------------------------------------//
 
 	float* outdata;
@@ -59,7 +59,6 @@ public:
 
 
 	void moveToDevice() {	// Loses pointer to RAM location!
-		compounds[0].particles[0].pos.print('B');
 
 		Compound_H2O* compounds_temp;
 		int bytesize = n_compounds * sizeof(Compound_H2O);

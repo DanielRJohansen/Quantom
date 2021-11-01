@@ -9,8 +9,8 @@ Simulation* Engine::prepSimulation(Simulation* simulation) {
 	boxbuilder.build(simulation);
 	printf("Boxbuild complete!\n");
 
-	updateNeighborLists();
-	printf("Neighborlists ready\n");
+	//updateNeighborLists();
+	//printf("Neighborlists ready\n");
 
 
 
@@ -23,33 +23,25 @@ Simulation* Engine::prepSimulation(Simulation* simulation) {
 
 
 void Engine::updateNeighborLists() {	// Write actual function later;
+	/*
 	int maxc = 1'000'000; // this is temporary!
 	CompoundState* statebuffer_host = new CompoundState[maxc];
-	CompoundNeighborInfo* neighborlists_host = new CompoundNeighborInfo[maxc];
+	CompoundNeighborList* neighborlists_host = new CompoundNeighborList[maxc];
 	cudaMemcpy(statebuffer_host, simulation->box->compound_state_buffer, sizeof(CompoundState) * maxc, cudaMemcpyDeviceToHost);
 	cudaDeviceSynchronize();
 
 
 	// This only needs to be done the first time... Or does it????
 	for (int i = 0; i < maxc; i++) {
-		neighborlists_host[i].n_neighbors = 0;
+		//neighborlists_host[i].n_neighbors = 0;
 	}
 		
-	printf("1\n");
 
-	// This is the temp func //
-	for (int i = 0; i < simulation->box->n_compounds; i++) {
-		for (int j = 0; j < simulation->box->n_compounds; j++) {
-			if (i != j) {
-				CompoundNeighborInfo* nlist = neighborlists_host;
-				nlist->neighborcompound_indexes[nlist->n_neighbors++] = j;
-			}
-		}
-	}
-	// --------------------- //
 
-	cudaMemcpy(simulation->box->compound_neighborinfo_buffer, neighborlists_host, sizeof(CompoundNeighborInfo) * maxc, cudaMemcpyHostToDevice);
+
+	cudaMemcpy(simulation->box->compound_neighborlist_buffer, neighborlists_host, sizeof(CompoundNeighborList) * maxc, cudaMemcpyHostToDevice);
 	cudaDeviceSynchronize();
+	*/
 }
 
 
@@ -290,9 +282,9 @@ __device__ void calcAngleForce(Compound_H2O* compound, AngleBond* anglebond, flo
 	}		
 }
 */
-__device__ void integrateTimestep(CompactParticle* particle, Float3 force, float dt) {	// Kinetic formula: v = sqrt(2*K/m), m in kg
-	Float3 vel_next = particle->vel_prev + (force * (1000.f/particle->mass) * dt);
-	particle->pos = particle->pos + vel_next * dt;
+__device__ void integrateTimestep(CompactParticle* particle, Float3* particle_pos, Float3* particle_force, float dt) {	// Kinetic formula: v = sqrt(2*K/m), m in kg
+	Float3 vel_next = particle->vel_prev + (*particle_force * (1000.f/particle->mass) * dt);
+	*particle_pos = *particle_pos + vel_next * dt;
 	particle->vel_prev = vel_next;
 }
 
@@ -300,7 +292,10 @@ __device__ void integrateTimestep(CompactParticle* particle, Float3 force, float
 
 __global__ void forceKernel(Box* box) {
 	__shared__ Compound_H2O compound;
-	//__shared__ Compound_H2O_
+	__shared__ CompoundState eigenstate;
+	__shared__ CompoundState neighborstate_buffer;
+
+
 
 	if (threadIdx.x == 0) {
 		compound = box->compounds[blockIdx.x];
@@ -317,7 +312,7 @@ __global__ void forceKernel(Box* box) {
 			box->compound_state_buffer[blockIdx.x].particle_cnt = compound.n_particles;
 		}
 			
-		box->compound_state_buffer[blockIdx.x].positions[threadIdx.x] = compound.particles[threadIdx.x].pos;
+		//box->compound_state_buffer[blockIdx.x].positions[threadIdx.x] = compound.particles[threadIdx.x].pos;
 	}
 		
 	//box->compounds[blockIdx.x].particles[threadIdx.x].pos = compound.particles[threadIdx.x].pos;

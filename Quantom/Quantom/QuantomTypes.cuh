@@ -40,7 +40,9 @@ struct Float3 {
 	__host__ __device__ Float3 norm() {
 		float l = len();
 		if (l)
-			return *this * (1.f / l); }
+			return *this * (1.f / l); 
+		return Float3(0, 0, 0);
+	}
 	__host__ __device__ Float3 square() {return Float3(x * x, y * y, z * z);}
 	__host__ __device__ inline float len() {return (float)sqrtf(x * x + y * y + z * z); }
 	__host__ __device__ inline float lenSquared() { return (float)(x * x + y * y + z * z); }
