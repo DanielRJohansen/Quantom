@@ -40,12 +40,12 @@ void Environment::run() {
 
 		for (int i = 0; i < simulation->steps_per_render; i++) {
 			engine->step();
-			printf("\r\tStep #%05d", simulation->step);
 			//simulation->finished = true;
 			//exit(1);
 			if (simulation->finished)
 				break;
 		}
+		printf("\r\tStep #%05d", simulation->step);
 		float duration = (float) std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - t0).count();
 		int remaining_seconds = (int) (1.f/1000 * duration/simulation->steps_per_render * (simulation->n_steps - simulation->step));
 		printf("\tAverage step time: %.1fms (%d/%d/%d)  Remaining: %ds",  duration/simulation->steps_per_render, engine->timings.x/simulation->steps_per_render, engine->timings.y / simulation->steps_per_render, engine->timings.z / simulation->steps_per_render, remaining_seconds);

@@ -63,57 +63,12 @@ void Engine::step() {
 	auto t0 = std::chrono::high_resolution_clock::now();
 
 
-	int compounds_per_sm = 1000;
-	Box* box = simulation->box;	// Why the fuck do i have to do this, VisualStudio???!
-	for (int i = 0; i < N_STREAMS; i++) {
-		int offset = i * compounds_per_sm;
-		//intramolforceKernel <<< compounds_per_sm, 3, 0, stream[i] >>> (box, offset);
-	}
-	forceKernel <<< box->n_compounds, 256 >>> (box);
+	forceKernel <<< simulation->box->n_compounds, 256 >>> (simulation->box);
 	cudaDeviceSynchronize();
 
 
 	auto t1 = std::chrono::high_resolution_clock::now();
-
-
-
-	int blocks_handled = 0;
-	while (blocks_handled < sim_blocks) {
-		for (int i = 0; i < N_STREAMS; i++) {
-			//stepKernel << < BLOCKS_PER_SM, MAX_FOCUS_BODIES, 0, stream[i] >> > (simulation, blocks_handled);
-			blocks_handled += BLOCKS_PER_SM;
-			if (blocks_handled >= sim_blocks)
-				break;
-		}
-
-		cudaDeviceSynchronize();
-		if (cudaGetLastError() != cudaSuccess) {
-			fprintf(stderr, "Error during step :/\n");
-			exit(1);
-		}
-	}
-
-
-
-
 	auto t2 = std::chrono::high_resolution_clock::now();
-
-	blocks_handled = 0;
-	while (blocks_handled < sim_blocks) {
-		for (int i = 0; i < N_STREAMS; i++) {
-			//updateKernel << < BLOCKS_PER_SM, dim3(3,3,3), 0, stream[i] >> > (simulation, blocks_handled);
-			blocks_handled += BLOCKS_PER_SM;
-			if (blocks_handled >= sim_blocks)
-				break;
-		}
-
-		cudaDeviceSynchronize();
-		if (cudaGetLastError() != cudaSuccess) {
-			fprintf(stderr, "Error during update :/\n");
-			exit(1);
-		}
-	}
-
 	auto t3 = std::chrono::high_resolution_clock::now();
 
 	bool verbose = true;
@@ -179,11 +134,11 @@ __device__ float getAngle(Float3 v1, Float3 v2) {
 }
 
 
-/*
+
 constexpr float sigma = 0.3923;	//nm
 constexpr float epsilon = 0.5986 * 1'000; //kJ/mol | J/mol
-__device__ Float3 calcLJForce(Particle* particle0, Particle* particle1, int i, int bid) {	// Applying force to p0 only! 
-	float dist = (particle0->pos - particle1->pos).len();
+__device__ Float3 calcLJForce(Float3* pos0, Float3* pos1) {	// Applying force to p0 only! 
+	float dist = (*pos0 - *pos1).len();
 	float fraction = sigma / dist;
 
 	float f2 = fraction * fraction;
@@ -191,21 +146,15 @@ __device__ Float3 calcLJForce(Particle* particle0, Particle* particle1, int i, i
 	float f12 = f6 * f6;
 
 	float LJ_pot = 4 * epsilon * (f12 - f6);
-	Float3 force_unit_vector = (particle0->pos - particle1->pos).norm();	// + is repulsive, - is attractive
+	Float3 force_unit_vector = (*pos0 - *pos1).norm();	// + is repulsive, - is attractive
 
 
 	if (LJ_pot > 20'000) {
-		//body0->molecule_type = 99;
-		printf("\n\n KILOFORCE! Block %d thread %d\n", bid, threadIdx.x);
-		printf("other body index: %d\n", i);
-		printf("Body 0 id: %d     %f %f %f\n", particle0->id, particle0->pos.x, particle0->pos.y, particle0->pos.z);
-		printf("Body 1 id: %d     %f %f %f\n", particle1->id, particle1->pos.x, particle1->pos.y, particle1->pos.z);
-		printf("Distance: %f\n", (particle0->pos - particle1->pos).len());
-
+		printf("\n\n KILOFORCE! Block thread %d\n", threadIdx.x);
 	}
 	return force_unit_vector * LJ_pot;
 }
-*/
+
 
 
 /*
@@ -294,18 +243,40 @@ __global__ void forceKernel(Box* box) {
 	__shared__ Compound_H2O compound;
 	__shared__ CompoundState self_state;
 	__shared__ CompoundState neighborstate_buffer;
-
+	__shared__ CompoundNeighborList neighborlist;
 	
-
 	if (threadIdx.x == 0) {
 		compound = box->compounds[blockIdx.x];
 		self_state = box->compound_state_array[blockIdx.x];
+		neighborlist = box->compound_neighborlist_array[blockIdx.x];
 	}
 	__syncthreads();
+	return;
+
 	bool thread_particle_active = (compound.n_particles > threadIdx.x);
 
 
 	Float3 force(0, 0, 0);
+
+
+	for (int neighbor_index = 0; neighbor_index < neighborlist.n_neighbors; neighbor_index++) {
+		if (threadIdx.x == 0) {
+			neighborstate_buffer = box->compound_state_array[neighborlist.neighborcompound_indexes[neighbor_index]];
+		}
+		__syncthreads();
+
+		for (int neighbor_particle_index = 0; neighbor_particle_index < neighborstate_buffer.n_particles; neighbor_particle_index++) {
+			force = force + calcLJForce(&self_state.positions[threadIdx.x], &neighborstate_buffer.positions[neighbor_particle_index]);
+		}
+		
+
+
+
+		__syncthreads();
+	}
+
+
+
 
 
 	if (thread_particle_active) {
@@ -315,32 +286,9 @@ __global__ void forceKernel(Box* box) {
 
 
 
-
-
-
-
-
-
-
-
 	__syncthreads();
 	if (threadIdx.x == 0)
 		box->compound_state_array[blockIdx.x] = self_state;
-
-
-	/*
-	if (thread_particle_active) {
-		if (threadIdx.x == 0) {
-
-			//compound.particles[threadIdx.x].pos.print();
-			
-			//box->compound_state_array[blockIdx.x].particle_cnt = compound.n_particles;
-		}
-		
-		box->compound_state_array[blockIdx.x].positions[threadIdx.x] = compound.particles[threadIdx.x].pos;
-	}
-		*/
-	//box->compounds[blockIdx.x].particles[threadIdx.x].pos = compound.particles[threadIdx.x].pos;
 }
 
 
