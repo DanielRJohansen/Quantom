@@ -89,10 +89,9 @@ constexpr unsigned char UNUSED_BODY = 255;
 
 struct CompactParticle {	// Contains information only needed by the Ownerkernel
 	CompactParticle() {}	
-	CompactParticle(float mass) : mass(mass) {}
-	//Float3 pos;
+	CompactParticle(float mass, Float3 initial_vel) : mass(mass), vel_prev(initial_vel)  {}
 	Float3 vel_prev;
-	float pot_E_prev = 0;
+	float pot_E_prev = 999999999;			// MUST BE INITIATED BY CALCULATION, OR IT WILL FUCK SHIT UP!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	float mass;
 };
 
@@ -138,11 +137,11 @@ struct AngleBond {
 
 struct CompoundNeighborList {
 	uint32_t neighborcompound_indexes[256]; // For now so we dont need to track, adjust to 16 or 32 later!!
-	uint8_t n_neighbors;					// adjust too?
+	uint8_t n_neighbors = 0;					// adjust too?
 };
 struct CompoundState {
 	Float3 positions[128];
-	uint8_t particle_cnt;
+	uint8_t n_particles = 0;
 };
 
 

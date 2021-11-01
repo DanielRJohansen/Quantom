@@ -27,7 +27,7 @@ void Engine::updateNeighborLists() {	// Write actual function later;
 	int maxc = 1'000'000; // this is temporary!
 	CompoundState* statebuffer_host = new CompoundState[maxc];
 	CompoundNeighborList* neighborlists_host = new CompoundNeighborList[maxc];
-	cudaMemcpy(statebuffer_host, simulation->box->compound_state_buffer, sizeof(CompoundState) * maxc, cudaMemcpyDeviceToHost);
+	cudaMemcpy(statebuffer_host, simulation->box->compound_state_array, sizeof(CompoundState) * maxc, cudaMemcpyDeviceToHost);
 	cudaDeviceSynchronize();
 
 
@@ -39,7 +39,7 @@ void Engine::updateNeighborLists() {	// Write actual function later;
 
 
 
-	cudaMemcpy(simulation->box->compound_neighborlist_buffer, neighborlists_host, sizeof(CompoundNeighborList) * maxc, cudaMemcpyHostToDevice);
+	cudaMemcpy(simulation->box->compound_neighborlist_array, neighborlists_host, sizeof(CompoundNeighborList) * maxc, cudaMemcpyHostToDevice);
 	cudaDeviceSynchronize();
 	*/
 }
@@ -292,29 +292,54 @@ __device__ void integrateTimestep(CompactParticle* particle, Float3* particle_po
 
 __global__ void forceKernel(Box* box) {
 	__shared__ Compound_H2O compound;
-	__shared__ CompoundState eigenstate;
+	__shared__ CompoundState self_state;
 	__shared__ CompoundState neighborstate_buffer;
 
-
+	
 
 	if (threadIdx.x == 0) {
 		compound = box->compounds[blockIdx.x];
+		self_state = box->compound_state_array[blockIdx.x];
 	}
 	__syncthreads();
-	bool thread_compound_active = (compound.n_particles > threadIdx.x);
+	bool thread_particle_active = (compound.n_particles > threadIdx.x);
 
 
+	Float3 force(0, 0, 0);
 
 
-	if (thread_compound_active) {
-		if (threadIdx.x == 0) {
-			//compound.particles[threadIdx.x].pos.print();
-			box->compound_state_buffer[blockIdx.x].particle_cnt = compound.n_particles;
-		}
-			
-		//box->compound_state_buffer[blockIdx.x].positions[threadIdx.x] = compound.particles[threadIdx.x].pos;
+	if (thread_particle_active) {
+		integrateTimestep(&compound.particles[threadIdx.x], &self_state.positions[threadIdx.x], &force, box->dt);
 	}
+
+
+
+
+
+
+
+
+
+
+
+
+	__syncthreads();
+	if (threadIdx.x == 0)
+		box->compound_state_array[blockIdx.x] = self_state;
+
+
+	/*
+	if (thread_particle_active) {
+		if (threadIdx.x == 0) {
+
+			//compound.particles[threadIdx.x].pos.print();
+			
+			//box->compound_state_array[blockIdx.x].particle_cnt = compound.n_particles;
+		}
 		
+		box->compound_state_array[blockIdx.x].positions[threadIdx.x] = compound.particles[threadIdx.x].pos;
+	}
+		*/
 	//box->compounds[blockIdx.x].particles[threadIdx.x].pos = compound.particles[threadIdx.x].pos;
 }
 

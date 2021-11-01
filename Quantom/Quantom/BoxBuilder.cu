@@ -7,13 +7,13 @@ void BoxBuilder::build(Simulation* simulation) {
 	compoundneighborlists_host = new CompoundNeighborList[max_compounds];
 	compoundstates_host = new CompoundState[max_compounds];
 
-	cudaMalloc(&simulation->box->compound_state_buffer, sizeof(CompoundState) * max_compounds);
-	cudaMalloc(&simulation->box->compound_neighborlist_buffer, sizeof(CompoundNeighborList) * max_compounds);
+	cudaMalloc(&simulation->box->compound_state_array, sizeof(CompoundState) * max_compounds);
+	cudaMalloc(&simulation->box->compound_neighborlist_array, sizeof(CompoundNeighborList) * max_compounds);
 
 	simulation->box->n_compounds = solvateBox(simulation);
 
-	cudaMemcpy(simulation->box->compound_state_buffer, compoundstates_host, sizeof(CompoundState) * max_compounds, cudaMemcpyHostToDevice);
-	cudaMemcpy(simulation->box->compound_neighborlist_buffer, compoundneighborlists_host, sizeof(CompoundNeighborList) * max_compounds, cudaMemcpyHostToDevice);
+	cudaMemcpy(simulation->box->compound_state_array, compoundstates_host, sizeof(CompoundState) * max_compounds, cudaMemcpyHostToDevice);
+	cudaMemcpy(simulation->box->compound_neighborlist_array, compoundneighborlists_host, sizeof(CompoundNeighborList) * max_compounds, cudaMemcpyHostToDevice);
 
 	Molecule water;
 	for (int i = 0; i < water.n_atoms; i++) {
@@ -21,6 +21,8 @@ void BoxBuilder::build(Simulation* simulation) {
 		for (int j = 0; j < 3; j++)
 			simulation->box->rendermolecule.colors[i][j] = water.atoms[i].color[j];
 	}
+
+	simulation->box->dt = simulation->dt;
 
 	simulation->box->moveToDevice();
 }
@@ -34,36 +36,26 @@ int BoxBuilder::solvateBox(Simulation* simulation)
 	printf("Bodies per dim: %d. Dist per dim: %.3f\n", bodies_per_dim, dist_between_compounds);
 
 
-
-	double m = 18.01528;		// g/mol
-	double k_B = 8.617333262145 * 10e-5;
-	double T = 293;	// Kelvin
-	float mean_velocity = m / (2 * k_B * T);
-
-
-	
-
-
-	int solvate_cnt = 0;
 	for (int z_index = 0; z_index < bodies_per_dim; z_index++) {
 		for (int y_index = 0; y_index < bodies_per_dim; y_index++) {
 			for (int x_index = 0; x_index < bodies_per_dim; x_index++) {
-				if (solvate_cnt == N_BODIES_START)
+				if (simulation->box->n_compounds == N_BODIES_START)
 					break;
 
 				Float3 compound_center = Float3(base + dist_between_compounds * (float)x_index, base + dist_between_compounds * (float)y_index, base + dist_between_compounds * (float)z_index);
-				Float3 compound_united_vel = Float3(random(), random(), random()).norm() * mean_velocity;
 				float compound_radius = 0.2;
 
 				if (spaceAvailable(compound_center, compound_radius)) {
-					Compound_H2O compound = createCompound(compound_center, solvate_cnt, &simulation->box->compound_state_buffer[solvate_cnt], &simulation->box->compound_neighborlist_buffer[solvate_cnt]);
-					simulation->box->compounds[simulation->box->n_compounds++] = compound;
-					solvate_cnt++;
+					simulation->box->compounds[simulation->box->n_compounds++] = createCompound(	compound_center, 
+																								simulation->box->n_compounds, 
+																								&simulation->box->compound_state_array[simulation->box->n_compounds],
+																								&simulation->box->compound_neighborlist_array[simulation->box->n_compounds]
+					);
 				}
 			}
 		}
 	}
-	return solvate_cnt;
+	return simulation->box->n_compounds;
 }
 
 
@@ -80,11 +72,15 @@ Compound_H2O BoxBuilder::createCompound(Float3 com, int compound_index, Compound
 	for (int i = 0; i < water.n_atoms; i++) {
 		(com + water.atoms[i].pos).print('p');
 		compoundstates_host[compound_index].positions[i] = com + water.atoms[i].pos;	// PLACE EACH PARTICLE IN COMPOUNDS STATE, BEFORE CREATING COMPOUNDS, LETS US IMMEDIATELY CALCULATE THE COMPOUNDS CENTER OF MASS.
+		compoundstates_host[compound_index].n_particles++;
 	}
+
+
+	Float3 compound_united_vel = Float3(random(), random(), random()).norm() * mean_velocity;
 
 	Compound_H2O compound(compound_index, neighborinfo_node, statebuffer_node, compoundstates_host);
 	for (int i = 0; i < water.n_atoms; i++) {
-		compound.particles[i] = CompactParticle(water.atoms[i].mass);
+		compound.particles[i] = CompactParticle(water.atoms[i].mass, compound_united_vel);
 	}
 	return compound;
 }

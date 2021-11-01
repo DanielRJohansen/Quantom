@@ -50,12 +50,13 @@ public:
 	RenderMolecule rendermolecule;	// Not proud, TEMP
 
 	// These are shared for all compounds, MUST be allocated before adding any compounds to box, so not in moveToDevice //
-	CompoundState* compound_state_buffer;	
-	CompoundNeighborList* compound_neighborlist_buffer;
+	CompoundState* compound_state_array;	
+	CompoundNeighborList* compound_neighborlist_array;
 	//------------------------------------//
 
 	float* outdata;
 	uint32_t step = 0;
+	float dt;
 
 
 	void moveToDevice() {	// Loses pointer to RAM location!

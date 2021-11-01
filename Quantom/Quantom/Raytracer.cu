@@ -32,7 +32,7 @@ __device__ float Ray::distToPoint(Float3 point) {
 }
     
 __device__ void Ray::searchCompound(CompoundState* state, Box* box) {
-    for (int i = 0; i < state->particle_cnt; i++) {
+    for (int i = 0; i < state->n_particles; i++) {
         if (hitsParticle(&state->positions[i], box->rendermolecule.radii[i])) {
             if (distToSphereIntersect(&state->positions[i], box->rendermolecule.radii[i]) < closest_collision) {
                 atom_type = i;
@@ -91,7 +91,7 @@ __global__ void renderKernel(Ray* rayptr, uint8_t* image, Box* box) {
     ray.reset();
 
     for (int i = 0; i < box->n_compounds; i++) {
-        CompoundState* compoundstate = &box->compound_state_buffer[i];
+        CompoundState* compoundstate = &box->compound_state_array[i];
         ray.searchCompound(compoundstate, box);
     }
 

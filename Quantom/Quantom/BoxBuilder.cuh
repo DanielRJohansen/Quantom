@@ -27,6 +27,22 @@ private:
 
 
 
+
+	double m = 18.01528;					// g/mol
+	double k_B = 8.617333262145 * 10e-5;	// Boltzmann constant
+	double T = 293;	// Kelvin
+	float mean_velocity = m / (2 * k_B * T);
+
+
+
+
+
+
+
+
+
+
+
 	// We cannot use the pointers in the box, as they must be on device from start, 
 	// since the compounds must know the adresses as they are created.
 	CompoundState* compoundstates_host;		
