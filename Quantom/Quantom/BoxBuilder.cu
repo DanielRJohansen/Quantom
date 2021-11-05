@@ -70,7 +70,7 @@ Compound_H2O BoxBuilder::createCompound(Float3 com, int compound_index, Compound
 {
 	Molecule water;
 	for (int i = 0; i < water.n_atoms; i++) {
-		(com + water.atoms[i].pos).print('p');
+		//(com + water.atoms[i].pos).print('p');
 		compoundstates_host[compound_index].positions[i] = com + water.atoms[i].pos;	// PLACE EACH PARTICLE IN COMPOUNDS STATE, BEFORE CREATING COMPOUNDS, LETS US IMMEDIATELY CALCULATE THE COMPOUNDS CENTER OF MASS.
 		compoundstates_host[compound_index].n_particles++;
 	}

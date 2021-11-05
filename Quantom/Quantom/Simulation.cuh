@@ -28,7 +28,7 @@ const int MAX_NEAR_BODIES = 256 - MAX_FOCUS_BODIES;
 
 const int INDEXA = 100900;
 //const int N_BODIES_START = BOX_LEN*BOX_LEN*BOX_LEN/(FOCUS_LEN*FOCUS_LEN*FOCUS_LEN) * 25;
-const int N_BODIES_START = 10;
+const int N_BODIES_START = 32;
 const int BLOCKS_PER_SM = 512;
 //const int GRIDBLOCKS_PER_BODY = 16;
 //const int THREADS_PER_GRIDBLOCK = MAX_BLOCK_BODIES / GRIDBLOCKS_PER_BODY;
@@ -106,7 +106,7 @@ public:
 
 	float box_size = BOX_LEN;	//nm
 	int blocks_per_dim;
-	int n_steps = 10000;
+	int n_steps = 20000;
 
 	const double dt = 0.5 *	10.0e-6;		// ns, so first val corresponds to fs
 	int steps_per_render = 100;

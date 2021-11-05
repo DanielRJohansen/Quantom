@@ -157,42 +157,17 @@ __device__ Float3 calcLJForce(Float3* pos0, Float3* pos1) {	// Applying force to
 
 
 
-/*
+
 constexpr float kb = 17.5 * 10e+6;		//	J/(mol*nm^2)
-__device__ void calcPairbondForce(Compound_H2O* compound, PairBond* pairbond, float* dataptr) {
-	Float3 particle1_mirrorpos = getClosestMirrorPos(compound->particles[pairbond->atom_indexes[1]].pos, compound->particles[pairbond->atom_indexes[0]].pos);
-	Float3 direction = compound->particles[pairbond->atom_indexes[0]].pos - particle1_mirrorpos;
-	//int focus_index = pairbond->atom_indexes[1] == threadIdx.x;	// If it is not pos 1 we get false, meaning pos 0... Not beautiful but it works.
-	//direction = direction - direction * 2 * (1 * focus_index);	// Flip dir if focusatom is at index 1
-
-	if (pairbond->atom_indexes[1] == threadIdx.x)	// Flip so we repel the particle in focus
-		direction = direction * -1;
-	
-
-	float dist = direction.len();
-	float dif = dist - pairbond->reference_dist;
-	if (dif > 0)	// Flip to attraction
-		direction = direction * -1;
-
-	float force_scalar = 0.5 * kb * (dif * dif);
-	direction = direction.norm();
-	//float invert_if_attraction = -1 + (2 * (dif < 0));
-
-	compound->particles[threadIdx.x].force = compound->particles[threadIdx.x].force + direction * force_scalar;
-
-	if (compound->startindex_particle + threadIdx.x == LOG_P_ID) {
-		*dataptr = dist;
-	}
-		
-	Float3 p0p = compound->particles[pairbond->atom_indexes[0]].pos;
-	if (force_scalar > WARN_FORCE) {
-		printf("\n\n Atom id %d dist %f dif: %f FORCE %f Repulsive %d\n", compound->startindex_particle + threadIdx.x, dist, dif, force_scalar, dif < 0);
-		(direction * force_scalar).print('b');
-		compound->particles[threadIdx.x].force.print('B');
-		//printf("p0 %f %f %f \tp1_mirror %f %f %f\n", p0p.x, p0p.y, p0p.z, particle1_mirrorpos.x, particle1_mirrorpos.y, particle1_mirrorpos.z);
-	}
+__device__ float calcPairbondPotential(Float3* p1_pos, Float3* p2_pos, float* reference_dist) {
+	float dist = (*p1_pos - *p2_pos).len();
+	float dif = dist - *reference_dist;
+	if (dif < 0)
+		dif *= -1;
+	return 0.5 * kb * (dif * dif);
 }
 
+/*
 
 constexpr float ktheta = 65 * 10e+3;	// J/mol
 __device__ void calcAngleForce(Compound_H2O* compound, AngleBond* anglebond, float* dataptr) {	// We fix the middle particle and move the other particles so they are closest as possible
@@ -237,6 +212,7 @@ __device__ void integrateTimestep(CompactParticle* particle, Float3* particle_po
 	particle->vel_prev = vel_next;
 }
 
+
 // ------------------------------------------------------------------------------------------- KERNELS -------------------------------------------------------------------------------------------//
 
 __global__ void forceKernel(Box* box) {
@@ -251,35 +227,42 @@ __global__ void forceKernel(Box* box) {
 		neighborlist = box->compound_neighborlist_array[blockIdx.x];
 	}
 	__syncthreads();
-	return;
 
-	bool thread_particle_active = (compound.n_particles > threadIdx.x);
+	//bool thread_particle_active = (compound.n_particles > threadIdx.x);
 
 
 	Float3 force(0, 0, 0);
 
-
+	// Intermolecular forces //
 	for (int neighbor_index = 0; neighbor_index < neighborlist.n_neighbors; neighbor_index++) {
-		if (threadIdx.x == 0) {
+		if (threadIdx.x == 0) 
 			neighborstate_buffer = box->compound_state_array[neighborlist.neighborcompound_indexes[neighbor_index]];
-		}
+		
+
 		__syncthreads();
 
 		for (int neighbor_particle_index = 0; neighbor_particle_index < neighborstate_buffer.n_particles; neighbor_particle_index++) {
 			force = force + calcLJForce(&self_state.positions[threadIdx.x], &neighborstate_buffer.positions[neighbor_particle_index]);
 		}
-		
-
-
-
 		__syncthreads();
 	}
+	// Intramolecular forces //
+	float intramolecular_potential = 0;
+	for (int i = 0; i < compound.n_pairbonds; i++) {
+		PairBond* pb = &compound.pairbonds[i];
+		if (pb->atom_indexes[0] == threadIdx.x || pb->atom_indexes[1] == threadIdx.x) {
+			intramolecular_potential += calcPairbondPotential(&self_state.positions[pb->atom_indexes[0]], &self_state.positions[pb->atom_indexes[1]], &pb->reference_dist);
+		}
+	}
+
+	//Float3 intramolecular_force = compound.particles[threadIdx.x].vel_prev.norm() * (compound.particles[threadIdx.x].pot_E_prev - intramolecular_potential);
+	//force = force + intramolecular_force;
 
 
 
 
 
-	if (thread_particle_active) {
+	if (compound.n_particles > threadIdx.x) {
 		integrateTimestep(&compound.particles[threadIdx.x], &self_state.positions[threadIdx.x], &force, box->dt);
 	}
 
@@ -290,6 +273,7 @@ __global__ void forceKernel(Box* box) {
 	if (threadIdx.x == 0)
 		box->compound_state_array[blockIdx.x] = self_state;
 }
+
 
 
 
