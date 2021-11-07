@@ -63,7 +63,7 @@ void Engine::step() {
 	auto t0 = std::chrono::high_resolution_clock::now();
 
 
-	forceKernel <<< simulation->box->n_compounds, 256 >>> (simulation->box);
+	forceKernel <<< simulation->box->n_compounds, 64 >>> (simulation->box);
 	cudaDeviceSynchronize();
 
 
@@ -220,6 +220,8 @@ __global__ void forceKernel(Box* box) {
 	__shared__ CompoundState self_state;
 	__shared__ CompoundState neighborstate_buffer;
 	__shared__ CompoundNeighborList neighborlist;
+	__shared__ Float3 buffer[64];
+	__shared__ int hyperpos_offset[3];
 	
 	if (threadIdx.x == 0) {
 		compound = box->compounds[blockIdx.x];
@@ -265,11 +267,45 @@ __global__ void forceKernel(Box* box) {
 	if (compound.n_particles > threadIdx.x) {
 		integrateTimestep(&compound.particles[threadIdx.x], &self_state.positions[threadIdx.x], &force, box->dt);
 	}
+	__syncthreads();
+	
+
+
+
+
+
+
+
+
+
+
+	// ------------------------------------ PERIODIC BOUNDARY CONDITION ------------------------------------------------------------------------------------------------- //
+	buffer[threadIdx.x] = self_state.positions[threadIdx.x];
+	__syncthreads();
+	
+	for (int i = 1; i < 64; i*=2) {
+		if (threadIdx.x + i < 64)	
+			buffer[threadIdx.x] = buffer[threadIdx.x] + buffer[threadIdx.x + i];
+		__syncthreads();
+	}
+
+	if (threadIdx.x == 0) {
+		buffer[0] = buffer[0] * (1.f / compound.n_particles);
+		hyperpos_offset[0] = 1 * (buffer[0].x < 0) - 1 * (buffer[0].x > BOX_LEN);
+		hyperpos_offset[1] = 1 * (buffer[0].y < 0) - 1 * (buffer[0].y > BOX_LEN);
+		hyperpos_offset[2] = 1 * (buffer[0].z < 0) - 1 * (buffer[0].z > BOX_LEN);
+		box->compounds[blockIdx.x].center_of_mass = buffer[0] + (Float3(BOX_LEN, BOX_LEN, BOX_LEN) * Float3(hyperpos_offset[0], hyperpos_offset[1], hyperpos_offset[2]));
+	}
+	__syncthreads();
+
+	self_state.positions[threadIdx.x] = self_state.positions[threadIdx.x] + (Float3(BOX_LEN, BOX_LEN, BOX_LEN) * Float3(hyperpos_offset[0], hyperpos_offset[1], hyperpos_offset[2]));
+	// ------------------------------------------------------------------------------------------------------------------------------------------------------------------ //
 
 
 
 
 	__syncthreads();
+
 	if (threadIdx.x == 0)
 		box->compound_state_array[blockIdx.x] = self_state;
 }
