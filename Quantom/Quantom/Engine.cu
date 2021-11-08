@@ -189,8 +189,6 @@ constexpr float kb = 17.5 * 10e+6;		//	J/(mol*nm^2)
 __device__ float calcPairbondPotential(Float3* p1_pos, Float3* p2_pos, float* reference_dist) {
 	float dist = (*p1_pos - *p2_pos).len();
 	float dif = dist - *reference_dist;
-	if (dif < 0)
-		dif *= -1;
 	return 0.5 * kb * (dif * dif);
 }
 
@@ -233,10 +231,15 @@ __device__ void calcAngleForce(Compound_H2O* compound, AngleBond* anglebond, flo
 	}		
 }
 */
-__device__ void integrateTimestep(CompactParticle* particle, Float3* particle_pos, Float3* particle_force, float dt) {	// Kinetic formula: v = sqrt(2*K/m), m in kg
+__device__ void integrateTimestep(CompactParticle* particle, Float3* particle_pos, Float3* particle_force, float dt, bool verbose=false) {	// Kinetic formula: v = sqrt(2*K/m), m in kg
 	Float3 vel_next = particle->vel_prev + (*particle_force * (1000.f/particle->mass) * dt);
+	if (verbose) {
+		particle->vel_prev.print('p');
+		vel_next.print('n');
+	}
 	*particle_pos = *particle_pos + vel_next * dt;
 	particle->vel_prev = vel_next;
+	
 }
 
 
@@ -265,8 +268,6 @@ __global__ void forceKernel(Box* box) {
 	// --------------------------------------------------------------- Intermolecular forces --------------------------------------------------------------- //
 	for (int neighbor_index = 0; neighbor_index < neighborlist.n_neighbors; neighbor_index++) {
 
-		if (neighborlist.neighborcompound_indexes[neighbor_index] == blockIdx.x)
-			printf("HEREEEEEE");
 		// ------------ Load and process neighbor molecule ------------ //
 		neighborstate_buffer.n_particles = box->compound_state_array[neighborlist.neighborcompound_indexes[neighbor_index]].n_particles;						// These two lines may be optimizable.
 		neighborstate_buffer.positions[threadIdx.x] = box->compound_state_array[neighborlist.neighborcompound_indexes[neighbor_index]].positions[threadIdx.x];
@@ -286,7 +287,7 @@ __global__ void forceKernel(Box* box) {
 		
 		
 		for (int neighbor_particle_index = 0; neighbor_particle_index < neighborstate_buffer.n_particles; neighbor_particle_index++) {
-			//force = force + calcLJForce(&self_state.positions[threadIdx.x], &neighborstate_buffer.positions[neighbor_particle_index]);
+			force = force + calcLJForce(&self_state.positions[threadIdx.x], &neighborstate_buffer.positions[neighbor_particle_index]);
 			//printf("hey");
 		}
 		__syncthreads();
@@ -303,8 +304,9 @@ __global__ void forceKernel(Box* box) {
 
 
 
-	// Intramolecular forces //
+	// ------------------------------------------------------------ Intramolecular forces ------------------------------------------------------------ //
 	float intramolecular_potential = 0;
+	bool verbose_integration = false;
 	float bondlen = 0;	// TEMP, for logging data
 	for (int i = 0; i < compound.n_pairbonds; i++) {
 		PairBond* pb = &compound.pairbonds[i];
@@ -313,12 +315,24 @@ __global__ void forceKernel(Box* box) {
 			bondlen = (self_state.positions[pb->atom_indexes[0]] - self_state.positions[pb->atom_indexes[1]]).len();
 		}
 	}
-	// ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ //
 
 	
-		
+
 	Float3 intramolecular_force = compound.particles[threadIdx.x].vel_prev.norm() * (compound.particles[threadIdx.x].pot_E_prev - intramolecular_potential);
 	force = force + intramolecular_force;
+	if (blockIdx.x == LOGBLOCK && threadIdx.x == LOGTHREAD && box->step > 2500) {
+		printf("\n Step %d\n", box->step);
+		compound.particles[threadIdx.x].vel_prev.print('v');
+		printf("Scalar %f\n", (compound.particles[threadIdx.x].pot_E_prev - intramolecular_potential));
+		intramolecular_force.print('f');
+		force.print('F');
+		verbose_integration = true;
+	}
+
+
+	
+
+	// ----------------------------------------------------------------------------------------------------------------------------------------------- //
 
 	/*if (threadIdx.x < compound.n_particles) {
 		printf("e: %f\n", compound.particles[threadIdx.x].pot_E_prev);
@@ -330,13 +344,15 @@ __global__ void forceKernel(Box* box) {
 
 
 
+	
+	// ------------------------------------------------------------ Integration ------------------------------------------------------------ //
 	if (compound.n_particles > threadIdx.x) {
-		integrateTimestep(&compound.particles[threadIdx.x], &self_state.positions[threadIdx.x], &force, box->dt);
+		integrateTimestep(&compound.particles[threadIdx.x], &self_state.positions[threadIdx.x], &force, box->dt, verbose_integration);
+		box->compounds[blockIdx.x].particles[threadIdx.x].vel_prev = compound.particles[threadIdx.x].vel_prev;
+		box->compounds[blockIdx.x].particles[threadIdx.x].pot_E_prev = intramolecular_potential;
 	}
 	__syncthreads();
-	
-
-
+	// ------------------------------------------------------------------------------------------------------------------------------------- //
 
 
 
@@ -346,7 +362,9 @@ __global__ void forceKernel(Box* box) {
 
 
 	// ------------------------------------ PERIODIC BOUNDARY CONDITION ------------------------------------------------------------------------------------------------- //
-	utility_buffer[threadIdx.x] = self_state.positions[threadIdx.x];
+	utility_buffer[threadIdx.x] = Float3(0,0,0);
+	if (threadIdx.x < compound.n_particles)
+		utility_buffer[threadIdx.x] = self_state.positions[threadIdx.x];
 	__syncthreads();
 	
 	for (int i = 1; i < 64; i*=2) {
@@ -356,18 +374,17 @@ __global__ void forceKernel(Box* box) {
 	}
 
 	if (threadIdx.x == 0) {
+		if (utility_buffer[0].x < -10) {
+			printf("\nBlock %d Thread %d\n", blockIdx.x, threadIdx.x);
+			utility_buffer[0].print('u');
+		}
+			
 		utility_buffer[0] = utility_buffer[0] * (1.f / compound.n_particles);
 		hyperpos_offset.x = 1 * (utility_buffer[0].x < 0) - 1 * (utility_buffer[0].x > BOX_LEN);
 		hyperpos_offset.y = 1 * (utility_buffer[0].y < 0) - 1 * (utility_buffer[0].y > BOX_LEN);
 		hyperpos_offset.z = 1 * (utility_buffer[0].z < 0) - 1 * (utility_buffer[0].z > BOX_LEN);
 		hyperpos_offset = hyperpos_offset * Float3(BOX_LEN, BOX_LEN, BOX_LEN);
 		box->compounds[blockIdx.x].center_of_mass = utility_buffer[0] + hyperpos_offset;
-
-		if (!(hyperpos_offset == Float3(0, 0, 0))) {
-			utility_buffer[0].print('m');
-			box->compounds[blockIdx.x].center_of_mass.print('C');
-			hyperpos_offset.print('H');
-		}
 	}
 	__syncthreads();
 
@@ -377,7 +394,7 @@ __global__ void forceKernel(Box* box) {
 
 
 
-	if (blockIdx.x == INDEXA && threadIdx.x == 1 && box->step < 10000) {
+	if (blockIdx.x == LOGBLOCK && threadIdx.x == LOGTHREAD && box->step < 10000) {
 		box->outdata[0 + box->step * 10] = bondlen;
 		box->outdata[1 + box->step * 10] = 0;	// Angles
 		box->outdata[2 + box->step * 10] = intramolecular_potential;
@@ -389,8 +406,10 @@ __global__ void forceKernel(Box* box) {
 
 	__syncthreads();
 
-	if (threadIdx.x == 0)
+	if (threadIdx.x == 0) {
 		box->compound_state_array[blockIdx.x] = self_state;
+	}
+		
 }
 
 

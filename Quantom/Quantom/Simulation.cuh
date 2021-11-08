@@ -26,7 +26,8 @@ const int MAX_NEAR_BODIES = 256 - MAX_FOCUS_BODIES;
 //constexpr float SOLOBLOCK_DIST = BLOCK_LEN - BLOCK_OVERLAP;
 
 
-const int INDEXA = 6;
+const int LOGBLOCK = 2;
+const int LOGTHREAD = 0;
 //const int N_BODIES_START = BOX_LEN*BOX_LEN*BOX_LEN/(FOCUS_LEN*FOCUS_LEN*FOCUS_LEN) * 25;
 const int N_BODIES_START = 40;
 const int BLOCKS_PER_SM = 512;
@@ -106,7 +107,7 @@ public:
 
 	float box_size = BOX_LEN;	//nm
 	int blocks_per_dim;
-	int n_steps = 8000;
+	int n_steps = 4000;
 
 	const double dt = 0.5 *	10.0e-6;		// ns, so first val corresponds to fs
 	int steps_per_render = 200;
