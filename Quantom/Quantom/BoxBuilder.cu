@@ -12,6 +12,8 @@ void BoxBuilder::build(Simulation* simulation) {
 
 	simulation->box->n_compounds = solvateBox(simulation);
 
+	compoundLinker(simulation);
+
 	cudaMemcpy(simulation->box->compound_state_array, compoundstates_host, sizeof(CompoundState) * max_compounds, cudaMemcpyHostToDevice);
 	cudaMemcpy(simulation->box->compound_neighborlist_array, compoundneighborlists_host, sizeof(CompoundNeighborList) * max_compounds, cudaMemcpyHostToDevice);
 
@@ -101,7 +103,7 @@ void BoxBuilder::compoundLinker(Simulation* simulation) {
 	for (int i = 0; i < simulation->box->n_compounds; i++) {
 		for (int j = 0; j < simulation->box->n_compounds; j++) {
 			if (i != j) {
-				CompoundNeighborList* nlist = compoundneighborlists_host;
+				CompoundNeighborList* nlist = &compoundneighborlists_host[i];
 				nlist->neighborcompound_indexes[nlist->n_neighbors++] = j;
 			}
 		}

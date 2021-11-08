@@ -104,6 +104,17 @@ struct Float3 {
 		}
 	}
 
+	__host__ __device__ float* placeAt(int index) {
+		switch (index) {
+		case 0:
+			return &x;
+		case 1:
+			return &y;
+		case 2:
+			return &z;
+		}
+	}
+
 	// Not used right now!
 	__host__ __device__ static Float3 centerOfMass(Float3* arr_ptr, uint32_t arr_size) {	// Only run before sim, so we can cast to double without slowing sim
 		Float3 sum = Float3(0,0,0);

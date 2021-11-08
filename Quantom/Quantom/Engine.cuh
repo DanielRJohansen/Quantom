@@ -17,7 +17,7 @@
 
 
 __global__ void forceKernel(Box* box);
-
+__global__ void initKernel(Box* box);	// For now, just initializes previous potential energy
 
 class Engine {
 public:

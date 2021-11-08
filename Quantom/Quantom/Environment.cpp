@@ -41,7 +41,7 @@ void Environment::run() {
 		for (int i = 0; i < simulation->steps_per_render; i++) {
 			engine->step();
 			//simulation->finished = true;
-			//exit(1);
+
 			if (simulation->finished)
 				break;
 		}
@@ -78,6 +78,8 @@ void Environment::run() {
 
 	}
 
+
+
 	printf("\n\n\n########################## SIMULATION FINISHED ##########################\n");
 	printOut(simulation->box->outdata);
 }
@@ -86,7 +88,7 @@ void Environment::run() {
 void Environment::printOut(float* data) {
 	std::ofstream myfile("D:\\Quantom\\log.csv");
 	for (int i = 0; i < 10; i++) {
-		myfile << "Data" << std::to_string(i) << ";";
+		myfile << "Data" << std::to_string(i+1) << ";";
 	}
 	myfile << "\n";
 
@@ -94,7 +96,7 @@ void Environment::printOut(float* data) {
 
 	for (int i = 0; i < n_datapoints; i++) {
 		for (int j = 0; j < 10; j++) {
-			myfile << data[i + j * n_datapoints] << ";";
+			myfile << data[j + i * 10] << ";";
 		}
 		myfile << "\n";
 

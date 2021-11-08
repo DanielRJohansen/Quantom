@@ -10,8 +10,6 @@ struct Test {
 };
 
 int main() {
-
-
 	std::printf("Program starting...\n");
 	Environment Env;
 

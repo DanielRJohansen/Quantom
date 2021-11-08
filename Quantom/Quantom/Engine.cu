@@ -15,6 +15,10 @@ Simulation* Engine::prepSimulation(Simulation* simulation) {
 
 
 	simulation->moveToDevice();
+
+	initKernel << < simulation->box->n_compounds, 64 >> > (simulation->box);
+	cudaDeviceSynchronize();
+
 	return this->simulation;
 }
 
@@ -134,11 +138,32 @@ __device__ float getAngle(Float3 v1, Float3 v2) {
 }
 
 
+__device__ void determineMoleculerHyperposOffset(Float3* utility_buffer, Float3* compund_center, Float3* neighbor_center) {		// Called with 3 threads!! I hope i dont have to search for any bugs here! :D
+	*utility_buffer[0].placeAt(threadIdx.x) =
+		(
+			1 * (
+					(compund_center->at(threadIdx.x) - neighbor_center->at(threadIdx.x)
+				) > BOX_LEN_HALF)
+			- 1 *	(
+				neighbor_center->at(threadIdx.x) - (compund_center->at(threadIdx.x)
+					) > BOX_LEN_HALF)
+		)
+		* BOX_LEN;
+		;
+}
+
+
+
+
 
 constexpr float sigma = 0.3923;	//nm
 constexpr float epsilon = 0.5986 * 1'000; //kJ/mol | J/mol
 __device__ Float3 calcLJForce(Float3* pos0, Float3* pos1) {	// Applying force to p0 only! 
 	float dist = (*pos0 - *pos1).len();
+	if (dist < 0.000001) {
+		printf("WTF");
+	}
+		
 	float fraction = sigma / dist;
 
 	float f2 = fraction * fraction;
@@ -146,13 +171,15 @@ __device__ Float3 calcLJForce(Float3* pos0, Float3* pos1) {	// Applying force to
 	float f12 = f6 * f6;
 
 	float LJ_pot = 4 * epsilon * (f12 - f6);
+	//printf("pot: %f\n", LJ_pot);
 	Float3 force_unit_vector = (*pos0 - *pos1).norm();	// + is repulsive, - is attractive
+	//force_unit_vector.print('v');
 
-
-	if (LJ_pot > 20'000) {
+	if (LJ_pot > 1'000) {
 		printf("\n\n KILOFORCE! Block thread %d\n", threadIdx.x);
 	}
-	return force_unit_vector * LJ_pot;
+	return Float3(1, 1, 1);
+	//return force_unit_vector * LJ_pot;
 }
 
 
@@ -220,8 +247,8 @@ __global__ void forceKernel(Box* box) {
 	__shared__ CompoundState self_state;
 	__shared__ CompoundState neighborstate_buffer;
 	__shared__ CompoundNeighborList neighborlist;
-	__shared__ Float3 buffer[64];
-	__shared__ int hyperpos_offset[3];
+	__shared__ Float3 utility_buffer[64];
+	__shared__ Float3 hyperpos_offset;
 	
 	if (threadIdx.x == 0) {
 		compound = box->compounds[blockIdx.x];
@@ -234,31 +261,70 @@ __global__ void forceKernel(Box* box) {
 
 
 	Float3 force(0, 0, 0);
-
-	// Intermolecular forces //
+	
+	// --------------------------------------------------------------- Intermolecular forces --------------------------------------------------------------- //
 	for (int neighbor_index = 0; neighbor_index < neighborlist.n_neighbors; neighbor_index++) {
-		if (threadIdx.x == 0) 
-			neighborstate_buffer = box->compound_state_array[neighborlist.neighborcompound_indexes[neighbor_index]];
+
+		if (neighborlist.neighborcompound_indexes[neighbor_index] == blockIdx.x)
+			printf("HEREEEEEE");
+		// ------------ Load and process neighbor molecule ------------ //
+		neighborstate_buffer.n_particles = box->compound_state_array[neighborlist.neighborcompound_indexes[neighbor_index]].n_particles;						// These two lines may be optimizable.
+		neighborstate_buffer.positions[threadIdx.x] = box->compound_state_array[neighborlist.neighborcompound_indexes[neighbor_index]].positions[threadIdx.x];
+		__syncthreads(); // Necessary?
+
 		
-
+		// Hyperpositioning the entire molecule
+		/*
+		if (threadIdx.x < 3)
+			determineMoleculerHyperposOffset(&utility_buffer[0], &compound.center_of_mass, &box->compounds[neighborlist.neighborcompound_indexes[neighbor_index]].center_of_mass);
 		__syncthreads();
+		neighborstate_buffer.positions[threadIdx.x] = neighborstate_buffer.positions[threadIdx.x] + utility_buffer[0];
+		__syncthreads();
+		*/
+		// ------------------------------------------------------------ //
 
+		
+		
 		for (int neighbor_particle_index = 0; neighbor_particle_index < neighborstate_buffer.n_particles; neighbor_particle_index++) {
-			force = force + calcLJForce(&self_state.positions[threadIdx.x], &neighborstate_buffer.positions[neighbor_particle_index]);
+			//force = force + calcLJForce(&self_state.positions[threadIdx.x], &neighborstate_buffer.positions[neighbor_particle_index]);
+			//printf("hey");
 		}
 		__syncthreads();
 	}
+	
+	//force.print('F');
+	float interForceScalar = 0;
+	//float interForceScalar = force.len();	// Temp, for logging data!
+	// ------------------------------------------------------------------------------------------------------------------------------------------------------ //
+
+
+
+
+
+
+
 	// Intramolecular forces //
 	float intramolecular_potential = 0;
+	float bondlen = 0;	// TEMP, for logging data
 	for (int i = 0; i < compound.n_pairbonds; i++) {
 		PairBond* pb = &compound.pairbonds[i];
 		if (pb->atom_indexes[0] == threadIdx.x || pb->atom_indexes[1] == threadIdx.x) {
 			intramolecular_potential += calcPairbondPotential(&self_state.positions[pb->atom_indexes[0]], &self_state.positions[pb->atom_indexes[1]], &pb->reference_dist);
+			bondlen = (self_state.positions[pb->atom_indexes[0]] - self_state.positions[pb->atom_indexes[1]]).len();
 		}
 	}
+	// ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ //
 
-	//Float3 intramolecular_force = compound.particles[threadIdx.x].vel_prev.norm() * (compound.particles[threadIdx.x].pot_E_prev - intramolecular_potential);
-	//force = force + intramolecular_force;
+	
+		
+	Float3 intramolecular_force = compound.particles[threadIdx.x].vel_prev.norm() * (compound.particles[threadIdx.x].pot_E_prev - intramolecular_potential);
+	force = force + intramolecular_force;
+
+	/*if (threadIdx.x < compound.n_particles) {
+		printf("e: %f\n", compound.particles[threadIdx.x].pot_E_prev);
+		printf("P: %f\n", intramolecular_potential);
+		intramolecular_force.print('F');
+	}*/
 
 
 
@@ -276,32 +342,49 @@ __global__ void forceKernel(Box* box) {
 
 
 
-
+	
 
 
 	// ------------------------------------ PERIODIC BOUNDARY CONDITION ------------------------------------------------------------------------------------------------- //
-	buffer[threadIdx.x] = self_state.positions[threadIdx.x];
+	utility_buffer[threadIdx.x] = self_state.positions[threadIdx.x];
 	__syncthreads();
 	
 	for (int i = 1; i < 64; i*=2) {
 		if (threadIdx.x + i < 64)	
-			buffer[threadIdx.x] = buffer[threadIdx.x] + buffer[threadIdx.x + i];
+			utility_buffer[threadIdx.x] = utility_buffer[threadIdx.x] + utility_buffer[threadIdx.x + i];
 		__syncthreads();
 	}
 
 	if (threadIdx.x == 0) {
-		buffer[0] = buffer[0] * (1.f / compound.n_particles);
-		hyperpos_offset[0] = 1 * (buffer[0].x < 0) - 1 * (buffer[0].x > BOX_LEN);
-		hyperpos_offset[1] = 1 * (buffer[0].y < 0) - 1 * (buffer[0].y > BOX_LEN);
-		hyperpos_offset[2] = 1 * (buffer[0].z < 0) - 1 * (buffer[0].z > BOX_LEN);
-		box->compounds[blockIdx.x].center_of_mass = buffer[0] + (Float3(BOX_LEN, BOX_LEN, BOX_LEN) * Float3(hyperpos_offset[0], hyperpos_offset[1], hyperpos_offset[2]));
+		utility_buffer[0] = utility_buffer[0] * (1.f / compound.n_particles);
+		hyperpos_offset.x = 1 * (utility_buffer[0].x < 0) - 1 * (utility_buffer[0].x > BOX_LEN);
+		hyperpos_offset.y = 1 * (utility_buffer[0].y < 0) - 1 * (utility_buffer[0].y > BOX_LEN);
+		hyperpos_offset.z = 1 * (utility_buffer[0].z < 0) - 1 * (utility_buffer[0].z > BOX_LEN);
+		hyperpos_offset = hyperpos_offset * Float3(BOX_LEN, BOX_LEN, BOX_LEN);
+		box->compounds[blockIdx.x].center_of_mass = utility_buffer[0] + hyperpos_offset;
+
+		if (!(hyperpos_offset == Float3(0, 0, 0))) {
+			utility_buffer[0].print('m');
+			box->compounds[blockIdx.x].center_of_mass.print('C');
+			hyperpos_offset.print('H');
+		}
 	}
 	__syncthreads();
 
-	self_state.positions[threadIdx.x] = self_state.positions[threadIdx.x] + (Float3(BOX_LEN, BOX_LEN, BOX_LEN) * Float3(hyperpos_offset[0], hyperpos_offset[1], hyperpos_offset[2]));
+	self_state.positions[threadIdx.x] = self_state.positions[threadIdx.x] + hyperpos_offset;	// Uhh, move hyperpos to utilbuffer?
 	// ------------------------------------------------------------------------------------------------------------------------------------------------------------------ //
 
 
+
+
+	if (blockIdx.x == INDEXA && threadIdx.x == 1 && box->step < 10000) {
+		box->outdata[0 + box->step * 10] = bondlen;
+		box->outdata[1 + box->step * 10] = 0;	// Angles
+		box->outdata[2 + box->step * 10] = intramolecular_potential;
+		box->outdata[3 + box->step * 10] = interForceScalar;
+		box->step++;
+	}
+	
 
 
 	__syncthreads();
@@ -320,7 +403,33 @@ __global__ void forceKernel(Box* box) {
 
 
 
+__global__ void initKernel(Box* box) {
+	__shared__ Compound_H2O compound;
+	__shared__ CompoundState self_state;
 
+	if (threadIdx.x == 0) {
+		compound = box->compounds[blockIdx.x];
+		self_state = box->compound_state_array[blockIdx.x];
+	}
+	__syncthreads();
+
+
+
+
+
+
+	// Intramolecular forces //
+	float intramolecular_potential = 0;
+	for (int i = 0; i < compound.n_pairbonds; i++) {
+		PairBond* pb = &compound.pairbonds[i];
+		if (pb->atom_indexes[0] == threadIdx.x || pb->atom_indexes[1] == threadIdx.x) {
+			intramolecular_potential += calcPairbondPotential(&self_state.positions[pb->atom_indexes[0]], &self_state.positions[pb->atom_indexes[1]], &pb->reference_dist);
+		}
+	}
+
+	if (compound.n_particles > threadIdx.x)
+		box->compounds[blockIdx.x].particles[threadIdx.x].pot_E_prev = intramolecular_potential;
+}
 
 
 
