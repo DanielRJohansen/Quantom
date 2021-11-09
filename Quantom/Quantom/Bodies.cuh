@@ -120,13 +120,13 @@ struct PairBond {	// IDS and indexes are used interchangeably here!
 struct AngleBond {
 	AngleBond() {}
 	AngleBond(float ref_t, uint32_t particleindex_l, uint32_t particleindex_m, uint32_t particleindex_r) :
-		reference_theta(ref_t) {
+		reference_angle(ref_t) {
 		atom_indexes[0] = particleindex_l;
 		atom_indexes[1] = particleindex_m;
 		atom_indexes[2] = particleindex_r;
 	}
 
-	float reference_theta;
+	float reference_angle;
 	uint32_t atom_indexes[3]; // i,j,k angle between i and k
 };
 
