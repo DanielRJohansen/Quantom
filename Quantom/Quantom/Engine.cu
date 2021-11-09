@@ -191,6 +191,12 @@ __device__ float calcPairbondPotential(Float3* p1_pos, Float3* p2_pos, float* re
 	float dif = dist - *reference_dist;
 	return 0.5 * kb * (dif * dif);
 }
+__device__ Float3 calcPairbondForce(Float3* self_pos, Float3* other_pos, float* reference_dist) {
+	Float3 v = *self_pos - *other_pos;
+	float dif = v.len() - *reference_dist;
+	float invert = v.len() > *reference_dist ? -1 : 1;
+	return v.norm() * (0.5 * kb * (dif * dif) * invert);
+}
 
 /*
 
@@ -287,7 +293,7 @@ __global__ void forceKernel(Box* box) {
 		
 		
 		for (int neighbor_particle_index = 0; neighbor_particle_index < neighborstate_buffer.n_particles; neighbor_particle_index++) {
-			force = force + calcLJForce(&self_state.positions[threadIdx.x], &neighborstate_buffer.positions[neighbor_particle_index]);
+			//force = force + calcLJForce(&self_state.positions[threadIdx.x], &neighborstate_buffer.positions[neighbor_particle_index]);
 			//printf("hey");
 		}
 		__syncthreads();
@@ -306,21 +312,24 @@ __global__ void forceKernel(Box* box) {
 
 	// ------------------------------------------------------------ Intramolecular forces ------------------------------------------------------------ //
 	float intramolecular_potential = 0;
+	Float3 intramolecular_force = Float3(0,0,0);
 	bool verbose_integration = false;
 	float bondlen = 0;	// TEMP, for logging data
 	for (int i = 0; i < compound.n_pairbonds; i++) {
 		PairBond* pb = &compound.pairbonds[i];
 		if (pb->atom_indexes[0] == threadIdx.x || pb->atom_indexes[1] == threadIdx.x) {
-			intramolecular_potential += calcPairbondPotential(&self_state.positions[pb->atom_indexes[0]], &self_state.positions[pb->atom_indexes[1]], &pb->reference_dist);
+			int other_index = pb->atom_indexes[0] != threadIdx.x ? pb->atom_indexes[0] : pb->atom_indexes[1];
+			//intramolecular_potential += calcPairbondPotential(&self_state.positions[pb->atom_indexes[0]], &self_state.positions[pb->atom_indexes[1]], &pb->reference_dist);
+			intramolecular_force = intramolecular_force + calcPairbondForce(&self_state.positions[threadIdx.x], &self_state.positions[other_index], &pb->reference_dist);
 			bondlen = (self_state.positions[pb->atom_indexes[0]] - self_state.positions[pb->atom_indexes[1]]).len();
 		}
 	}
 
 	
 
-	Float3 intramolecular_force = compound.particles[threadIdx.x].vel_prev.norm() * (compound.particles[threadIdx.x].pot_E_prev - intramolecular_potential);
+	//Float3 intramolecular_force = compound.particles[threadIdx.x].vel_prev.norm() * (compound.particles[threadIdx.x].pot_E_prev - intramolecular_potential);
 	force = force + intramolecular_force;
-	if (blockIdx.x == LOGBLOCK && threadIdx.x == LOGTHREAD && box->step > 2500) {
+	if (blockIdx.x == LOGBLOCK && threadIdx.x == LOGTHREAD && box->step > 20500) {
 		printf("\n Step %d\n", box->step);
 		compound.particles[threadIdx.x].vel_prev.print('v');
 		printf("Scalar %f\n", (compound.particles[threadIdx.x].pot_E_prev - intramolecular_potential));
@@ -349,7 +358,9 @@ __global__ void forceKernel(Box* box) {
 	if (compound.n_particles > threadIdx.x) {
 		integrateTimestep(&compound.particles[threadIdx.x], &self_state.positions[threadIdx.x], &force, box->dt, verbose_integration);
 		box->compounds[blockIdx.x].particles[threadIdx.x].vel_prev = compound.particles[threadIdx.x].vel_prev;
-		box->compounds[blockIdx.x].particles[threadIdx.x].pot_E_prev = intramolecular_potential;
+		//box->compounds[blockIdx.x].particles[threadIdx.x].pot_E_prev = intramolecular_potential;
+		box->compounds[blockIdx.x].particles[threadIdx.x].pot_E_prev *= 0.99;
+		box->compounds[blockIdx.x].particles[threadIdx.x].pot_E_prev += intramolecular_potential * 0.01;
 	}
 	__syncthreads();
 	// ------------------------------------------------------------------------------------------------------------------------------------- //
@@ -394,14 +405,18 @@ __global__ void forceKernel(Box* box) {
 
 
 
+
+
+
+	// ------------------------------------ DATA LOG ------------------------------- //
 	if (blockIdx.x == LOGBLOCK && threadIdx.x == LOGTHREAD && box->step < 10000) {
 		box->outdata[0 + box->step * 10] = bondlen;
 		box->outdata[1 + box->step * 10] = 0;	// Angles
-		box->outdata[2 + box->step * 10] = intramolecular_potential;
+		box->outdata[2 + box->step * 10] = intramolecular_force.len();
 		box->outdata[3 + box->step * 10] = interForceScalar;
 		box->step++;
 	}
-	
+	// ----------------------------------------------------------------------------- //
 
 
 	__syncthreads();
