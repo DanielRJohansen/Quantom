@@ -17,6 +17,24 @@ void BoxBuilder::build(Simulation* simulation) {
 	cudaMemcpy(simulation->box->compound_state_array, compoundstates_host, sizeof(CompoundState) * max_compounds, cudaMemcpyHostToDevice);
 	cudaMemcpy(simulation->box->compound_neighborlist_array, compoundneighborlists_host, sizeof(CompoundNeighborList) * max_compounds, cudaMemcpyHostToDevice);
 
+
+
+
+	// FUCK THIS SHIT TO ABSOLUTE HEELLLL
+	int n_points = simulation->box->n_compounds * 3 * 2 * 10000;
+	cudaMalloc(&simulation->box->data_buffer, sizeof(float) * n_points);	// Can only log molecules of size 3 for now...
+	float* aaa = new float[n_points];
+	for (int i = 0; i < n_points; i++)
+		aaa[i] = 999999 * 0;
+	cudaMemcpy(simulation->box->data_buffer, aaa, sizeof(float) * n_points, cudaMemcpyHostToDevice);
+	cudaDeviceSynchronize();
+	delete(aaa);
+
+
+
+
+
+
 	Molecule water;
 	for (int i = 0; i < water.n_atoms; i++) {
 		simulation->box->rendermolecule.radii[i] = water.atoms[i].radius;

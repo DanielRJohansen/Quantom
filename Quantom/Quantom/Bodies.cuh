@@ -89,10 +89,13 @@ constexpr unsigned char UNUSED_BODY = 255;
 
 struct CompactParticle {	// Contains information only needed by the Ownerkernel
 	CompactParticle() {}	
-	CompactParticle(float mass, Float3 initial_vel) : mass(mass), vel_prev(initial_vel)  {}
-	Float3 vel_prev;
+	CompactParticle(float mass, Float3 initial_vel) : mass(mass), vel(initial_vel)  {
+		acc = Float3(0, 0, 0);
+	}
+	Float3 vel;						// nm/ns
+	Float3 acc;						// nm/ns^2
 	float pot_E_prev = 999999999;			// MUST BE INITIATED BY CALCULATION, OR IT WILL FUCK SHIT UP!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-	float mass;
+	float mass;								// g/mol
 };
 
 

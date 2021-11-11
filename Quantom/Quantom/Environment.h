@@ -31,6 +31,6 @@ private:
 	Engine* engine;
 
 	void printOut(float* data);
-
+	void printDataBuffer(Box* box);
 };
 

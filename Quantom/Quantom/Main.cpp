@@ -8,6 +8,14 @@
 struct Test {
 	int arr[4];
 };
+/*
+int main() {
+	Engine engine;
+
+	return engine.testFunction();
+}
+*/
+
 
 int main() {
 	std::printf("Program starting...\n");
@@ -15,5 +23,5 @@ int main() {
 
 	Env.run();
 
-	return 1;
+	return 0;
 }

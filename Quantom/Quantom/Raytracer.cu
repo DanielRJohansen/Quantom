@@ -7,10 +7,10 @@ Ray::Ray(Float3 unit_vector, Float3 origin) : unit_vector(unit_vector), origin(o
 void Ray::reset() {
     closest_collision = 999999999;
     atom_type = -1;
+    log_particle = false;
 }
 
 __device__ bool Ray::hitsParticle(Float3* particle_center, float particle_radius) {
-    //printf("dist: %f \n", distToPoint(*particle_center));
     return (distToPoint(*particle_center) < particle_radius);
 }
 
@@ -31,11 +31,13 @@ __device__ float Ray::distToPoint(Float3 point) {
         );
 }
     
-__device__ void Ray::searchCompound(CompoundState* state, Box* box) {
+__device__ void Ray::searchCompound(CompoundState* state, Box* box, int compound_index) {
     for (int i = 0; i < state->n_particles; i++) {
         if (hitsParticle(&state->positions[i], box->rendermolecule.radii[i])) {
             if (distToSphereIntersect(&state->positions[i], box->rendermolecule.radii[i]) < closest_collision) {
                 atom_type = i;
+                if (compound_index == LOGBLOCK && i == LOGTHREAD)
+                    log_particle = true;        // Temp
             }
         }
     }
@@ -92,7 +94,7 @@ __global__ void renderKernel(Ray* rayptr, uint8_t* image, Box* box) {
 
     for (int i = 0; i < box->n_compounds; i++) {
         CompoundState* compoundstate = &box->compound_state_array[i];
-        ray.searchCompound(compoundstate, box);
+        ray.searchCompound(compoundstate, box, i);
     }
 
 
@@ -103,6 +105,9 @@ __global__ void renderKernel(Ray* rayptr, uint8_t* image, Box* box) {
         image[index * 4 + 3] = 255;
     else
         image[index * 4 + 3] = 0;
+    
+    if (ray.log_particle)
+        image[index * 4 + 0] = 50;
 }
     
     

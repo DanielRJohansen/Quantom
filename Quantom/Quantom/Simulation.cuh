@@ -28,8 +28,9 @@ const int MAX_NEAR_BODIES = 256 - MAX_FOCUS_BODIES;
 
 const int LOGBLOCK = 0;
 const int LOGTHREAD = 1;
-//const int N_BODIES_START = BOX_LEN*BOX_LEN*BOX_LEN/(FOCUS_LEN*FOCUS_LEN*FOCUS_LEN) * 25;
-const int N_BODIES_START = 40;
+
+//const int N_BODIES_START = 40;
+const int N_BODIES_START = 20;
 const int BLOCKS_PER_SM = 512;
 //const int GRIDBLOCKS_PER_BODY = 16;
 //const int THREADS_PER_GRIDBLOCK = MAX_BLOCK_BODIES / GRIDBLOCKS_PER_BODY;
@@ -55,9 +56,14 @@ public:
 	CompoundNeighborList* compound_neighborlist_array;
 	//------------------------------------//
 
-	float* outdata;
+	float* outdata;	// Temp, for longging values to whatever
 	uint32_t step = 0;
 	float dt;
+
+
+	float* data_buffer;		// also temp, for total energy summation
+
+
 
 
 	void moveToDevice() {	// Loses pointer to RAM location!
@@ -106,10 +112,10 @@ public:
 
 	float box_size = BOX_LEN;	//nm
 	int blocks_per_dim;
-	int n_steps = 6000;
+	int n_steps = 4000;
 
 	const double dt = 1 *	10.0e-6;		// ns, so first val corresponds to fs
-	int steps_per_render = 200;
+	int steps_per_render = 100;
 
 	int n_bodies = N_BODIES_START;
 	Box* box;

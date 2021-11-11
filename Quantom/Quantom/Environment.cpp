@@ -79,9 +79,9 @@ void Environment::run() {
 	}
 
 
-
 	printf("\n\n\n########################## SIMULATION FINISHED ##########################\n");
 	printOut(simulation->box->outdata);
+	printDataBuffer(simulation->box);
 }
 
 
@@ -99,8 +99,24 @@ void Environment::printOut(float* data) {
 			myfile << data[j + i * 10] << ";";
 		}
 		myfile << "\n";
-
 	}
 		
+	myfile.close();
+}
+
+void Environment::printDataBuffer(Box* box) {
+	std::ofstream myfile("D:\\Quantom\\energy.csv");
+	
+	float* host_data = engine->getDatabuffer();
+
+	printf("Printing %d columns per step\n", box->n_compounds * 3 * 2);
+
+	for (int i = 0; i < box->step; i++) {
+		for (int j = 0; j < box->n_compounds * 3; j++) {
+			myfile << host_data[0 + j*2 + i * box->n_compounds * 3 * 2] << ';';
+			myfile << host_data[1 + j*2 + i * box->n_compounds * 3 * 2] << ';';
+		}
+		myfile << "\n";
+	}
 	myfile.close();
 }
