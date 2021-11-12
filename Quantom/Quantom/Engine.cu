@@ -124,13 +124,17 @@ void Engine::step() {
 	forceKernel <<< simulation->box->n_compounds, 64 >>> (simulation->box, testval++);
 	cudaDeviceSynchronize();
 	auto t1 = std::chrono::high_resolution_clock::now();
+	cudaMemcpy(simulation->box->compound_state_array, simulation->box->compound_state_array_next, sizeof(CompoundState) * boxbuilder.max_compounds, cudaMemcpyDeviceToDevice);
+	cudaDeviceSynchronize();
+	auto t2 = std::chrono::high_resolution_clock::now();
 
 
 
 	simulation->box->step++;
 
 	int force_duration = (int)std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
-	timings = timings + Int3(force_duration, 0, 0);
+	int copy_duration = (int)std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
+	timings = timings + Int3(force_duration, copy_duration, 0);
 	
 
 
@@ -143,9 +147,6 @@ void Engine::step() {
 
 // ------------------------------------------------------------------------------------------- DEVICE FUNCTIONS -------------------------------------------------------------------------------------------//
 
-
-
-
 __device__ float cudaMax(float a, float b) {
 	if (a > b)
 		return a;
@@ -156,11 +157,6 @@ __device__ float cudaMin(float a, float b) {
 		return a;
 	return b;
 }
-
-
-
-																				// TODO: MAKE IS SUCH THAT A BODY CAN NEVER BE EXACTLY ON THE EDGE OF FOCUS, THUS APPEARING IN MULTIPLE GROUPS!
-
 
 
 __device__ Float3 getHyperPosition(Float3 pos) {			// Dont thjínk this is right anymore??????
@@ -274,8 +270,7 @@ __device__ void integrateTimestep(CompactParticle* particle, Float3* particle_po
 	// force: Joule is kg*m^2*s^-2, so mul by 1000 to get in grammes, which is how the mass of atoms is defined
 	*particle_pos = *particle_pos + particle->vel * dt + particle->acc * 0.5 * dt * dt;
 
-	Float3 acc_next = *particle_force * (1000.f / particle->mass);
-
+	Float3 acc_next = *particle_force * (1000.f / particle->mass);// *dt;
 	Float3 vel_next = particle->vel + (particle->acc + acc_next) * 0.5 * dt;
 
 	particle->vel = vel_next;
@@ -286,20 +281,6 @@ __device__ void integrateTimestep(CompactParticle* particle, Float3* particle_po
 		vel_next.print('n');
 	}
 }
-/*
-__device__ void integrateTimestep(CompactParticle* particle, Float3* particle_pos, Float3* particle_force, float dt, bool verbose=false) {	// Kinetic formula: v = sqrt(2*K/m), m in kg
-	// force: Joule is kg*m^2*s^-2, so mul by 1000 to get in grammes, which is how the mass of atoms is defined
-
-	Float3 vel_next = particle->vel_prev + (*particle_force * 1000 * (1.f/particle->mass) * dt);
-	if (verbose) {
-		particle->vel_prev.print('p');
-		vel_next.print('n');
-	}
-	*particle_pos = *particle_pos + vel_next * dt;
-	particle->vel_prev = vel_next;
-	
-}
-*/
 
 // ------------------------------------------------------------------------------------------- KERNELS -------------------------------------------------------------------------------------------//
 
@@ -388,7 +369,7 @@ __global__ void forceKernel(Box* box, int step_test) {
 	for (int i = 0; i < compound.n_anglebonds; i++) {
 		AngleBond* ab = &compound.anglebonds[i];
 		if (ab->atom_indexes[0] == threadIdx.x || ab->atom_indexes[2] == threadIdx.x) {
-			intramolecular_force = intramolecular_force + calcAngleForce(&self_state, ab, &data_ptr1);
+			//intramolecular_force = intramolecular_force + calcAngleForce(&self_state, ab, &data_ptr1);
 		}
 	}
 
@@ -458,20 +439,20 @@ __global__ void forceKernel(Box* box, int step_test) {
 
 	if (threadIdx.x < 3) {
 		float kin_e = 0.5 * compound.particles[threadIdx.x].mass * compound.particles[threadIdx.x].vel.len() * compound.particles[threadIdx.x].vel.len();
-		box->data_buffer[0 + threadIdx.x * 2 + blockIdx.x * 3 * 2 + step_test * 20 * 3 * 2] = data_ptr2 + intramolecular_force.len();
-		box->data_buffer[1 + threadIdx.x * 2 + blockIdx.x * 3 * 2 + box->step * 20 * 3 * 2] =  kin_e * 0.1;
+		box->data_buffer[0 + threadIdx.x * 2 + blockIdx.x * 3 * 2 + step_test * box->n_compounds * 3 * 2] = data_ptr2 + intramolecular_force.len();
+		box->data_buffer[1 + threadIdx.x * 2 + blockIdx.x * 3 * 2 + box->step * box->n_compounds * 3 * 2] =  kin_e;
 	}
 	__syncthreads();
 
 	if (blockIdx.x == LOGBLOCK && threadIdx.x == LOGTHREAD && box->step < 10000) {
-		/*
+		
 		box->outdata[0 + box->step * 10] = bondlen;
 		box->outdata[1 + box->step * 10] = data_ptr1;	// Angles
 		box->outdata[2 + box->step * 10] = intramolecular_force.len();
 		box->outdata[3 + box->step * 10] = data_ptr2;	// LJ pot
-		box->outdata[4 + box->step * 10] = compound.particles[threadIdx.x].vel_prev.len();
+		box->outdata[4 + box->step * 10] = compound.particles[threadIdx.x].vel.len();
 		box->outdata[5 + box->step * 10] = data_ptr3;	// closest particle
-		*/
+		
 	}
 	// ----------------------------------------------------------------------------- //
 
@@ -479,7 +460,8 @@ __global__ void forceKernel(Box* box, int step_test) {
 	__syncthreads();
 
 	if (threadIdx.x == 0) {
-		box->compound_state_array[blockIdx.x] = self_state;
+		//box->compound_state_array[blockIdx.x] = self_state;
+		box->compound_state_array_next[blockIdx.x] = self_state;
 	}
 		
 }

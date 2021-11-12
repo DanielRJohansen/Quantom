@@ -8,6 +8,7 @@ void BoxBuilder::build(Simulation* simulation) {
 	compoundstates_host = new CompoundState[max_compounds];
 
 	cudaMalloc(&simulation->box->compound_state_array, sizeof(CompoundState) * max_compounds);
+	cudaMalloc(&simulation->box->compound_state_array_next, sizeof(CompoundState) * max_compounds);
 	cudaMalloc(&simulation->box->compound_neighborlist_array, sizeof(CompoundNeighborList) * max_compounds);
 
 	simulation->box->n_compounds = solvateBox(simulation);

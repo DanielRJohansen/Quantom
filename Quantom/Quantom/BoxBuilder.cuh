@@ -9,6 +9,8 @@ public:
 	BoxBuilder() {};
 	void build(Simulation* simulation);
 
+
+	const int max_compounds = 100'000;								// DO we want something const here? Smaller val?
 private:
 	int solvateBox(Simulation* simulation);					// Returns # of solvate compounds placed
 	Compound_H2O createCompound(Float3 com, int compound_index, CompoundState* statebuffer_node, CompoundNeighborList* neighborinfo_node);
@@ -22,7 +24,6 @@ private:
 	Box box;	// Local host version
 	float box_len = BOX_LEN;
 	float box_base = 0;
-	const int max_compounds = 1'000'000;								// DO we want something const here? Smaller val?
 
 
 

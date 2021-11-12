@@ -5,7 +5,7 @@
 
 
 
-constexpr float BOX_LEN = 6.0;	// Multiple of FOCUS_LEN please!
+constexpr float BOX_LEN = 2.0;	// Multiple of FOCUS_LEN please!
 
 constexpr float BOX_LEN_HALF = BOX_LEN/2.f;
 constexpr float BOX_BASE = -BOX_LEN_HALF;
@@ -30,7 +30,7 @@ const int LOGBLOCK = 0;
 const int LOGTHREAD = 1;
 
 //const int N_BODIES_START = 40;
-const int N_BODIES_START = 20;
+const int N_BODIES_START = 1;
 const int BLOCKS_PER_SM = 512;
 //const int GRIDBLOCKS_PER_BODY = 16;
 //const int THREADS_PER_GRIDBLOCK = MAX_BLOCK_BODIES / GRIDBLOCKS_PER_BODY;
@@ -53,6 +53,7 @@ public:
 
 	// These are shared for all compounds, MUST be allocated before adding any compounds to box, so not in moveToDevice //
 	CompoundState* compound_state_array;	
+	CompoundState* compound_state_array_next;
 	CompoundNeighborList* compound_neighborlist_array;
 	//------------------------------------//
 
@@ -112,10 +113,10 @@ public:
 
 	float box_size = BOX_LEN;	//nm
 	int blocks_per_dim;
-	int n_steps = 4000;
+	int n_steps = 2000;
 
-	const double dt = 1 *	10.0e-6;		// ns, so first val corresponds to fs
-	int steps_per_render = 100;
+	const double dt = 0.5 *	10.0e-6;		// ns, so first val corresponds to fs
+	int steps_per_render = 1;
 
 	int n_bodies = N_BODIES_START;
 	Box* box;
