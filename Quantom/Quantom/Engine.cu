@@ -124,7 +124,8 @@ void Engine::step() {
 	forceKernel <<< simulation->box->n_compounds, 64 >>> (simulation->box, testval++);
 	cudaDeviceSynchronize();
 	auto t1 = std::chrono::high_resolution_clock::now();
-	cudaMemcpy(simulation->box->compound_state_array, simulation->box->compound_state_array_next, sizeof(CompoundState) * boxbuilder.max_compounds, cudaMemcpyDeviceToDevice);
+
+	cudaMemcpy(simulation->box->compound_state_array, simulation->box->compound_state_array_next, sizeof(CompoundState) * boxbuilder.max_compounds, cudaMemcpyDeviceToDevice);	// Update all positions, after all forces have been calculated
 	cudaDeviceSynchronize();
 	auto t2 = std::chrono::high_resolution_clock::now();
 
@@ -265,7 +266,15 @@ __device__ Float3 calcAngleForce(CompoundState* statebuffer, AngleBond* anglebon
 }
 
 
+__device__ void integratePosition(CompactParticle* particle, Float3* particle_pos, Float3* particle_force, float* dt) {
+	Float3 temp = *particle_pos;
+	*particle_pos = *particle_pos * 2 - particle->pos_tsub1 + *particle_force * (1000 / particle->mass) * *dt * *dt;	// no *0.5?
+	particle->pos_tsub1 = temp;
+}
 
+
+
+/*
 __device__ void integrateTimestep(CompactParticle* particle, Float3* particle_pos, Float3* particle_force, float dt, bool verbose = false) {	// Kinetic formula: v = sqrt(2*K/m), m in kg
 	// force: Joule is kg*m^2*s^-2, so mul by 1000 to get in grammes, which is how the mass of atoms is defined
 	*particle_pos = *particle_pos + particle->vel * dt + particle->acc * 0.5 * dt * dt;
@@ -281,7 +290,7 @@ __device__ void integrateTimestep(CompactParticle* particle, Float3* particle_po
 		vel_next.print('n');
 	}
 }
-
+*/
 // ------------------------------------------------------------------------------------------- KERNELS -------------------------------------------------------------------------------------------//
 
 
@@ -338,7 +347,7 @@ __global__ void forceKernel(Box* box, int step_test) {
 		
 		for (int neighbor_particle_index = 0; neighbor_particle_index < neighborstate_buffer.n_particles; neighbor_particle_index++) {
 			if (threadIdx.x < compound.n_particles) {
-				//force = force + calcLJForce(&self_state.positions[threadIdx.x], &neighborstate_buffer.positions[neighbor_particle_index], &data_ptr2, &data_ptr3); 
+				force = force + calcLJForce(&self_state.positions[threadIdx.x], &neighborstate_buffer.positions[neighbor_particle_index], &data_ptr2, &data_ptr3); 
 			}
 		}
 		__syncthreads();
@@ -369,7 +378,7 @@ __global__ void forceKernel(Box* box, int step_test) {
 	for (int i = 0; i < compound.n_anglebonds; i++) {
 		AngleBond* ab = &compound.anglebonds[i];
 		if (ab->atom_indexes[0] == threadIdx.x || ab->atom_indexes[2] == threadIdx.x) {
-			//intramolecular_force = intramolecular_force + calcAngleForce(&self_state, ab, &data_ptr1);
+			intramolecular_force = intramolecular_force + calcAngleForce(&self_state, ab, &data_ptr1);
 		}
 	}
 
@@ -385,9 +394,11 @@ __global__ void forceKernel(Box* box, int step_test) {
 	
 	// ------------------------------------------------------------ Integration ------------------------------------------------------------ //
 	if (threadIdx.x < compound.n_particles) {
-		integrateTimestep(&compound.particles[threadIdx.x], &self_state.positions[threadIdx.x], &force, box->dt, verbose_integration);
-		box->compounds[blockIdx.x].particles[threadIdx.x].vel = compound.particles[threadIdx.x].vel;
-		box->compounds[blockIdx.x].particles[threadIdx.x].acc = compound.particles[threadIdx.x].acc;
+		//integrateTimestep(&compound.particles[threadIdx.x], &self_state.positions[threadIdx.x], &force, box->dt, verbose_integration);
+		//box->compounds[blockIdx.x].particles[threadIdx.x].vel = compound.particles[threadIdx.x].vel;
+		//box->compounds[blockIdx.x].particles[threadIdx.x].acc = compound.particles[threadIdx.x].acc;
+		integratePosition(&compound.particles[threadIdx.x], &self_state.positions[threadIdx.x], &force, &box->dt);
+		box->compounds[blockIdx.x].particles[threadIdx.x].pos_tsub1 = compound.particles[threadIdx.x].pos_tsub1;
 	}
 	__syncthreads();
 	// ------------------------------------------------------------------------------------------------------------------------------------- //
@@ -438,9 +449,9 @@ __global__ void forceKernel(Box* box, int step_test) {
 	// ------------------------------------ DATA LOG ------------------------------- //
 
 	if (threadIdx.x < 3) {
-		float kin_e = 0.5 * compound.particles[threadIdx.x].mass * compound.particles[threadIdx.x].vel.len() * compound.particles[threadIdx.x].vel.len();
+		//float kin_e = 0.5 * compound.particles[threadIdx.x].mass * compound.particles[threadIdx.x].vel.len() * compound.particles[threadIdx.x].vel.len();
 		box->data_buffer[0 + threadIdx.x * 2 + blockIdx.x * 3 * 2 + step_test * box->n_compounds * 3 * 2] = data_ptr2 + intramolecular_force.len();
-		box->data_buffer[1 + threadIdx.x * 2 + blockIdx.x * 3 * 2 + box->step * box->n_compounds * 3 * 2] =  kin_e;
+		//box->data_buffer[1 + threadIdx.x * 2 + blockIdx.x * 3 * 2 + box->step * box->n_compounds * 3 * 2] =  kin_e;
 	}
 	__syncthreads();
 
@@ -450,7 +461,7 @@ __global__ void forceKernel(Box* box, int step_test) {
 		box->outdata[1 + box->step * 10] = data_ptr1;	// Angles
 		box->outdata[2 + box->step * 10] = intramolecular_force.len();
 		box->outdata[3 + box->step * 10] = data_ptr2;	// LJ pot
-		box->outdata[4 + box->step * 10] = compound.particles[threadIdx.x].vel.len();
+		box->outdata[4 + box->step * 10] = -1;//compound.particles[threadIdx.x].vel.len();
 		box->outdata[5 + box->step * 10] = data_ptr3;	// closest particle
 		
 	}
@@ -460,7 +471,6 @@ __global__ void forceKernel(Box* box, int step_test) {
 	__syncthreads();
 
 	if (threadIdx.x == 0) {
-		//box->compound_state_array[blockIdx.x] = self_state;
 		box->compound_state_array_next[blockIdx.x] = self_state;
 	}
 		
@@ -499,3 +509,12 @@ __global__ void initKernel(Box* box) {
 
 
 
+
+/*	VELOCITY VERLET STORMER
+__device__ void integratePosition(CompactParticle* particle, Float3* particle_pos, Float3* particle_force, float* dt) {
+	*particle_pos = *particle_pos + (particle->vel + *particle_force * (0.5 / particle->mass) * *dt) * *dt;
+}
+__device__ void integrateVelocity(CompactParticle* particle, Float3* particle_force, float* dt) {
+	particle->vel = particle->vel + (*particle_force + particle->force_prev) * (0.5 / particle->mass) * *dt;
+}
+*/

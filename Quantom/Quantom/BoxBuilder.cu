@@ -67,10 +67,12 @@ int BoxBuilder::solvateBox(Simulation* simulation)
 				float compound_radius = 0.2;
 
 				if (spaceAvailable(compound_center, compound_radius)) {
-					simulation->box->compounds[simulation->box->n_compounds++] = createCompound(	compound_center, 
-																								simulation->box->n_compounds, 
-																								&simulation->box->compound_state_array[simulation->box->n_compounds],
-																								&simulation->box->compound_neighborlist_array[simulation->box->n_compounds]
+					simulation->box->compounds[simulation->box->n_compounds++] = createCompound(
+						compound_center,
+						simulation->box->n_compounds,
+						&simulation->box->compound_state_array[simulation->box->n_compounds],
+						&simulation->box->compound_neighborlist_array[simulation->box->n_compounds],
+						simulation->dt
 					);
 				}
 			}
@@ -87,7 +89,7 @@ int BoxBuilder::solvateBox(Simulation* simulation)
 
 
 
-Compound_H2O BoxBuilder::createCompound(Float3 com, int compound_index, CompoundState* statebuffer_node, CompoundNeighborList* neighborinfo_node)	// Nodes obv. points to addresses in device global memory.
+Compound_H2O BoxBuilder::createCompound(Float3 com, int compound_index, CompoundState* statebuffer_node, CompoundNeighborList* neighborinfo_node, float dt)	// Nodes obv. points to addresses in device global memory.
 {
 	Molecule water;
 	for (int i = 0; i < water.n_atoms; i++) {
@@ -101,7 +103,8 @@ Compound_H2O BoxBuilder::createCompound(Float3 com, int compound_index, Compound
 
 	Compound_H2O compound(compound_index, neighborinfo_node, statebuffer_node, compoundstates_host);
 	for (int i = 0; i < water.n_atoms; i++) {
-		compound.particles[i] = CompactParticle(water.atoms[i].mass, compound_united_vel);
+		Float3 atom_pos_sub1 = compoundstates_host[compound_index].positions[i] - compound_united_vel * dt;
+		compound.particles[i] = CompactParticle(water.atoms[i].mass, atom_pos_sub1);
 	}
 	return compound;
 }
