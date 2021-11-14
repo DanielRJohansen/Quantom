@@ -20,13 +20,8 @@
 __global__ void forceKernel(Box* box, int testval);
 __global__ void initKernel(Box* box);	// For now, just initializes previous potential energy
 
-__device__ float getAngle(Float3 v1, Float3 v2);
 
-__device__ Float3 computeLJForces(Box* box, Compound_H2O* compound, CompoundNeighborList* neighborlist, 
-	CompoundState* self_state, CompoundState* neighborstate_buffer, Float3* utility_buffer);
 
-__device__ Float3 computePairbondForces(Compound_H2O* compound, CompoundState* self_state);
-__device__ Float3 computeAnglebondForces(Compound_H2O* compound, CompoundState* self_state);
 
 
 class Engine {
@@ -68,13 +63,6 @@ private:
 
 
 
-
-
-
-
-
-
-
 	// ################################# VARIABLES AND ARRAYS ################################# //
 
 	int testval = 0;
@@ -95,3 +83,27 @@ private:
 	cudaError_t cuda_status;
 
 };
+
+
+// FUNCTIONS IN THIS CLASS CAN BE CALLED FROM OTHER FILES
+/*
+class DeviceFunctionCollection {
+public:
+	__device__ __host__ DeviceFunctionCollection(){}
+
+	__device__ static float getAngle(Float3 v1, Float3 v2);
+	__device__ static void determineMoleculerHyperposOffset(Float3* utility_buffer, Float3* compund_center, 
+		Float3* neighbor_center);	
+
+	__device__ static Float3 calcLJForce(Float3* pos0, Float3* pos1);
+
+	__device__ static Float3 calcPairbondForce(Float3* self_pos, Float3* other_pos, float* reference_dist);
+	__device__ static Float3 calcAngleForce(CompoundState* statebuffer, AngleBond* anglebond);
+
+	__device__ static Float3 computeLJForces(Box* box, Compound_H2O* compound, CompoundNeighborList* neighborlist,
+		CompoundState* self_state, CompoundState* neighborstate_buffer, Float3* utility_buffer);
+	__device__ static Float3 computePairbondForces(Compound_H2O* compound, CompoundState* self_state);
+	__device__ static Float3 computeAnglebondForces(Compound_H2O* compound, CompoundState* self_state);
+
+};
+*/

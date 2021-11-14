@@ -22,7 +22,7 @@ void BoxBuilder::build(Simulation* simulation) {
 
 
 	// FUCK THIS SHIT TO ABSOLUTE HEELLLL
-	int n_points = simulation->box->n_compounds * 3 * 2 * 10000;
+	int n_points = simulation->box->n_compounds * 3 * 2 * simulation->n_steps;
 	cudaMalloc(&simulation->box->data_buffer, sizeof(float) * n_points);	// Can only log molecules of size 3 for now...
 	float* aaa = new float[n_points];
 	for (int i = 0; i < n_points; i++)
@@ -50,7 +50,7 @@ void BoxBuilder::build(Simulation* simulation) {
 
 
 
-
+	printf("N points: %d", simulation->box->n_compounds * 3 * simulation->n_steps);
 	cudaMalloc(&simulation->box->trajectory, sizeof(Float3) * simulation->box->n_compounds * 3 * simulation->n_steps);
 
 

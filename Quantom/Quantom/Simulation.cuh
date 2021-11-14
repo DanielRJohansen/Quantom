@@ -113,10 +113,10 @@ public:
 
 	float box_size = BOX_LEN;	//nm
 	int blocks_per_dim;
-	int n_steps = 500;
+	int n_steps = 2000;
 
 	const float dt = 1 * 10.0e-6;		// ns, so first val corresponds to fs
-	int steps_per_render = 100;
+	int steps_per_render = 200;
 
 	int n_bodies = N_BODIES_START;
 	Box* box;

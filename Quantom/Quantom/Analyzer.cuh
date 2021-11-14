@@ -16,6 +16,15 @@
 
 
 
+
+
+
+__device__ Float3 _computeLJForces(Box* box, Compound_H2O* compound, CompoundNeighborList* neighborlist, CompoundState* self_state, CompoundState* neighborstate, Float3* utility_buffer);
+__device__ Float3 _computePairbondForces(Compound_H2O* compound, CompoundState* self_state);
+__device__ Float3 _computeAnglebondForces(Compound_H2O* compound, CompoundState* self_state);
+
+
+
 class Analyzer {
 public:
 	Analyzer() {}

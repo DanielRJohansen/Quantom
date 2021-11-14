@@ -68,7 +68,6 @@ void Engine::updateNeighborLists() {	// Write actual function later;
 
 
 
-
 //--------------------------------------------------------------------------	SIMULATION BEGINS HERE --------------------------------------------------------------//
 
 
@@ -283,7 +282,6 @@ __device__ Float3 computeLJForces(Box * box, Compound_H2O* compound, CompoundNei
 	return force;
 }
 
-
 __device__ Float3 computePairbondForces(Compound_H2O* compound, CompoundState* self_state) {
 	Float3 force(0, 0, 0);
 	for (int i = 0; i < compound->n_pairbonds; i++) {
@@ -426,6 +424,7 @@ __global__ void forceKernel(Box* box, int step_test) {
 		//float kin_e = 0.5 * compound.particles[threadIdx.x].mass * compound.particles[threadIdx.x].vel.len() * compound.particles[threadIdx.x].vel.len();
 		box->data_buffer[0 + threadIdx.x * 2 + blockIdx.x * 3 * 2 + step_test * box->n_compounds * 3 * 2] = data_ptr2 + intramolecular_force.len();
 		//box->data_buffer[1 + threadIdx.x * 2 + blockIdx.x * 3 * 2 + box->step * box->n_compounds * 3 * 2] =  kin_e;
+		box->trajectory[threadIdx.x + blockIdx.x * 3 + (box->step) * box->n_compounds * 3] = self_state.positions[threadIdx.x];
 	}
 	__syncthreads();
 
@@ -442,6 +441,7 @@ __global__ void forceKernel(Box* box, int step_test) {
 	// ----------------------------------------------------------------------------- //
 
 
+	
 	__syncthreads();
 
 	if (threadIdx.x == 0) {

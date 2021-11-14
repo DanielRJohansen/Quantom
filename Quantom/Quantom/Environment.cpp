@@ -80,12 +80,12 @@ void Environment::run() {
 
 
 
-	printf("\n\n\n########################## SIMULATION FINISHED ##########################\n");
+	printf("\n\n\n########################## SIMULATION FINISHED ##########################\n\n\n\n");
 
 	analyzer.analyzeEnergy(simulation);
 
-	printOut(simulation->box->outdata);
-	printDataBuffer(simulation->box);
+	//printOut(simulation->box->outdata);
+	//printDataBuffer(simulation->box);
 }
 
 
