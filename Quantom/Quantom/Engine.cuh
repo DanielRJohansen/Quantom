@@ -20,6 +20,15 @@
 __global__ void forceKernel(Box* box, int testval);
 __global__ void initKernel(Box* box);	// For now, just initializes previous potential energy
 
+__device__ float getAngle(Float3 v1, Float3 v2);
+
+__device__ Float3 computeLJForces(Box* box, Compound_H2O* compound, CompoundNeighborList* neighborlist, 
+	CompoundState* self_state, CompoundState* neighborstate_buffer, Float3* utility_buffer);
+
+__device__ Float3 computePairbondForces(Compound_H2O* compound, CompoundState* self_state);
+__device__ Float3 computeAnglebondForces(Compound_H2O* compound, CompoundState* self_state);
+
+
 class Engine {
 public:
 	Engine(){}
@@ -28,8 +37,18 @@ public:
 	float* getDatabuffer();
 	bool testFunction();
 	void step();
+	float* analyzeEnergy();
+
 
 	Int3 timings = Int3(0, 0, 0);
+
+
+	// ----- Functions used by analyzer aswell ----- //
+	//__device__ Float3 computeLJForces(Box* box, Compound_H2O* compound, CompoundNeighborList* neighborlist, 
+		//CompoundState* self_state, CompoundState* neighborstate_buffer, Float3* utility_buffer);
+
+
+
 
 
 	~Engine() {
@@ -40,9 +59,23 @@ private:
 	BoxBuilder boxbuilder;
 	Simulation* simulation;
 
+
+	// HOST FUNCTIONS //
 	void updateNeighborLists();
 
 
+
+
+
+
+
+
+
+
+
+
+
+	// ################################# VARIABLES AND ARRAYS ################################# //
 
 	int testval = 0;
 

@@ -143,7 +143,7 @@ struct CompoundNeighborList {
 	uint8_t n_neighbors = 0;					// adjust too?
 };
 struct CompoundState {
-	Float3 positions[128];
+	Float3 positions[64];
 	uint8_t n_particles = 0;
 };
 

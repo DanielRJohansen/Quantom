@@ -10,7 +10,7 @@ public:
 	void build(Simulation* simulation);
 
 
-	const int max_compounds = 100'000;								// DO we want something const here? Smaller val?
+	const int max_compounds = 10'000;								// DO we want something const here? Smaller val?
 private:
 	int solvateBox(Simulation* simulation);					// Returns # of solvate compounds placed
 	Compound_H2O createCompound(Float3 com, int compound_index, 

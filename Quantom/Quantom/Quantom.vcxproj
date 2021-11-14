@@ -86,6 +86,7 @@
     <ClCompile Include="Main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Analyzer.cuh" />
     <ClInclude Include="Bodies.cuh" />
     <ClInclude Include="BoxBuilder.cuh" />
     <ClInclude Include="Display.h" />
@@ -97,6 +98,7 @@
     <ClInclude Include="Simulation.cuh" />
   </ItemGroup>
   <ItemGroup>
+    <CudaCompile Include="Analyzer.cu" />
     <CudaCompile Include="Bodies.cu" />
     <CudaCompile Include="Engine.cu" />
     <CudaCompile Include="QuantomTypes.cu" />

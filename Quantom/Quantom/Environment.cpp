@@ -79,7 +79,11 @@ void Environment::run() {
 	}
 
 
+
 	printf("\n\n\n########################## SIMULATION FINISHED ##########################\n");
+
+	analyzer.analyzeEnergy(simulation);
+
 	printOut(simulation->box->outdata);
 	printDataBuffer(simulation->box);
 }
@@ -119,4 +123,25 @@ void Environment::printDataBuffer(Box* box) {
 		myfile << "\n";
 	}
 	myfile.close();
+
+	delete host_data;
+}
+
+void Environment::printTrajectory(Simulation* simulation) {
+	std::ofstream myfile("D:\\Quantom\\trajectory.csv");
+
+	Float3* traj_host = new Float3[simulation->box->n_compounds * 3 * simulation->n_steps];
+	cudaMemcpy(traj_host, simulation->box->trajectory, sizeof(Float3) * simulation->box->n_compounds * 3 * simulation->n_steps, cudaMemcpyDeviceToHost);
+
+	for (int i = 0; i < simulation->box->step; i++) {
+		for (int j = 0; j < simulation->box->n_compounds * 3; j++) {
+			for (int k = 0; k < 3; k++) {
+				myfile << traj_host[j + i * 10].at(k) << ";";
+			}			
+		}
+		myfile << "\n";
+	}
+
+	myfile.close();
+
 }

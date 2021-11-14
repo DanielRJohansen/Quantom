@@ -5,6 +5,7 @@
 #include "Display.h"
 #include "Interface.h"
 #include "Engine.cuh"
+#include "Analyzer.cuh"
 
 // For logging
 #include <fstream>
@@ -29,8 +30,11 @@ private:
 	Display* display;
 	Interface* interface;
 	Engine* engine;
+	Analyzer analyzer;
 
+	// These should be in interface maybe?
 	void printOut(float* data);
 	void printDataBuffer(Box* box);
+	void printTrajectory(Simulation* simulation);
 };
 

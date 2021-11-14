@@ -64,7 +64,7 @@ public:
 
 	float* data_buffer;		// also temp, for total energy summation
 
-
+	Float3* trajectory;
 
 
 	void moveToDevice() {	// Loses pointer to RAM location!
@@ -113,9 +113,9 @@ public:
 
 	float box_size = BOX_LEN;	//nm
 	int blocks_per_dim;
-	int n_steps = 5000;
+	int n_steps = 500;
 
-	const float dt = 1 *	10.0e-6;		// ns, so first val corresponds to fs
+	const float dt = 1 * 10.0e-6;		// ns, so first val corresponds to fs
 	int steps_per_render = 100;
 
 	int n_bodies = N_BODIES_START;

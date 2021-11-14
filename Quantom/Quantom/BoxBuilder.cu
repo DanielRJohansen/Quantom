@@ -45,6 +45,17 @@ void BoxBuilder::build(Simulation* simulation) {
 
 	simulation->box->dt = simulation->dt;
 
+
+
+
+
+
+
+	cudaMalloc(&simulation->box->trajectory, sizeof(Float3) * simulation->box->n_compounds * 3 * simulation->n_steps);
+
+
+
+
 	simulation->box->moveToDevice();
 }
 
