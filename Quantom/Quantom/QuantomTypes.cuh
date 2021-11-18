@@ -36,7 +36,6 @@ struct Float3 {
 	__host__ __device__ inline Float3 operator - (const Float3 a) const { return Float3(x - a.x, y - a.y, z - a.z); }
 	__host__ __device__ inline bool operator == (const Float3 a) const { return (a.x == x && a.y == y && a.z == z); }
 
-	//__host__ __device__ static Float3 norm(Float3 a) { return a * (1.f / a.len()); }	// Remove this at some point..
 	__host__ __device__ Float3 norm() {
 		float l = len();
 		if (l)
@@ -100,7 +99,7 @@ struct Float3 {
 		case 2:
 			return z;
 		default:
-			return -1;
+			return -404;
 		}
 	}
 

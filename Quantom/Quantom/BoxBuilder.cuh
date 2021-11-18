@@ -12,8 +12,12 @@ public:
 
 	const int max_compounds = 10'000;								// DO we want something const here? Smaller val?
 private:
+
+	void placeMainMolecule(Simulation* simulation);
 	int solvateBox(Simulation* simulation);					// Returns # of solvate compounds placed
-	Compound_H2O createCompound(Float3 com, int compound_index, 
+	Compound createCompound(Float3 com, int compound_index,
+		CompoundState* statebuffer_node, CompoundNeighborList* neighborinfo_node, float dt);
+	Compound createSolvent(Float3 com, int compound_index, 
 		CompoundState* statebuffer_node, CompoundNeighborList* neighborinfo_node, float dt);
 	bool spaceAvailable(Float3 com, float radius);
 	void compoundLinker(Simulation* simulation);									// Temp function
@@ -31,10 +35,13 @@ private:
 
 
 	float m = 18.01528;					// g/mol
-	float k_B = 8.617333262145 * 10e-5;	// Boltzmann constant
+	float M = m * 0.001;				// kg/mol
+	//float k_B = 8.617333262145 * 10e-5;	// Boltzmann constant
+	double k_B = 1.380 * 1e-23;
 	float T = 293;	// Kelvin
+	float R = 8.3144;					// J/(Kelvin*mol)
 	float mean_velocity = m / (2 * k_B * T);
-
+	float v_rms = sqrt(3 * R * T / M);
 
 
 
@@ -64,7 +71,7 @@ private:
 		);
 	}
 	float random() {
-		return rand() % 10000 / 10000.f - 0.5f;
+		return rand() % 10000 / 10000.f * 2 - 1.f;
 	}
 };
 

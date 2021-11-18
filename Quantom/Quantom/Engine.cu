@@ -80,7 +80,7 @@ void Engine::step() {
 
 
 	auto t0 = std::chrono::high_resolution_clock::now();
-	forceKernel <<< simulation->box->n_compounds, 64 >>> (simulation->box, testval++);
+	forceKernel <<< simulation->box->n_compounds, MAX_PARTICLES >>> (simulation->box, testval++);
 	cudaDeviceSynchronize();
 	auto t1 = std::chrono::high_resolution_clock::now();
 
@@ -163,62 +163,54 @@ __device__ void determineMoleculerHyperposOffset(Float3* utility_buffer, Float3*
 
 constexpr float sigma = 0.3923;	//nm, basicllay break 0 point
 constexpr float epsilon = 0.5986 * 1'000; // J/mol
-__device__ Float3 calcLJForce(Float3* pos0, Float3* pos1, float* data_ptr, float* data_ptr2) {	// Applying force to p0 only! Returns force in J/mol
-	float dist = (*pos0 - *pos1).len();
-	if (dist < *data_ptr2)
-		*data_ptr2 = dist;
-
-	if (dist < 0.000001) {
-		printf("WTF");
-	}
-		
-	float fraction = sigma / dist;		//nm/nm, so unitless
-
-	float f2 = fraction * fraction;
-	float f6 = f2 * f2 * f2;
-	float f12 = f6 * f6;
-
-	float LJ_pot = 4 * epsilon * (f12 - f6);
-	*data_ptr += LJ_pot;
-
-	Float3 force_unit_vector = (*pos0 - *pos1).norm();	
-
-	if (LJ_pot > 50'000) {
-		printf("\n\n KILOFORCE! Block %d thread %d\n", blockIdx.x, threadIdx.x);
-	}
-	return force_unit_vector * LJ_pot;	//J/mol*M	(M is direction)
-}
-
-__device__ Float3 calcLJForce(Float3* pos0, Float3* pos1) {	// Applying force to p0 only! Returns force in J/mol
+__device__ Float3 calcLJForce(Float3* pos0, Float3* pos1, float* potE) {	// Applying force to p0 only! Returns force in J/mol
 	float dist = (*pos0 - *pos1).len();
 	float fraction = sigma / dist;		//nm/nm, so unitless
 
 	float f2 = fraction * fraction;
 	float f6 = f2 * f2 * f2;
 	float f12 = f6 * f6;
+
+	float force = -24.f * epsilon / (dist * dist) * f6 * (1 - 2 * f6) * dist;
 
 	float LJ_pot = 4 * epsilon * (f12 - f6);
 	Float3 force_unit_vector = (*pos0 - *pos1).norm();
 
+	*potE += LJ_pot;
+	//*potE += force;
+	if (!blockIdx.x && LJ_pot > 2000)
+		printf("\n%f\n", LJ_pot * 1e-6);
+
+
 	if (LJ_pot > 50'000) {
-		printf("\n\n KILOFORCE! Block %d thread %d\n", blockIdx.x, threadIdx.x);
+		//printf("\n\n KILOFORCE! Block %d thread %d\n", blockIdx.x, threadIdx.x);
 	}
-	return force_unit_vector * LJ_pot;	//J/mol*M	(M is direction)
+	return force_unit_vector * force;	//J/mol*M	(M is direction)
 }
 
 
 
-constexpr float kb = 17.5 * 10e+6;		//	J/(mol*nm^2)
-__device__ Float3 calcPairbondForce(Float3* self_pos, Float3* other_pos, float* reference_dist) {
+constexpr float kb = 17.5 * 1e+6;		//	J/(mol*nm^2)
+__device__ Float3 calcPairbondForce(Float3* self_pos, Float3* other_pos, float* reference_dist, float* potE) {
 	Float3 v = *self_pos - *other_pos;
 	float dif = v.len() - *reference_dist;
 	float invert = v.len() > *reference_dist ? -1 : 1;
-	return v.norm() * (0.5 * kb * (dif * dif) * invert);
+
+
+	*potE += 0.5 * kb * (dif*dif);// *1 * 10e+4;
+	Float3 force = v.norm() * kb * (-dif);
+	if (threadIdx.x == LOGTHREAD && blockIdx.x == LOGBLOCK) {
+		//printf("%f\n", v.len());
+		self_pos[63 - threadIdx.x].x = v.len();
+		self_pos[63 - threadIdx.x].y = *potE;
+	}
+	return force;
+	//return v.norm() * (0.5 * kb * (dif * dif) * invert) *1.99 * 10e+4;
 }
 
 
 
-constexpr float ktheta = 65 * 10e+3;	// J/mol
+constexpr float ktheta = 65 * 1e+3;	// J/mol
 __device__ Float3 calcAngleForce(CompoundState* statebuffer, AngleBond* anglebond) {	// We fix the middle particle and move the other particles so they are closest as possible
 	// HOLY FUUUCK this shit is unsafe. Works if atoma are ordered left to right, with angles BELOW 180. Dont know which checks to implement yet
 
@@ -242,7 +234,7 @@ __device__ Float3 calcAngleForce(CompoundState* statebuffer, AngleBond* anglebon
 
 __device__ void integratePosition(CompactParticle* particle, Float3* particle_pos, Float3* particle_force, float* dt) {
 	Float3 temp = *particle_pos;
-	*particle_pos = *particle_pos * 2 - particle->pos_tsub1 + *particle_force * (1000 / particle->mass) * *dt * *dt;	// no *0.5?
+	*particle_pos = *particle_pos * 2 - particle->pos_tsub1 + *particle_force * (1.f / particle->mass) * *dt * *dt;	// no *0.5?
 	particle->pos_tsub1 = temp;
 }
 
@@ -252,8 +244,7 @@ __device__ void integratePosition(CompactParticle* particle, Float3* particle_po
 
 
 
-
-__device__ Float3 computeLJForces(Box * box, Compound_H2O* compound, CompoundNeighborList* neighborlist, CompoundState* self_state, CompoundState* neighborstate_buffer, Float3* utility_buffer) {
+__device__ Float3 computeLJForces(Box * box, Compound* compound, CompoundNeighborList* neighborlist, CompoundState* self_state, CompoundState* neighborstate_buffer, Float3* utility_buffer, float* potE) {
 	Float3 force(0, 0, 0);
 	for (int neighbor_index = 0; neighbor_index < neighborlist->n_neighbors; neighbor_index++) {
 		// ------------ Load and process neighbor molecule ------------ //
@@ -274,7 +265,12 @@ __device__ Float3 computeLJForces(Box * box, Compound_H2O* compound, CompoundNei
 
 		for (int neighbor_particle_index = 0; neighbor_particle_index < neighborstate_buffer->n_particles; neighbor_particle_index++) {
 			if (threadIdx.x < compound->n_particles) {
-				force = force + calcLJForce(&self_state->positions[threadIdx.x], &neighborstate_buffer->positions[neighbor_particle_index]);
+				force = force + calcLJForce(&self_state->positions[threadIdx.x], &neighborstate_buffer->positions[neighbor_particle_index], potE);
+
+				if (threadIdx.x == LOGTHREAD && blockIdx.x == LOGBLOCK) {
+					float len = (self_state->positions[threadIdx.x] - neighborstate_buffer->positions[neighbor_particle_index]).len();
+					self_state->positions[60].x = cudaMin(self_state->positions[60].x, len);
+				}
 			}
 		}
 		__syncthreads();
@@ -282,19 +278,19 @@ __device__ Float3 computeLJForces(Box * box, Compound_H2O* compound, CompoundNei
 	return force;
 }
 
-__device__ Float3 computePairbondForces(Compound_H2O* compound, CompoundState* self_state) {
+__device__ Float3 computePairbondForces(Compound* compound, CompoundState* self_state, float* potE) {
 	Float3 force(0, 0, 0);
 	for (int i = 0; i < compound->n_pairbonds; i++) {
 		PairBond* pb = &compound->pairbonds[i];
 		if (pb->atom_indexes[0] == threadIdx.x || pb->atom_indexes[1] == threadIdx.x) {
 			int other_index = pb->atom_indexes[0] != threadIdx.x ? pb->atom_indexes[0] : pb->atom_indexes[1];
-			force = force + calcPairbondForce(&self_state->positions[threadIdx.x], &self_state->positions[other_index], &pb->reference_dist);
+			force = force + calcPairbondForce(&self_state->positions[threadIdx.x], &self_state->positions[other_index], &pb->reference_dist, potE);
 		}
 	}
 	return force;
 }
 
-__device__ Float3 computeAnglebondForces(Compound_H2O* compound, CompoundState* self_state) {
+__device__ Float3 computeAnglebondForces(Compound* compound, CompoundState* self_state) {
 	Float3 force(0, 0, 0);
 	for (int i = 0; i < compound->n_anglebonds; i++) {
 		AngleBond* ab = &compound->anglebonds[i];
@@ -314,7 +310,7 @@ __device__ Float3 computeAnglebondForces(Compound_H2O* compound, CompoundState* 
 
 
 __global__ void forceKernel(Box* box, int step_test) {
-	__shared__ Compound_H2O compound;
+	__shared__ Compound compound;
 	__shared__ CompoundState self_state;
 	__shared__ CompoundState neighborstate_buffer;
 	__shared__ CompoundNeighborList neighborlist;
@@ -329,19 +325,22 @@ __global__ void forceKernel(Box* box, int step_test) {
 	
 	__syncthreads();
 
+	self_state.positions[63] = Float3(404, 404, 404);
+	self_state.positions[60] = Float3(9999, 9999, 9999);
 	//bool thread_particle_active = (compound.n_particles > threadIdx.x);
 
 
 	Float3 force(0, 0, 0);
-	float data_ptr1 = 404;
-	float data_ptr2 = 0;
-	float data_ptr3 = 404;
+	float potE = 0;
+	//float data_ptr1 = 404;
+	//float data_ptr2 = 0;
+	//float data_ptr3 = 404;
 
 
 
 	
 	// --------------------------------------------------------------- Intermolecular forces --------------------------------------------------------------- //
-	force = force + computeLJForces(box, &compound, &neighborlist, &self_state, &neighborstate_buffer, utility_buffer) * 0.1;
+	force = force + computeLJForces(box, &compound, &neighborlist, &self_state, &neighborstate_buffer, utility_buffer, &potE);
 	// ------------------------------------------------------------------------------------------------------------------------------------------------------ //
 
 
@@ -354,12 +353,12 @@ __global__ void forceKernel(Box* box, int step_test) {
 	//float intramolecular_potential = 0;
 	Float3 intramolecular_force = Float3(0,0,0);
 
-	intramolecular_force = intramolecular_force + computePairbondForces(&compound, &self_state);
+	//intramolecular_force = intramolecular_force + computePairbondForces(&compound, &self_state, &potE);
 
-	intramolecular_force = intramolecular_force + computeAnglebondForces(&compound, &self_state);
+	//intramolecular_force = intramolecular_force + computeAnglebondForces(&compound, &self_state);
 	
 
-	force = force + intramolecular_force;
+	//force = force + intramolecular_force;
 	// ----------------------------------------------------------------------------------------------------------------------------------------------- //
 
 
@@ -383,6 +382,7 @@ __global__ void forceKernel(Box* box, int step_test) {
 
 	
 	// ------------------------------------ PERIODIC BOUNDARY CONDITION ------------------------------------------------------------------------------------------------- //
+	/*		HOW DO I ACCOUNT FOR THIS IN ENERGY ANALYZATION?
 	utility_buffer[threadIdx.x] = Float3(0, 0, 0);
 	if (threadIdx.x < compound.n_particles)
 		utility_buffer[threadIdx.x] = self_state.positions[threadIdx.x];
@@ -410,6 +410,7 @@ __global__ void forceKernel(Box* box, int step_test) {
 	__syncthreads();
 
 	self_state.positions[threadIdx.x] = self_state.positions[threadIdx.x] + hyperpos_offset;	// Uhh, move hyperpos to utilbuffer?	
+	*/
 	// ------------------------------------------------------------------------------------------------------------------------------------------------------------------ //
 	
 
@@ -421,28 +422,25 @@ __global__ void forceKernel(Box* box, int step_test) {
 	// ------------------------------------ DATA LOG ------------------------------- //
 
 	if (threadIdx.x < 3) {
-		//float kin_e = 0.5 * compound.particles[threadIdx.x].mass * compound.particles[threadIdx.x].vel.len() * compound.particles[threadIdx.x].vel.len();
-		box->data_buffer[0 + threadIdx.x * 2 + blockIdx.x * 3 * 2 + step_test * box->n_compounds * 3 * 2] = data_ptr2 + intramolecular_force.len();
-		//box->data_buffer[1 + threadIdx.x * 2 + blockIdx.x * 3 * 2 + box->step * box->n_compounds * 3 * 2] =  kin_e;
+		box->data_buffer[threadIdx.x + blockIdx.x * 3 + step_test * box->n_compounds * 3] = potE;
 		box->trajectory[threadIdx.x + blockIdx.x * 3 + (box->step) * box->n_compounds * 3] = self_state.positions[threadIdx.x];
 	}
 	__syncthreads();
 
 	if (blockIdx.x == LOGBLOCK && threadIdx.x == LOGTHREAD && box->step < 10000) {
-		
 		//box->outdata[0 + box->step * 10] = bondlen;
-		box->outdata[1 + box->step * 10] = data_ptr1;	// Angles
-		box->outdata[2 + box->step * 10] = intramolecular_force.len();
-		box->outdata[3 + box->step * 10] = data_ptr2;	// LJ pot
-		box->outdata[4 + box->step * 10] = -1;//compound.particles[threadIdx.x].vel.len();
-		box->outdata[5 + box->step * 10] = data_ptr3;	// closest particle
-		
+		box->outdata[0 + box->step * 10] = self_state.positions[63].x;	//bondlen
+		box->outdata[2 + box->step * 10] = potE;	//pairbond force
+		//box->outdata[1 + box->step * 10] = data_ptr1;	// Angles
+		//box->outdata[2 + box->step * 10] = intramolecular_force.len();
+		//box->outdata[3 + box->step * 10] = data_ptr2;	// LJ pot
+		//box->outdata[4 + box->step * 10] = -1;//compound.particles[threadIdx.x].vel.len();
+		box->outdata[5 + box->step * 10] = self_state.positions[60].x;	// closest particle	
 	}
 	// ----------------------------------------------------------------------------- //
 
 
 	
-	__syncthreads();
 
 	if (threadIdx.x == 0) {
 		box->compound_state_array_next[blockIdx.x] = self_state;

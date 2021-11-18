@@ -39,7 +39,7 @@ public:
 
 
 	// ----- Functions used by analyzer aswell ----- //
-	//__device__ Float3 computeLJForces(Box* box, Compound_H2O* compound, CompoundNeighborList* neighborlist, 
+	//__device__ Float3 computeLJForces(Box* box, Compound* compound, CompoundNeighborList* neighborlist, 
 		//CompoundState* self_state, CompoundState* neighborstate_buffer, Float3* utility_buffer);
 
 
@@ -100,10 +100,10 @@ public:
 	__device__ static Float3 calcPairbondForce(Float3* self_pos, Float3* other_pos, float* reference_dist);
 	__device__ static Float3 calcAngleForce(CompoundState* statebuffer, AngleBond* anglebond);
 
-	__device__ static Float3 computeLJForces(Box* box, Compound_H2O* compound, CompoundNeighborList* neighborlist,
+	__device__ static Float3 computeLJForces(Box* box, Compound* compound, CompoundNeighborList* neighborlist,
 		CompoundState* self_state, CompoundState* neighborstate_buffer, Float3* utility_buffer);
-	__device__ static Float3 computePairbondForces(Compound_H2O* compound, CompoundState* self_state);
-	__device__ static Float3 computeAnglebondForces(Compound_H2O* compound, CompoundState* self_state);
+	__device__ static Float3 computePairbondForces(Compound* compound, CompoundState* self_state);
+	__device__ static Float3 computeAnglebondForces(Compound* compound, CompoundState* self_state);
 
 };
 */

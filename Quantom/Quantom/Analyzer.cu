@@ -24,7 +24,7 @@
 
 void __global__ monitorEnergyKernel(Box* box, float* data_out, int step) {
 	
-	__shared__ Compound_H2O compound;
+	__shared__ Compound compound;
 	__shared__ CompoundState self_state;
 	__shared__ CompoundState neighborstate;	// Buffer for all neighbors state, one at a time.
 	__shared__ CompoundNeighborList neighborlist;
@@ -42,23 +42,15 @@ void __global__ monitorEnergyKernel(Box* box, float* data_out, int step) {
 	}
 
 
-	Float3 force(0, 0, 0);
+
+	//float potE = force.len();
 
 
-	force = force + _computeLJForces(box, &compound, &neighborlist, &self_state, &neighborstate, utility_buffer);
-	force = force + _computePairbondForces(&compound, &self_state);
-	force = force + _computeAnglebondForces(&compound, &self_state);
+	float potE = box->data_buffer[0 + threadIdx.x + blockIdx.x * 3 + step * box->n_compounds * 3];	
 
-	float potE = force.len();
+	float vel = (box->trajectory[threadIdx.x + blockIdx.x * blockDim.x + (step + 1) * box->n_compounds * blockDim.x] - box->trajectory[threadIdx.x + blockIdx.x * blockDim.x + (step - 1) * box->n_compounds * blockDim.x]).len() * 0.5 * 1.f / box->dt;
+	float kinE = 0.5 * compound.particles[threadIdx.x].mass * vel * vel;
 
-	
-	float vel = (box->trajectory[threadIdx.x + blockIdx.x * blockDim.x + (step + 1) * box->n_compounds * blockDim.x] - box->trajectory[threadIdx.x + blockIdx.x * blockDim.x + (step - 1) * box->n_compounds * blockDim.x]).len() *0.5 * 1.f / box->dt;
-	if (blockIdx.x == 0) {
-		//printf("Index %d %d\n", threadIdx.x + blockIdx.x * blockDim.x + (step - 1) * box->n_compounds * blockDim.x, threadIdx.x + blockIdx.x * blockDim.x + (step + 1) * box->n_compounds * blockDim.x);
-		//printf("vel %f\n", vel);
-	}
-	
-	float kinE = vel * compound.particles[threadIdx.x].mass * 1 / 1000.f;
 	float totalE = potE + kinE;
 
 	energy[threadIdx.x] = Float3(potE, kinE, totalE);
@@ -66,7 +58,10 @@ void __global__ monitorEnergyKernel(Box* box, float* data_out, int step) {
 
 	__syncthreads();
 	if (threadIdx.x == 0) {
-		Float3 sum = energy[0] + energy[1] + energy[2];
+		Float3 sum = Float3(0, 0, 0);
+		for (int i = 0; i < compound.n_particles; i++)
+			sum = sum + energy[i] * (1.f / compound.n_particles);
+
 		for (int i = 0; i < 3; i++) {
 			data_out[i + blockIdx.x * 3] = sum.at(i);
 		}		
@@ -80,31 +75,34 @@ void __global__ monitorEnergyKernel(Box* box, float* data_out, int step) {
 
 
 
-void Analyzer::analyzeEnergy(Simulation* simulation) {
+void Analyzer::analyzeEnergy(Simulation* simulation) {	// Calculates the avg J/mol
 
 
 
 	int data_per_step = 3 * simulation->box->n_compounds;
 	int n_datapoints = data_per_step * simulation->n_steps;
 
-	
+	printf("N Compounds: %d\n", simulation->box->n_compounds);
+
 	float* host_data = new float[n_datapoints];
 	float* device_data;
 	cudaMalloc(&device_data, sizeof(float) * n_datapoints);
 	cudaDeviceSynchronize();
 	int n_compounds = simulation->box->n_compounds;
 	for (int i = 1; i < (simulation->n_steps-1); i++) {
+		if (!(i % 100))
+			printf("Analyzing step %d\r", i);
 		monitorEnergyKernel << <n_compounds, 3 >> > (simulation->box, &device_data[data_per_step * i], i);
 	}
 
 	cudaMemcpy(host_data, device_data, sizeof(float) * n_datapoints, cudaMemcpyDeviceToHost);
 
 	float* out_data = new float[3 * (simulation->n_steps-2)];
-	for (int step = 1; step < (simulation->n_steps-1); step++) {
+	for (int step = 1; step < (simulation->n_steps-1); step++) {	
 		for (int energy_type = 0; energy_type < 3; energy_type++) {
 			out_data[energy_type + (step-1) * 3] = 0;
 			for (int m = 0; m < n_compounds; m++) {
-				out_data[energy_type + (step-1) * 3] += host_data[energy_type + m * 3 + step * data_per_step];
+				out_data[energy_type + (step-1) * 3] += host_data[energy_type + m * 3 + step * data_per_step] / simulation->box->n_compounds;
 			}
 		}
 	}
@@ -115,7 +113,7 @@ void Analyzer::analyzeEnergy(Simulation* simulation) {
 	delete host_data, out_data;
 	
 
-	printf("########## Finished analyzing energies ##########\n\n");
+	printf("\n########## Finished analyzing energies ##########\n\n");
 
 }
 
@@ -238,7 +236,7 @@ __device__ Float3 _calcLJForce(Float3* pos0, Float3* pos1) {	// Applying force t
 
 
 
-constexpr float kb = 17.5 * 10e+6;		//	J/(mol*nm^2)
+constexpr float kb = 17.5 * 1e+6;		//	J/(mol*nm^2)
 __device__ Float3 _calcPairbondForce(Float3* self_pos, Float3* other_pos, float* reference_dist) {
 	Float3 v = *self_pos - *other_pos;
 	float dif = v.len() - *reference_dist;
@@ -248,7 +246,7 @@ __device__ Float3 _calcPairbondForce(Float3* self_pos, Float3* other_pos, float*
 
 
 
-constexpr float ktheta = 65 * 10e+3;	// J/mol
+constexpr float ktheta = 65 * 1e+3;	// J/mol
 __device__ Float3 _calcAngleForce(CompoundState* statebuffer, AngleBond* anglebond) {	// We fix the middle particle and move the other particles so they are closest as possible
 	// HOLY FUUUCK this shit is unsafe. Works if atoma are ordered left to right, with angles BELOW 180. Dont know which checks to implement yet
 
@@ -276,7 +274,7 @@ __device__ Float3 _calcAngleForce(CompoundState* statebuffer, AngleBond* anglebo
 
 
 
-__device__ Float3 _computeLJForces(Box* box, Compound_H2O* compound, CompoundNeighborList* neighborlist, CompoundState* self_state, CompoundState* neighborstate_buffer, Float3* utility_buffer) {
+__device__ Float3 _computeLJForces(Box* box, Compound* compound, CompoundNeighborList* neighborlist, CompoundState* self_state, CompoundState* neighborstate_buffer, Float3* utility_buffer) {
 	Float3 force(0, 0, 0);
 	for (int neighbor_index = 0; neighbor_index < neighborlist->n_neighbors; neighbor_index++) {
 		// ------------ Load and process neighbor molecule ------------ //
@@ -306,7 +304,7 @@ __device__ Float3 _computeLJForces(Box* box, Compound_H2O* compound, CompoundNei
 }
 
 
-__device__ Float3 _computePairbondForces(Compound_H2O* compound, CompoundState* self_state) {
+__device__ Float3 _computePairbondForces(Compound* compound, CompoundState* self_state) {
 	Float3 force(0, 0, 0);
 	for (int i = 0; i < compound->n_pairbonds; i++) {
 		PairBond* pb = &compound->pairbonds[i];
@@ -318,7 +316,7 @@ __device__ Float3 _computePairbondForces(Compound_H2O* compound, CompoundState* 
 	return force;
 }
 
-__device__ Float3 _computeAnglebondForces(Compound_H2O* compound, CompoundState* self_state) {
+__device__ Float3 _computeAnglebondForces(Compound* compound, CompoundState* self_state) {
 	Float3 force(0, 0, 0);
 	for (int i = 0; i < compound->n_anglebonds; i++) {
 		AngleBond* ab = &compound->anglebonds[i];

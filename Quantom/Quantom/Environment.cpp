@@ -84,7 +84,7 @@ void Environment::run() {
 
 	analyzer.analyzeEnergy(simulation);
 
-	//printOut(simulation->box->outdata);
+	printOut(simulation->box->outdata);
 	//printDataBuffer(simulation->box);
 }
 

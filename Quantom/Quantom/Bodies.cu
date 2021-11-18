@@ -9,7 +9,7 @@ Molecule::Molecule() {	// Always returns a h2o molecule rn
 	uint8_t blue[3] = { 0,0,250 };
 	// Using Van der Waals radii.... https://en.m.wikipedia.org/wiki/Van_der_Waals_radius
 	atoms[0] = Atom(Float3(0, 0, 0), 0.152, 15.999, red);
-	atoms[1] = Atom(Float3(0, 0, -95.7 / 1000.f), 0.110, 1.008, white);
+	atoms[1] = Atom(Float3(0, 0, -95.7 / 1000.f * 1.5), 0.110, 1.008, white);
 	atoms[2] = Atom(Float3(0, 92.65 / 1000, 23.96 / 1000.f), 0.110, 1.008, white);// was 0.53
 
 

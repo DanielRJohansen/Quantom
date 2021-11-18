@@ -5,7 +5,7 @@
 
 
 
-constexpr float BOX_LEN = 8.0;	// Multiple of FOCUS_LEN please!
+constexpr float BOX_LEN = 2.0;	// Multiple of FOCUS_LEN please!
 
 constexpr float BOX_LEN_HALF = BOX_LEN/2.f;
 constexpr float BOX_BASE = -BOX_LEN_HALF;
@@ -27,10 +27,10 @@ const int MAX_NEAR_BODIES = 256 - MAX_FOCUS_BODIES;
 
 
 const int LOGBLOCK = 0;
-const int LOGTHREAD = 1;
+const int LOGTHREAD = 0;
 
 //const int N_BODIES_START = 40;
-const int N_BODIES_START = 60;
+const int N_SOLVATE_MOLECULES = 30;// 60;
 const int BLOCKS_PER_SM = 512;
 //const int GRIDBLOCKS_PER_BODY = 16;
 //const int THREADS_PER_GRIDBLOCK = MAX_BLOCK_BODIES / GRIDBLOCKS_PER_BODY;
@@ -43,11 +43,13 @@ const int LOG_P_ID = 17;
 
 
 
-class Box {	// Should each GPU block have a copy of the box?
+class Box {
 public:
 
-	Compound_H2O* compounds;
+	Compound* compounds;
+
 	uint32_t n_compounds = 0;
+	//uint32_t n_solvents = 0;
 
 	RenderMolecule rendermolecule;	// Not proud, TEMP
 
@@ -68,8 +70,8 @@ public:
 
 
 	void moveToDevice() {	// Loses pointer to RAM location!
-		Compound_H2O* compounds_temp;
-		int bytesize = n_compounds * sizeof(Compound_H2O);
+		Compound* compounds_temp;
+		int bytesize = n_compounds * sizeof(Compound);
 		cudaMallocManaged(&compounds_temp, bytesize);
 		cudaMemcpy(compounds_temp, compounds, bytesize, cudaMemcpyHostToDevice);
 		delete compounds;
@@ -113,12 +115,12 @@ public:
 
 	float box_size = BOX_LEN;	//nm
 	int blocks_per_dim;
-	int n_steps = 2000;
+	int n_steps = 500;
 
-	const float dt = 1 * 10.0e-6;		// ns, so first val corresponds to fs
-	int steps_per_render = 200;
+	const float dt = 1 * 1e-6;		// ns, so first val corresponds to fs
+	int steps_per_render = 2;
 
-	int n_bodies = N_BODIES_START;
+	//int n_bodies = N_BODIES_START;
 	Box* box;
 
 	~Simulation() {

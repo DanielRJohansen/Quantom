@@ -9,14 +9,14 @@
 struct Atom {
 	__host__ __device__ Atom() {}
 	__host__ Atom(Float3 pos, float r, float mass, uint8_t c[3]) : pos(pos), radius(r), mass(mass) {
-		
+		mass *= 0.001f;	// Convert to kg/mol
 		for (int i = 0; i < 3; i++) {
 			color[i] = c[i];
 		}
 	}
 	Float3 pos;	// Relative	to CoM, and (0,0,0) rotation
 	float radius;	// in fm?
-	float mass;
+	float mass;		// in kg/mol
 	uint8_t color[3] = { 0,100,0 };
 };
 
@@ -157,27 +157,30 @@ const float OH_refdist = 0.095;			// nm
 const float HOH_refangle = 1.822996;	// radians
 const float max_LJ_dist = 1;			// nm
 
-struct Compound_H2O {			// Entire molecule for small < 500 atoms molcules, or part of large molecule
-	__host__ Compound_H2O() {}	// {O, H, H}
-	__host__ Compound_H2O(uint32_t index, CompoundNeighborList* neighborlist_device, CompoundState* state_device,
-	CompoundState* states_host) {
+const int MAX_PARTICLES = 16;
+const int MAX_PAIRBONDS = 16;
+const int MAX_ANGLEBONDS = 16;
+const int CC_reftdist = 0.153; // nm
+struct Compound {
+	__host__ Compound() {}	// {}
+	__host__ Compound(uint32_t index, CompoundNeighborList* neighborlist_device, CompoundState* state_device,
+		CompoundState* states_host) {
 		this->index = index;
 		compound_neighborlist_ptr = neighborlist_device;
 		compound_state_ptr = state_device;
 
-		pairbonds[0] = PairBond(OH_refdist, 0, 1);
-		pairbonds[1] = PairBond(OH_refdist, 0, 2);
+		//pairbonds[0] = PairBond(CC_refdist, 0, 1);
 
-		anglebonds[0] = AngleBond(HOH_refangle, 1, 0, 2);
+
 
 		for (uint32_t i = 0; i < n_particles; i++)
 			center_of_mass = center_of_mass + states_host->positions[i];
 		center_of_mass = center_of_mass * (1.f / n_particles);
 
 		radius = pairbonds[0].reference_dist * n_particles;					// TODO: Shitty estimate, do better later
-	};	
+	};
 	
-	__host__ bool intersects(Compound_H2O a) {
+	__host__ bool intersects(Compound a) {
 		return (a.center_of_mass - center_of_mass).len() < (a.radius + radius + max_LJ_dist);
 	}
 
@@ -185,18 +188,15 @@ struct Compound_H2O {			// Entire molecule for small < 500 atoms molcules, or pa
 	CompoundState* compound_state_ptr;
 	CompoundNeighborList* compound_neighborlist_ptr;
 
-	uint8_t n_particles = H2O_PARTICLES;
-	CompactParticle particles[H2O_PARTICLES];
+	uint8_t n_particles = 1;
+	CompactParticle particles[MAX_PARTICLES];
 
-	Float3 center_of_mass = Float3(0,0,0);
-	float radius;
+	Float3 center_of_mass = Float3(0, 0, 0);
+	float radius = 0;
 
-	uint16_t n_pairbonds = H2O_PAIRBONDS;
-	PairBond pairbonds[H2O_PAIRBONDS];
-	
-	uint16_t n_anglebonds = H2O_ANGLEBONDS;
-	AngleBond anglebonds[H2O_ANGLEBONDS];
+	uint16_t n_pairbonds = 0;
+	PairBond pairbonds[MAX_PAIRBONDS];
+
+	uint16_t n_anglebonds = 0;
+	AngleBond anglebonds[MAX_ANGLEBONDS];
 };
-
-
-
