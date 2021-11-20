@@ -119,13 +119,14 @@ Compound BoxBuilder::createCompound(Float3 com, int compound_index, CompoundStat
 
 
 	//Float3 compound_united_vel = Float3(200 - 400 * compound_index, random(), random()).norm() * v_rms;
-	Float3 compound_united_vel = Float3(500 - 1000 * compound_index, 0,0) * 2;
+	float vrms = 789;
+	Float3 compound_united_vel = Float3(vrms - 2*vrms * compound_index, 0,0);
 
 
 	Compound compound(compound_index, neighborinfo_node, statebuffer_node, compoundstates_host);
 	for (int i = 0; i < 1; i++) {
 		Float3 atom_pos_sub1 = compoundstates_host[compound_index].positions[i] - compound_united_vel * dt;
-		compound.particles[i] = CompactParticle(12.0107, atom_pos_sub1);
+		compound.particles[i] = CompactParticle(12.0107*1e-3, atom_pos_sub1);
 	}
 	return compound;
 }
