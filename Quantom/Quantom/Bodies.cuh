@@ -160,7 +160,8 @@ const float max_LJ_dist = 1;			// nm
 const int MAX_PARTICLES = 16;
 const int MAX_PAIRBONDS = 16;
 const int MAX_ANGLEBONDS = 16;
-const int CC_reftdist = 0.153; // nm
+const float CC_refdist = 0.153; // nm
+const float CCC_reftheta = 1.953; // nm
 struct Compound {
 	__host__ Compound() {}	// {}
 	__host__ Compound(uint32_t index, CompoundNeighborList* neighborlist_device, CompoundState* state_device,
@@ -169,9 +170,14 @@ struct Compound {
 		compound_neighborlist_ptr = neighborlist_device;
 		compound_state_ptr = state_device;
 
-		//pairbonds[0] = PairBond(CC_refdist, 0, 1);
+		pairbonds[0] = PairBond(CC_refdist, 0, 1);
+		n_pairbonds++;
 
+		pairbonds[1] = PairBond(CC_refdist, 0, 2);
+		n_pairbonds++;
 
+		anglebonds[0] = AngleBond(CCC_reftheta, 1, 0, 2);
+		n_anglebonds++;
 
 		for (uint32_t i = 0; i < n_particles; i++)
 			center_of_mass = center_of_mass + states_host->positions[i];
@@ -188,7 +194,7 @@ struct Compound {
 	CompoundState* compound_state_ptr;
 	CompoundNeighborList* compound_neighborlist_ptr;
 
-	uint8_t n_particles = 1;
+	uint8_t n_particles = 0;
 	CompactParticle particles[MAX_PARTICLES];
 
 	Float3 center_of_mass = Float3(0, 0, 0);

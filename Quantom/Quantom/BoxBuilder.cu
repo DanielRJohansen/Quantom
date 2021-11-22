@@ -16,7 +16,7 @@ void BoxBuilder::build(Simulation* simulation) {
 
 
 
-	placeMainMolecule(simulation);
+	//placeMainMolecule(simulation);
 	placeMainMolecule(simulation);
 
 	//simulation->box->n_compounds += solvateBox(simulation);
@@ -62,7 +62,7 @@ void BoxBuilder::build(Simulation* simulation) {
 
 
 void BoxBuilder::placeMainMolecule(Simulation* simulation) {
-	Float3 compound_center = Float3(BOX_LEN_HALF * 0.5 + BOX_LEN_HALF * simulation->box->n_compounds, BOX_LEN_HALF, BOX_LEN_HALF);
+	Float3 compound_center = Float3(BOX_LEN_HALF, BOX_LEN_HALF, BOX_LEN_HALF);
 	float compound_radius = 0.2;
 
 	simulation->box->compounds[simulation->box->n_compounds++] = createCompound(
@@ -113,20 +113,27 @@ int BoxBuilder::solvateBox(Simulation* simulation)
 
 
 Compound BoxBuilder::createCompound(Float3 com, int compound_index, CompoundState* statebuffer_node, CompoundNeighborList* neighborinfo_node, float dt) {
-	compoundstates_host[compound_index].positions[0] = com;	// PLACE EACH PARTICLE IN COMPOUNDS STATE, BEFORE CREATING COMPOUNDS, LETS US IMMEDIATELY CALCULATE THE COMPOUNDS CENTER OF MASS.
-	compoundstates_host[compound_index].n_particles++;
+
+	int n_atoms = 3;
+	Float3 offsets[3] = { Float3(0,0,0), Float3(0.13, 0, 0), Float3(0, 0, -0.13) };
+	for (int i = 0; i < n_atoms; i++) {
+		compoundstates_host[compound_index].positions[i] = com + offsets[i];	// PLACE EACH PARTICLE IN COMPOUNDS STATE, BEFORE CREATING COMPOUNDS, LETS US IMMEDIATELY CALCULATE THE COMPOUNDS CENTER OF MASS.
+		compoundstates_host[compound_index].n_particles++;
+	}
+	
 	
 
 
 	//Float3 compound_united_vel = Float3(200 - 400 * compound_index, random(), random()).norm() * v_rms;
-	float vrms = 789;
+	float vrms = 0;
 	Float3 compound_united_vel = Float3(vrms - 2*vrms * compound_index, 0,0);
 
 
 	Compound compound(compound_index, neighborinfo_node, statebuffer_node, compoundstates_host);
-	for (int i = 0; i < 1; i++) {
+	for (int i = 0; i < n_atoms; i++) {
 		Float3 atom_pos_sub1 = compoundstates_host[compound_index].positions[i] - compound_united_vel * dt;
 		compound.particles[i] = CompactParticle(12.0107*1e-3, atom_pos_sub1);
+		compound.n_particles++;
 	}
 	return compound;
 }

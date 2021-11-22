@@ -27,7 +27,7 @@ const int MAX_NEAR_BODIES = 256 - MAX_FOCUS_BODIES;
 
 
 const int LOGBLOCK = 0;
-const int LOGTHREAD = 0;
+const int LOGTHREAD = 2;
 
 //const int N_BODIES_START = 40;
 const int N_SOLVATE_MOLECULES = 30;// 60;
@@ -115,10 +115,10 @@ public:
 
 	float box_size = BOX_LEN;	//nm
 	int blocks_per_dim;
-	int n_steps = 4000;
+	int n_steps = 20000;
 
 	const float dt = 1 * 1e-6;		// ns, so first val corresponds to fs
-	int steps_per_render = 40;
+	int steps_per_render = 10;
 
 	//int n_bodies = N_BODIES_START;
 	Box* box;

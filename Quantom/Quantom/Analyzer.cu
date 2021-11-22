@@ -40,7 +40,7 @@ void __global__ monitorEnergyKernel(Box* box, float* data_out, int step) {
 		self_state = box->compound_state_array[blockIdx.x];
 		neighborlist = box->compound_neighborlist_array[blockIdx.x];
 	}
-
+	__syncthreads();
 
 
 	//float potE = force.len();
@@ -48,15 +48,14 @@ void __global__ monitorEnergyKernel(Box* box, float* data_out, int step) {
 
 	float potE = box->data_buffer[0 + threadIdx.x + blockIdx.x * 3 + step * box->n_compounds * 3];	
 
-	Float3 postsub1 = box->trajectory[threadIdx.x + blockIdx.x * blockDim.x + (step) * box->n_compounds * blockDim.x];
-	Float3 postplus1 = box->trajectory[threadIdx.x + blockIdx.x * blockDim.x + (step+1) * box->n_compounds * blockDim.x];
+	Float3 postsub1 = box->trajectory[threadIdx.x + blockIdx.x * blockDim.x + (step - 1) * box->n_compounds * blockDim.x];
+	Float3 postplus1 = box->trajectory[threadIdx.x + blockIdx.x * blockDim.x + (step + 1) * box->n_compounds * blockDim.x];
 
 	for (int i = 0; i < 3; i++) {
 		*postsub1.placeAt(i) += BOX_LEN * ((postplus1.x - postsub1.x) > BOX_LEN_HALF);
 		*postsub1.placeAt(i) -= BOX_LEN * ((postplus1.x - postsub1.x) < -BOX_LEN_HALF);
 	}
-	float vel = (postplus1 - postsub1).len() * 1.f / box->dt;
-	//float vel = (box->trajectory[threadIdx.x + blockIdx.x * blockDim.x + (step + 1) * box->n_compounds * blockDim.x] - box->trajectory[threadIdx.x + blockIdx.x * blockDim.x + (step - 1) * box->n_compounds * blockDim.x]).len() * 0.5 * 1.f / box->dt;
+	float vel = (postplus1 - postsub1).len() * 0.5f / box->dt;
 	float kinE = 0.5 * compound.particles[threadIdx.x].mass * vel * vel;
 
 	float totalE = potE + kinE;
