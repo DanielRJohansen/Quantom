@@ -33,14 +33,29 @@ __device__ float Ray::distToPoint(Float3 point) {
     
 __device__ void Ray::searchCompound(CompoundState* state, Box* box, int compound_index) {
     for (int i = 0; i < state->n_particles; i++) {
-        if (hitsParticle(&state->positions[i], box->rendermolecule.radii[i])) {
-            if (distToSphereIntersect(&state->positions[i], box->rendermolecule.radii[i]) < closest_collision) {
-                atom_type = i;
+        if (hitsParticle(&state->positions[i], 0.170)) {              // LOOK HERE at index 0....
+            float dist = distToSphereIntersect(&state->positions[i], 0.170);
+            if (dist < closest_collision) {
+                closest_collision = dist;
+                atom_type = 0;
                 if (compound_index == LOGBLOCK && i == LOGTHREAD)
                     log_particle = true;        // Temp
             }
         }
     }
+}
+
+__device__ bool Ray::searchSolvent(Float3* pos, Box* box)
+{
+    if (hitsParticle(pos, 0.150)) {
+        float dist = distToSphereIntersect(pos, 0.170);
+        if (dist < closest_collision) {
+            closest_collision = dist;
+            atom_type = 1;
+            return true;
+        }
+    }
+    return false;
 }
 
 
@@ -87,17 +102,50 @@ Raytracer::Raytracer(Simulation* simulation, bool verbose) {
 }
 
 
+
+
+
 __global__ void renderKernel(Ray* rayptr, uint8_t* image, Box* box) {
     int  index = blockIdx.x * blockDim.x + threadIdx.x;
     Ray ray = rayptr[index];
     ray.reset();
+    
+    
 
     for (int i = 0; i < box->n_compounds; i++) {
         CompoundState* compoundstate = &box->compound_state_array[i];
         ray.searchCompound(compoundstate, box, i);
     }
 
+    for (int i = 0; i < box->n_solvents; i++) {
+        if (ray.searchSolvent(&box->solvents[i].pos, box)) {
+            
+        }
+    }
+    
+    
 
+
+
+
+    if (ray.atom_type == 0) {      // Carbon
+        image[index * 4 + 0] = 40;
+        image[index * 4 + 1] = 0;
+        image[index * 4 + 2] = 40;
+        image[index * 4 + 3] = 255;
+    }
+    else if (ray.atom_type == 1) {      // Solvent
+        image[index * 4 + 0] = 200;
+        image[index * 4 + 3] = 255;
+    }
+    else {
+        image[index * 4 + 0] = 0xFE;
+        image[index * 4 + 1] = 0xFE;
+        image[index * 4 + 2] = 0xFA;
+        image[index * 4 + 3] = 0xF2;
+    }
+
+    /*
     for (int i = 0; i < 3; i++) {
         image[index * 4 + i] = box->rendermolecule.colors[ray.atom_type][i];
     }
@@ -108,8 +156,17 @@ __global__ void renderKernel(Ray* rayptr, uint8_t* image, Box* box) {
     
     if (ray.log_particle)
         image[index * 4 + 0] = 50;
+        */
 }
     
+
+
+
+
+
+
+
+
     
 uint8_t* Raytracer::render(Simulation* simulation) {
     auto start = std::chrono::high_resolution_clock::now();

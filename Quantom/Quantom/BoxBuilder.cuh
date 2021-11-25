@@ -10,19 +10,17 @@ public:
 	void build(Simulation* simulation);
 
 
-	const int max_compounds = 10'000;								// DO we want something const here? Smaller val?
 private:
 
 	void placeMainMolecule(Simulation* simulation);
 	int solvateBox(Simulation* simulation);					// Returns # of solvate compounds placed
 	Compound createCompound(Float3 com, int compound_index,
 		CompoundState* statebuffer_node, CompoundNeighborList* neighborinfo_node, float dt);
-	Compound createSolvent(Float3 com, int compound_index, 
-		CompoundState* statebuffer_node, CompoundNeighborList* neighborinfo_node, float dt);
-	bool spaceAvailable(Float3 com, float radius);
+	Solvent createSolvent(Float3 com, float dt);
+	bool spaceAvailable(Box* box, Float3 com, float radius);
 	void compoundLinker(Simulation* simulation);									// Temp function
-
-
+	void solvateLinker(Simulation* simulation);
+	void solvateCompoundCrosslinker(Simulation* simulation);
 	
 
 	// ---------------------------------------------------- Variables ---------------------------------------------------- //
@@ -54,8 +52,8 @@ private:
 
 	// We cannot use the pointers in the box, as they must be on device from start, 
 	// since the compounds must know the adresses as they are created.
-	CompoundState* compoundstates_host;		
-	CompoundNeighborList* compoundneighborlists_host;
+	//CompoundState* compoundstates_host;		
+	//CompoundNeighborList* compoundneighborlists_host;
 	//----------------------------------------------------------------------//
 	
 	

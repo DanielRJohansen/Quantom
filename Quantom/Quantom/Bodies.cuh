@@ -104,6 +104,19 @@ struct CompactParticle {	// Contains information only needed by the Ownerkernel
 
 
 
+constexpr float SOLVENT_MASS = 18.01528f;
+struct Solvent {
+	Solvent() {}
+	Solvent(Float3 pos, Float3 pos_tsub1) : pos(pos), pos_tsub1(pos_tsub1) {}
+
+	Float3 pos;
+	Float3 pos_tsub1;
+};
+
+
+
+
+
 
 //--------------------------- THE FOLLOWING IS FOR HANDLING INTRAMOLECULAR FORCES ---------------------------//
 
@@ -138,10 +151,51 @@ struct AngleBond {
 
 // ------------------------------------------------- COMPOUNDS ------------------------------------------------- //
 
-struct CompoundNeighborList {
-	uint32_t neighborcompound_indexes[256]; // For now so we dont need to track, adjust to 16 or 32 later!!
+class NeighborList {
+public:
+	__host__ void init(uint16_t* index_buffer, int max_indexes) {
+		for (int i = 0; i < max_indexes; i++) {
+			index_buffer[i] = 0xFFFF;
+		}
+	}
+	__host__ void addIndex(int new_index, uint16_t* index_buffer, int max_indexes, uint8_t* neighbor_cnt) {
+		for (int i = 0; i < max_indexes; i++) {
+			if (index_buffer[i] == 0xFFFF) {
+				index_buffer[i] = new_index;
+				(*neighbor_cnt)++;
+				return;
+			}
+		}
+	}
+};
+class CompoundNeighborList : public NeighborList {	// Both compounds and solvents have one of these
+public:
+	CompoundNeighborList() {
+		init(neighborcompound_indexes, 32);
+	}
+	__host__ void addIndex(int new_index) {
+		NeighborList::addIndex(new_index, neighborcompound_indexes, 32, &n_neighbors);
+	}
+	uint16_t neighborcompound_indexes[32]; // For now so we dont need to track, adjust to 16 or 32 later!!
 	uint8_t n_neighbors = 0;					// adjust too?
 };
+
+class SolventNeighborList : public NeighborList{						// Both compounds and solvents have one of these
+public:
+	SolventNeighborList() {
+		init(neighborsolvent_indexes, 32);
+	}
+	__host__ void addIndex(int new_index) {
+		NeighborList::addIndex(new_index, neighborsolvent_indexes, 32, &n_neighbors);
+	}
+	uint16_t neighborsolvent_indexes[256]; 
+	uint8_t n_neighbors = 0;
+};
+
+
+
+
+
 struct CompoundState {
 	Float3 positions[64];
 	uint8_t n_particles = 0;
@@ -164,11 +218,10 @@ const float CC_refdist = 0.153; // nm
 const float CCC_reftheta = 1.953; // nm
 struct Compound {
 	__host__ Compound() {}	// {}
-	__host__ Compound(uint32_t index, CompoundNeighborList* neighborlist_device, CompoundState* state_device,
-		CompoundState* states_host) {
+	__host__ Compound(uint32_t index, CompoundState* states_host) {
 		this->index = index;
-		compound_neighborlist_ptr = neighborlist_device;
-		compound_state_ptr = state_device;
+		//compound_neighborlist_ptr = neighborlist_device;
+		//compound_state_ptr = state_device;
 
 		pairbonds[0] = PairBond(CC_refdist, 0, 1);
 		n_pairbonds++;
@@ -181,18 +234,20 @@ struct Compound {
 
 		for (uint32_t i = 0; i < n_particles; i++)
 			center_of_mass = center_of_mass + states_host->positions[i];
-		center_of_mass = center_of_mass * (1.f / n_particles);
+		center_of_mass = center_of_mass * (1.f / states_host->n_particles);
 
-		radius = pairbonds[0].reference_dist * n_particles;					// TODO: Shitty estimate, do better later
+		radius = pairbonds[0].reference_dist * states_host->n_particles;					// TODO: Shitty estimate, do better later
 	};
 	
+
+
 	__host__ bool intersects(Compound a) {
 		return (a.center_of_mass - center_of_mass).len() < (a.radius + radius + max_LJ_dist);
 	}
 
 	uint32_t index;										// Is this necessary
-	CompoundState* compound_state_ptr;
-	CompoundNeighborList* compound_neighborlist_ptr;
+	//CompoundState* compound_state_ptr;
+	//CompoundNeighborList* compound_neighborlist_ptr;
 
 	uint8_t n_particles = 0;
 	CompactParticle particles[MAX_PARTICLES];
@@ -205,4 +260,10 @@ struct Compound {
 
 	uint16_t n_anglebonds = 0;
 	AngleBond anglebonds[MAX_ANGLEBONDS];
+};
+
+
+struct Molecule1 {
+	int n_compounds = 0;
+	Compound* compounds;
 };

@@ -6,6 +6,12 @@ Environment::Environment() {
 	simulation = new Simulation();
 
 	engine = new Engine;
+
+	
+	//Molecule1 molecule = compoundbuilder.buildMolecule("D:\\Quantom\\17T_-_clean_peptide.pdb");
+
+
+
 	simulation = engine->prepSimulation(simulation);
 	printf("Engine ready\n");
 	if (!verifySimulationParameters()) {
@@ -40,7 +46,6 @@ void Environment::run() {
 
 		for (int i = 0; i < simulation->steps_per_render; i++) {
 			engine->step();
-			//simulation->finished = true;
 
 			if (simulation->finished)
 				break;
@@ -51,8 +56,6 @@ void Environment::run() {
 		printf("\tAverage step time: %.1fms (%d/%d/%d)  Remaining: %ds",  duration/simulation->steps_per_render, engine->timings.x/simulation->steps_per_render, engine->timings.y / simulation->steps_per_render, engine->timings.z / simulation->steps_per_render, remaining_seconds);
 		engine->timings = Int3(0, 0, 0);
 
-
-
 		if (!(simulation->step % simulation->steps_per_render)) {
 			display->render(simulation);
 
@@ -60,7 +63,7 @@ void Environment::run() {
 			if (interface->quit)
 				display->terminate();
 		}
-		
+
 
 		if (steps++ == -1)
 			break;

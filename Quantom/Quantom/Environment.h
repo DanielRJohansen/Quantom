@@ -6,6 +6,8 @@
 #include "Interface.h"
 #include "Engine.cuh"
 #include "Analyzer.cuh"
+#include "CompoundBuilder.h"
+
 
 // For logging
 #include <fstream>
@@ -31,6 +33,8 @@ private:
 	Interface* interface;
 	Engine* engine;
 	Analyzer analyzer;
+	CompoundBuilder compoundbuilder;
+
 
 	// These should be in interface maybe?
 	void printOut(float* data);

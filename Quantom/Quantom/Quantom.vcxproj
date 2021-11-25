@@ -80,6 +80,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="BoxBuilder.cu" />
+    <ClCompile Include="CompoundBuilder.cpp" />
     <ClCompile Include="Display.cpp" />
     <ClCompile Include="Environment.cpp" />
     <ClCompile Include="Interface.cpp" />
@@ -89,6 +90,7 @@
     <ClInclude Include="Analyzer.cuh" />
     <ClInclude Include="Bodies.cuh" />
     <ClInclude Include="BoxBuilder.cuh" />
+    <ClInclude Include="CompoundBuilder.h" />
     <ClInclude Include="Display.h" />
     <ClInclude Include="Engine.cuh" />
     <ClInclude Include="Environment.h" />

@@ -145,6 +145,19 @@ struct BlockMutex {
 */
 
 
+template<typename T>
 
+T* genericMoveToDevice(T* data_ptr, int n_elements) {
+	T* gpu_ptr;
+	int bytesize = n_elements * sizeof(T);
 
+	cudaMallocManaged(&gpu_ptr, bytesize);
+	cudaMemcpy(gpu_ptr, data_ptr, bytesize, cudaMemcpyHostToDevice);
+	delete data_ptr;
+
+	data_ptr = gpu_ptr;
+
+	printf("Moved %d bytes to device\n", bytesize);
+	return gpu_ptr;
+}
 
