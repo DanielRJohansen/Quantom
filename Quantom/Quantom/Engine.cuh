@@ -18,6 +18,7 @@
 
 
 __global__ void forceKernel(Box* box, int testval);
+__global__ void solventForceKernel(Box* box, int testval);
 __global__ void initKernel(Box* box);	// For now, just initializes previous potential energy
 
 

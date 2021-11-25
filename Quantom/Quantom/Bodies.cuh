@@ -226,7 +226,7 @@ struct Compound {
 		pairbonds[0] = PairBond(CC_refdist, 0, 1);
 		n_pairbonds++;
 
-		pairbonds[1] = PairBond(CC_refdist, 0, 2);
+		pairbonds[1] = PairBond(CC_refdist, 1, 2);
 		n_pairbonds++;
 
 		anglebonds[0] = AngleBond(CCC_reftheta, 1, 0, 2);

@@ -137,8 +137,8 @@ Compound BoxBuilder::createCompound(Float3 com, int compound_index, CompoundStat
 		statebuffer_node->n_particles++;
 	}
 	
-	float vrms = 0;
-	Float3 compound_united_vel = Float3(vrms - 2*vrms * compound_index, 0,0);
+	float vrms = 250;
+	Float3 compound_united_vel = Float3(vrms , 0,0);
 	Compound compound(compound_index, statebuffer_node);
 	for (int i = 0; i < n_atoms; i++) {
 		Float3 atom_pos_sub1 = statebuffer_node->positions[i] - compound_united_vel * dt;

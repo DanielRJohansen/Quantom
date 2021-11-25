@@ -24,7 +24,7 @@ const int LOGBLOCK = 0;
 const int LOGTHREAD = 2;
 
 //const int N_BODIES_START = 40;
-const int N_SOLVATE_MOLECULES = 4*4*4;// 60;
+const int N_SOLVATE_MOLECULES = 27;// 60;
 const int BLOCKS_PER_SM = 512;
 //const int GRIDBLOCKS_PER_BODY = 16;
 //const int THREADS_PER_GRIDBLOCK = MAX_BLOCK_BODIES / GRIDBLOCKS_PER_BODY;

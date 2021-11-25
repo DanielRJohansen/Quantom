@@ -48,7 +48,7 @@ __device__ void Ray::searchCompound(CompoundState* state, Box* box, int compound
 __device__ bool Ray::searchSolvent(Float3* pos, Box* box)
 {
     if (hitsParticle(pos, 0.150)) {
-        float dist = distToSphereIntersect(pos, 0.170);
+        float dist = distToSphereIntersect(pos, 0.150);
         if (dist < closest_collision) {
             closest_collision = dist;
             atom_type = 1;
