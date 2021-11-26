@@ -80,12 +80,15 @@ void Engine::step() {
 
 
 	auto t0 = std::chrono::high_resolution_clock::now();
-	forceKernel <<< simulation->box->n_compounds, MAX_PARTICLES >>> (simulation->box, testval++);
+	forceKernel <<< simulation->box->n_compounds, MAX_PARTICLES >>> (simulation->box, testval);
+	solventForceKernel <<<8, 64 >>> (simulation->box, testval);
+	testval++;
+
 	cudaDeviceSynchronize();
 	auto t1 = std::chrono::high_resolution_clock::now();
 
 	cudaMemcpy(simulation->box->compound_state_array, simulation->box->compound_state_array_next, sizeof(CompoundState) * MAX_COMPOUNDS, cudaMemcpyDeviceToDevice);	// Update all positions, after all forces have been calculated
-	//cudaMemcpy(simulation->box->solvents, simulation->box->solvents_next, sizeof(Solvent) * MAX_SOLVENTS, cudaMemcpyDeviceToDevice);
+	cudaMemcpy(simulation->box->solvents, simulation->box->solvents_next, sizeof(Solvent) * MAX_SOLVENTS, cudaMemcpyDeviceToDevice);
 	cudaDeviceSynchronize();
 	auto t2 = std::chrono::high_resolution_clock::now();
 
@@ -143,6 +146,7 @@ __device__ float getAngle(Float3 v1, Float3 v2) {
 }
 
 
+
 __device__ void determineMoleculerHyperposOffset(Float3* utility_buffer, Float3* compund_center, Float3* neighbor_center) {		// Called with 3 threads!! I hope i dont have to search for any bugs here! :D
 	if (threadIdx.x < 3) {
 		*utility_buffer[0].placeAt(threadIdx.x) =
@@ -166,6 +170,10 @@ __device__ Float3 getSolventHyperposOffset(Float3* self_pos, Float3* other_pos) 
 	);
 }
 
+__device__ Float3 forcePositionToInsideBox(Float3* current_position) {	// Only changes position if position is outside of box;
+	*current_position += Float3(BOX_LEN, BOX_LEN, BOX_LEN);
+	*current_position = current_position->elementwiseModulus(BOX_LEN);
+}
 
 
 
@@ -529,8 +537,7 @@ __global__ void forceKernel(Box* box, int step_test) {
 
 
 __global__ void solventForceKernel(Box* box, int step_test) {
-	__shared__ Float3 solvent_positions[2048];
-	//__shared__
+	//__shared__ Float3 solvent_positions[2048];
 
 	int index = threadIdx.x + blockIdx.x * blockDim.x;
 	if (index >= box->n_solvents) { return; }
@@ -540,14 +547,17 @@ __global__ void solventForceKernel(Box* box, int step_test) {
 
 
 	Solvent solvent = box->solvents[index];
-	__syncthreads();
 
 	force += computeLJForces(box, &solvent.pos, &box->compound_neighborlist_array[MAX_COMPOUNDS + index], &box->solvent_neighborlist_array[MAX_COMPOUNDS + index], data_ptr);
 
 	integratePosition(&solvent.pos, &solvent.pos_tsub1, &force, SOLVENT_MASS, box->dt);
-	box->solvents[index].pos_tsub1 = solvent.pos_tsub1;
+	//box->solvents[index].pos_tsub1 = solvent.pos_tsub1;	// Not needed for solvents, as pos_tsub1 is contained in the solvents_next;
 
 	
+	forcePositionToInsideBox(&solvent.pos);
+
+	box->solvents_next[index] = solvent;
+
 	__syncthreads();
 }
 

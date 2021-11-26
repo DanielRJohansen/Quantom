@@ -142,7 +142,7 @@ __global__ void renderKernel(Ray* rayptr, uint8_t* image, Box* box) {
         image[index * 4 + 0] = 0xFE;
         image[index * 4 + 1] = 0xFE;
         image[index * 4 + 2] = 0xFA;
-        image[index * 4 + 3] = 0xF2;
+        image[index * 4 + 3] = 0xE2;
     }
 
     /*
