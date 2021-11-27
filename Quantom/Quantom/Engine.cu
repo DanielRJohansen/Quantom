@@ -72,6 +72,8 @@ void Engine::updateNeighborLists() {	// Write actual function later;
 
 
 void Engine::step() {
+	if (simulation->box->step==simulation->n_steps)
+		return;
 	cuda_status = cudaGetLastError();
 	if (cuda_status != cudaSuccess) {
 		fprintf(stderr, "Error before step!");
