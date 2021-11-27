@@ -17,8 +17,8 @@
 #include <fstream>	// TEMP
 
 
-__global__ void forceKernel(Box* box, int testval);
-__global__ void solventForceKernel(Box* box, int testval);
+__global__ void forceKernel(Box* box);
+__global__ void solventForceKernel(Box* box);
 __global__ void initKernel(Box* box);	// For now, just initializes previous potential energy
 
 
@@ -30,7 +30,7 @@ public:
 	Engine(){}
 
 	Simulation* prepSimulation(Simulation* simulation);
-	float* getDatabuffer();
+	//float* getDatabuffer();
 	bool testFunction();
 	void step();
 	float* analyzeEnergy();

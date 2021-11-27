@@ -5,7 +5,7 @@
 
 
 
-constexpr float BOX_LEN = 3.0;	// Multiple of FOCUS_LEN please!
+constexpr float BOX_LEN = 3.f;	// Multiple of FOCUS_LEN please!
 
 constexpr float BOX_LEN_HALF = BOX_LEN/2.f;
 constexpr float BOX_BASE = -BOX_LEN_HALF;
@@ -14,17 +14,17 @@ constexpr float FOCUS_LEN = 2;
 constexpr float BLOCK_LEN = FOCUS_LEN * 2;	//nm
 constexpr float FOCUS_LEN_HALF = BLOCK_LEN / 4.f;
 
-constexpr float edgeforce_scalar = 100000.f;
-constexpr float edgeforce_scalar_half = edgeforce_scalar/2.f;
-
-
 
 
 const int LOGBLOCK = 0;
-const int LOGTHREAD = 2;
-
+const int LOGTHREAD = 53;
+const int LOGTYPE = 0;	// 0 for solvent, 1 for compound
 //const int N_BODIES_START = 40;
-const int N_SOLVATE_MOLECULES = 27;// 60;
+const int N_SOLVATE_MOLECULES = 4*4*4;// 60;
+//const int N_SOLVATE_MOLECULES = 3;
+
+
+const int PARTICLES_PER_COMPOUND = 3;
 const int BLOCKS_PER_SM = 512;
 //const int GRIDBLOCKS_PER_BODY = 16;
 //const int THREADS_PER_GRIDBLOCK = MAX_BLOCK_BODIES / GRIDBLOCKS_PER_BODY;
@@ -37,7 +37,7 @@ const int LOG_P_ID = 17;
 
 const int MAX_COMPOUNDS = 0xFF;
 const int MAX_SOLVENTS = 0xFFFF;
-constexpr float CUTOFF = 3.0f;	//nm/
+constexpr float CUTOFF = 5.0f;	//nm/
 
 
 class Box {
@@ -47,6 +47,7 @@ public:
 
 	uint32_t n_compounds = 0;
 	uint16_t n_solvents = 0;
+	uint32_t total_particles = 0;
 	//uint32_t n_solvents = 0;
 
 	RenderMolecule rendermolecule;	// Not proud, TEMP
@@ -64,13 +65,12 @@ public:
 
 
 
-	float* outdata;	// Temp, for longging values to whatever
+	float* outdata;			// Temp, for longging values to whatever
 	uint32_t step = 0;
 	float dt;
 
 
-	float* data_buffer;		// also temp, for total energy summation
-
+	float* potE_buffer;		// For total energy summation
 	Float3* trajectory;
 
 
@@ -87,7 +87,7 @@ public:
 		solvent_neighborlist_array = genericMoveToDevice(solvent_neighborlist_array, MAX_COMPOUNDS + MAX_SOLVENTS);
 
 
-		cudaMallocManaged(&outdata, sizeof(float) * 10 * 10000);	// 10 data streams for 10k steps. 1 step at a time.
+		
 
 
 		cudaDeviceSynchronize();
@@ -114,15 +114,15 @@ public:
 	}
 
 	bool finished = false;
-	int step = 0;
+	//int step = 0;
 
 
 	float box_size = BOX_LEN;	//nm
 	int blocks_per_dim;
-	int n_steps = 10000;
-
+	int n_steps = 1372;
+	//int n_steps = 3000;
 	const float dt = 1 * 1e-6;		// ns, so first val corresponds to fs
-	int steps_per_render = 20;
+	int steps_per_render = 4000;
 
 	//int n_bodies = N_BODIES_START;
 	Box* box;

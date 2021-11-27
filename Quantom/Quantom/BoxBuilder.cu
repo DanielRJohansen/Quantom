@@ -27,14 +27,17 @@ void BoxBuilder::build(Simulation* simulation) {
 
 	//cudaMalloc(&simulation->box->solvents, sizeof(Solvent) * MAX_SOLVENTS);
 
-
+	if (N_SOLVATE_MOLECULES > 256) {
+		printf("Critical indexing failure\n");
+		exit(1);
+	}
 
 
 
 
 	placeMainMolecule(simulation);
 	solvateBox(simulation);	// Always do after placing compounds
-
+	simulation->box->total_particles = simulation->box->n_compounds * PARTICLES_PER_COMPOUND + simulation->box->n_solvents;
 
 	compoundLinker(simulation);
 	solvateLinker(simulation);
@@ -43,9 +46,6 @@ void BoxBuilder::build(Simulation* simulation) {
 
 
 	
-	int n_points = simulation->box->n_compounds * 3 * simulation->n_steps;
-	cudaMalloc(&simulation->box->data_buffer, sizeof(float) * n_points);	// Can only log molecules of size 3 for now...
-										
 
 
 
@@ -64,11 +64,14 @@ void BoxBuilder::build(Simulation* simulation) {
 
 
 
-	printf("N points: %d\n", simulation->box->n_compounds * 3 * simulation->n_steps);
-	cudaMalloc(&simulation->box->trajectory, sizeof(Float3) * simulation->box->n_compounds * 3 * simulation->n_steps);
-
-
-
+	int n_points = simulation->box->total_particles * simulation->n_steps;
+	cudaMalloc(&simulation->box->potE_buffer, sizeof(float) * n_points);	// Can only log molecules of size 3 for now...
+	cudaMalloc(&simulation->box->trajectory, sizeof(Float3) * n_points);
+	//cudaMemset(&simulation->box->trajectory, 0, sizeof(float) * traj_points * 3);	// uhhhhhhhhhhhhhhhhahahaha dunno bout this
+	cudaMallocManaged(&simulation->box->outdata, sizeof(float) * 10 * simulation->n_steps);	// 10 data streams for 10k steps. 1 step at a time.
+	// 
+	// 
+	//cudaMalloc(&simulation->box->trajectory, sizeof(Float3) * simulation->box->n_compounds * 3 * simulation->n_steps);
 
 	simulation->box->moveToDevice();
 }
@@ -130,7 +133,7 @@ int BoxBuilder::solvateBox(Simulation* simulation)
 
 Compound BoxBuilder::createCompound(Float3 com, int compound_index, CompoundState* statebuffer_node, CompoundNeighborList* neighborinfo_node, float dt) {
 
-	int n_atoms = 3;
+	int n_atoms = PARTICLES_PER_COMPOUND;
 	Float3 offsets[3] = { Float3(0,0,0), Float3(0.13, 0, 0), Float3(0, 0, -0.13) };
 	for (int i = 0; i < n_atoms; i++) {
 		statebuffer_node->positions[i] = com + offsets[i];	// PLACE EACH PARTICLE IN COMPOUNDS STATE, BEFORE CREATING COMPOUNDS, LETS US IMMEDIATELY CALCULATE THE COMPOUNDS CENTER OF MASS.

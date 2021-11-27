@@ -104,7 +104,7 @@ struct CompactParticle {	// Contains information only needed by the Ownerkernel
 
 
 
-constexpr float SOLVENT_MASS = 18.01528f;
+constexpr float SOLVENT_MASS = 18.01528f * 1e-3;	// kg/mol
 struct Solvent {
 	Solvent() {}
 	Solvent(Float3 pos, Float3 pos_tsub1) : pos(pos), pos_tsub1(pos_tsub1) {}
@@ -183,10 +183,10 @@ public:
 class SolventNeighborList : public NeighborList{						// Both compounds and solvents have one of these
 public:
 	SolventNeighborList() {
-		init(neighborsolvent_indexes, 32);
+		init(neighborsolvent_indexes, 256);
 	}
 	__host__ void addIndex(int new_index) {
-		NeighborList::addIndex(new_index, neighborsolvent_indexes, 32, &n_neighbors);
+		NeighborList::addIndex(new_index, neighborsolvent_indexes, 256, &n_neighbors);
 	}
 	uint16_t neighborsolvent_indexes[256]; 
 	uint8_t n_neighbors = 0;
@@ -226,7 +226,7 @@ struct Compound {
 		pairbonds[0] = PairBond(CC_refdist, 0, 1);
 		n_pairbonds++;
 
-		pairbonds[1] = PairBond(CC_refdist, 1, 2);
+		pairbonds[1] = PairBond(CC_refdist, 0, 2);
 		n_pairbonds++;
 
 		anglebonds[0] = AngleBond(CCC_reftheta, 1, 0, 2);

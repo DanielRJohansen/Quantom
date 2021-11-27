@@ -38,20 +38,22 @@ __device__ void Ray::searchCompound(CompoundState* state, Box* box, int compound
             if (dist < closest_collision) {
                 closest_collision = dist;
                 atom_type = 0;
-                if (compound_index == LOGBLOCK && i == LOGTHREAD)
-                    log_particle = true;        // Temp
+                //if (compound_index == LOGBLOCK && i == LOGTHREAD)
+                  //  log_particle = true;        // Temp
             }
         }
     }
 }
 
-__device__ bool Ray::searchSolvent(Float3* pos, Box* box)
+__device__ bool Ray::searchSolvent(Float3* pos, Box* box, int solvent_index)
 {
     if (hitsParticle(pos, 0.150)) {
         float dist = distToSphereIntersect(pos, 0.150);
         if (dist < closest_collision) {
             closest_collision = dist;
             atom_type = 1;
+            if (solvent_index == LOGTHREAD)
+                log_particle = true;
             return true;
         }
     }
@@ -118,7 +120,7 @@ __global__ void renderKernel(Ray* rayptr, uint8_t* image, Box* box) {
     }
 
     for (int i = 0; i < box->n_solvents; i++) {
-        if (ray.searchSolvent(&box->solvents[i].pos, box)) {
+        if (ray.searchSolvent(&box->solvents[i].pos, box, i)) {
             
         }
     }
@@ -145,6 +147,9 @@ __global__ void renderKernel(Ray* rayptr, uint8_t* image, Box* box) {
         image[index * 4 + 3] = 0xE2;
     }
 
+    if (ray.log_particle) {        
+        image[index * 4 + 1] = 255;
+    }
     /*
     for (int i = 0; i < 3; i++) {
         image[index * 4 + i] = box->rendermolecule.colors[ray.atom_type][i];

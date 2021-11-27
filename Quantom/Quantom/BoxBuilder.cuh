@@ -35,7 +35,7 @@ private:
 	float m = 18.01528;					// g/mol
 	float M = m * 0.001;				// kg/mol
 	//float k_B = 8.617333262145 * 10e-5;	// Boltzmann constant
-	double k_B = 1.380 * 1e-23;
+	float k_B = 1.380 * 1e-23;
 	float T = 293;	// Kelvin
 	float R = 8.3144;					// J/(Kelvin*mol)
 	float mean_velocity = m / (2 * k_B * T);

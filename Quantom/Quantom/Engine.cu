@@ -23,7 +23,7 @@ Simulation* Engine::prepSimulation(Simulation* simulation) {
 
 	return this->simulation;
 }
-
+/*
 float* Engine::getDatabuffer() {
 	float* host_data;
 	int n_datapoints = simulation->box->n_compounds * 3 * 2 * 10000;
@@ -38,7 +38,7 @@ float* Engine::getDatabuffer() {
 	cudaDeviceSynchronize();
 	return host_data;
 }
-
+*/
 
 
 
@@ -80,14 +80,13 @@ void Engine::step() {
 
 
 	auto t0 = std::chrono::high_resolution_clock::now();
-	forceKernel <<< simulation->box->n_compounds, MAX_PARTICLES >>> (simulation->box, testval);
-	solventForceKernel <<<8, 64 >>> (simulation->box, testval);
-	testval++;
+	//forceKernel <<< simulation->box->n_compounds, MAX_PARTICLES >>> (simulation->box);
+	solventForceKernel <<<8, 64 >>> (simulation->box);
 
 	cudaDeviceSynchronize();
 	auto t1 = std::chrono::high_resolution_clock::now();
 
-	cudaMemcpy(simulation->box->compound_state_array, simulation->box->compound_state_array_next, sizeof(CompoundState) * MAX_COMPOUNDS, cudaMemcpyDeviceToDevice);	// Update all positions, after all forces have been calculated
+	//cudaMemcpy(simulation->box->compound_state_array, simulation->box->compound_state_array_next, sizeof(CompoundState) * MAX_COMPOUNDS, cudaMemcpyDeviceToDevice);	// Update all positions, after all forces have been calculated
 	cudaMemcpy(simulation->box->solvents, simulation->box->solvents_next, sizeof(Solvent) * MAX_SOLVENTS, cudaMemcpyDeviceToDevice);
 	cudaDeviceSynchronize();
 	auto t2 = std::chrono::high_resolution_clock::now();
@@ -101,7 +100,7 @@ void Engine::step() {
 	timings = timings + Int3(force_duration, copy_duration, 0);
 	
 
-	simulation->step++;
+	//simulation->step++;
 }
 
 
@@ -170,7 +169,7 @@ __device__ Float3 getSolventHyperposOffset(Float3* self_pos, Float3* other_pos) 
 	);
 }
 
-__device__ Float3 forcePositionToInsideBox(Float3* current_position) {	// Only changes position if position is outside of box;
+__device__ void applyPBC(Float3* current_position) {	// Only changes position if position is outside of box;
 	*current_position += Float3(BOX_LEN, BOX_LEN, BOX_LEN);
 	*current_position = current_position->elementwiseModulus(BOX_LEN);
 }
@@ -189,7 +188,7 @@ __device__ Float3 calcLJForce(Float3* pos0, Float3* pos1, float* data_ptr) {	// 
 	float f12 = f6 * f6;
 
 	//float force = 1.f / (dist) * f6 * (1.f - 2.f * f6);
-	float force = 24.f * epsilon / (dist)*f6 * (1.f - 2.f * f6);
+	float force = 24.f * (epsilon / dist) * f6 * (1.f - 2.f * f6);
 
 	float LJ_pot = 4 * epsilon * (f12 - f6);
 	Float3 force_unit_vector = (*pos1 - *pos0).norm();
@@ -198,9 +197,15 @@ __device__ Float3 calcLJForce(Float3* pos0, Float3* pos1, float* data_ptr) {	// 
 	//printf("Mol %d force %f\n", blockIdx.x, (force_unit_vector * force).x);
 	data_ptr[0] += LJ_pot *0.5;
 	data_ptr[1] = force;
+	data_ptr[2] = dist;
 
-	if (LJ_pot > 50'000) {
+	//if (dist < 0.18f) {
+	if (abs(LJ_pot) > 7000) {
+		printf("\nThread %d dist %f pot %f\n", threadIdx.x, (*pos0 - *pos1).len(), LJ_pot);
+		(*pos0 - *pos1).print('v');
+		(force_unit_vector * force).print('f');
 		//printf("\n\n KILOFORCE! Block %d thread %d\n", blockIdx.x, threadIdx.x);
+		//(force_unit_vector * force).print('f');
 	}
 	return force_unit_vector * force;	//J/mol*M	(M is direction)
 }
@@ -347,6 +352,7 @@ __device__ Float3 computeLJForces(Box* box, Float3* self_pos, CompoundNeighborLi
 		Float3 other_pos = box->solvents[solventneighbor_list->neighborsolvent_indexes[i]].pos;
 		other_pos += getSolventHyperposOffset(self_pos, &other_pos);
 		force += calcLJForce(self_pos, &other_pos, data_ptr);
+
 	}
 
 	//force = force * 24.f * epsilon;
@@ -382,6 +388,7 @@ __device__ void integratePosition(Float3* pos, Float3* pos_tsub1, Float3* force,
 	Float3 temp = *pos;
 	*pos = *pos * 2 - *pos_tsub1 + *force * (1.f / mass) * dt * dt;	// no *0.5?
 	*pos_tsub1 = temp;
+	//printf("force: %f\n", force->len());
 }
 __device__ void integratePosition(CompactParticle* particle, Float3* particle_pos, Float3* particle_force, float* dt) {
 	Float3 temp = *particle_pos;
@@ -398,7 +405,7 @@ __device__ void integratePosition(CompactParticle* particle, Float3* particle_po
 
 
 
-__global__ void forceKernel(Box* box, int step_test) {
+__global__ void forceKernel(Box* box) {
 	__shared__ Compound compound;
 	__shared__ CompoundState self_state;
 	__shared__ CompoundState neighborstate_buffer;
@@ -504,14 +511,13 @@ __global__ void forceKernel(Box* box, int step_test) {
 
 	
 	// ------------------------------------ DATA LOG ------------------------------- //
-
-	if (threadIdx.x < 3) {
-		box->data_buffer[threadIdx.x + blockIdx.x * 3 + step_test * box->n_compounds * 3] = data_ptr[0] + data_ptr[2];
-		box->trajectory[threadIdx.x + blockIdx.x * 3 + (box->step) * box->n_compounds * 3] = self_state.positions[threadIdx.x];
+	if (threadIdx.x < 3) {	// TODO: UPDATE 3 TO PARTICLES_PER_COMPOUND
+		box->potE_buffer[threadIdx.x + blockIdx.x * PARTICLES_PER_COMPOUND + box->step * box->total_particles] = data_ptr[0] + data_ptr[2];
+		box->trajectory[threadIdx.x + blockIdx.x * PARTICLES_PER_COMPOUND + (box->step) * box->total_particles] = self_state.positions[threadIdx.x];
 	}
 	__syncthreads();
 
-	if (blockIdx.x == LOGBLOCK && threadIdx.x == LOGTHREAD && box->step < 10000) {
+	if (blockIdx.x == LOGBLOCK && threadIdx.x == LOGTHREAD && LOGTYPE == 1) {
 		//box->outdata[0 + box->step * 10] = bondlen;
 		box->outdata[0 + box->step * 10] = self_state.positions[63].x;	//bondlen
 		//box->outdata[2 + box->step * 10] = potE;	//pairbond force
@@ -529,36 +535,61 @@ __global__ void forceKernel(Box* box, int step_test) {
 
 	if (threadIdx.x == 0) {
 		box->compound_state_array_next[blockIdx.x] = self_state;
-	}
-		
+	}	
 }
 
 
 
 
-__global__ void solventForceKernel(Box* box, int step_test) {
-	//__shared__ Float3 solvent_positions[2048];
+__global__ void solventForceKernel(Box* box) {
+	int solvent_index = threadIdx.x + blockIdx.x * blockDim.x;
+	if (solvent_index >= box->n_solvents) { return; }
 
-	int index = threadIdx.x + blockIdx.x * blockDim.x;
-	if (index >= box->n_solvents) { return; }
+	float data_ptr[4];	// Pot, force, ?, ?
+	for (int i = 0; i < 4; i++)
+		data_ptr[i] = 0;
+	data_ptr[2] = 9999.f;
+	Float3 force(0,0,0);
 
-	float data_ptr[4];
-	Float3 force;
 
+	Solvent solvent = box->solvents[solvent_index];
 
-	Solvent solvent = box->solvents[index];
-
-	force += computeLJForces(box, &solvent.pos, &box->compound_neighborlist_array[MAX_COMPOUNDS + index], &box->solvent_neighborlist_array[MAX_COMPOUNDS + index], data_ptr);
+	force += computeLJForces(box, &solvent.pos, &box->compound_neighborlist_array[MAX_COMPOUNDS + solvent_index], &box->solvent_neighborlist_array[MAX_COMPOUNDS + solvent_index], data_ptr);
 
 	integratePosition(&solvent.pos, &solvent.pos_tsub1, &force, SOLVENT_MASS, box->dt);
 	//box->solvents[index].pos_tsub1 = solvent.pos_tsub1;	// Not needed for solvents, as pos_tsub1 is contained in the solvents_next;
 
 	
-	forcePositionToInsideBox(&solvent.pos);
+	applyPBC(&solvent.pos);	// forcePositionToInsideBox
 
-	box->solvents_next[index] = solvent;
 
-	__syncthreads();
+
+
+
+	// ------------------------------------ DATA LOG ------------------------------- //
+	{
+		int compounds_offset = box->n_compounds * PARTICLES_PER_COMPOUND;
+		box->potE_buffer[compounds_offset + solvent_index + (box->step) * box->total_particles] = data_ptr[0];
+		box->trajectory[compounds_offset + solvent_index + (box->step) * box->total_particles] = solvent.pos;
+		//box->trajectory[compounds_offset + solvent_index + (box->step) * box->total_particles].print('g');
+		if (solvent_index == LOGTHREAD && LOGTYPE == 0) {
+			//printf("\nindex: %d\n", compounds_offset + solvent_index + (box->step) * box->total_particles);			
+			//solvent.pos.print('p');
+			box->outdata[3 + box->step * 10] = data_ptr[0];	// LJ pot
+			box->outdata[4 + box->step * 10] = (solvent.pos-solvent.pos_tsub1).len()/box->dt;	// approx. vel
+			box->outdata[5 + box->step * 10] = data_ptr[2];	// closest particle	
+			//printf("%f\n", data_ptr[2]);
+		}
+	}
+
+	// ----------------------------------------------------------------------------- //
+
+
+
+	box->solvents_next[solvent_index] = solvent;
+
+
+	//__syncthreads();
 }
 
 

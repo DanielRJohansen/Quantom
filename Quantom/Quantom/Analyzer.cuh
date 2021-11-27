@@ -17,13 +17,8 @@
 
 
 
-
-
-__device__ Float3 _computeLJForces(Box* box, Compound* compound, CompoundNeighborList* neighborlist, CompoundState* self_state, CompoundState* neighborstate, Float3* utility_buffer);
-__device__ Float3 _computePairbondForces(Compound* compound, CompoundState* self_state);
-__device__ Float3 _computeAnglebondForces(Compound* compound, CompoundState* self_state);
-
-
+const int THREADS_PER_MONITORBLOCK = 256;
+const int N_MONITORBLOCKS_PER_STEP = 256;
 
 class Analyzer {
 public:
@@ -35,6 +30,6 @@ public:
 
 
 private:
-	void printEnergies(float* energy_data, int n_steps);
+	void printEnergies(Float3* energy_data, int n_steps);
 	Engine engine;
 };
