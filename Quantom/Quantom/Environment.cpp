@@ -50,7 +50,8 @@ void Environment::run() {
 			if (simulation->finished)
 				break;
 		}
-
+		if (simulation->box->step == 1620)
+			printf("\nNOWNOWNOWNOW\n\n");
 
 
 		printf("\r\tStep #%06d", simulation->box->step);

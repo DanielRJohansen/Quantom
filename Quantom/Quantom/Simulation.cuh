@@ -5,7 +5,7 @@
 
 
 
-constexpr double BOX_LEN = 4.f;	// Multiple of FOCUS_LEN please!
+constexpr double BOX_LEN = 4.f;	
 
 constexpr double BOX_LEN_HALF = BOX_LEN/2.f;
 constexpr double BOX_BASE = -BOX_LEN_HALF;
@@ -21,14 +21,13 @@ const int LOGTHREAD = 50;
 const int LOGTYPE = 0;	// 0 for solvent, 1 for compound
 //const int N_BODIES_START = 40;
 const int N_SOLVATE_MOLECULES = 5*5*5;// 60;
-//const int N_SOLVATE_MOLECULES = 3;
+//const int N_SOLVATE_MOLECULES = 30;
 
 
 const int PARTICLES_PER_COMPOUND = 3;
 const int BLOCKS_PER_SM = 512;
 //const int GRIDBLOCKS_PER_BODY = 16;
 //const int THREADS_PER_GRIDBLOCK = MAX_BLOCK_BODIES / GRIDBLOCKS_PER_BODY;
-const int N_STREAMS = 50;			// 68 total, 0 is general purpose, 1 is for rendering.
 
 
 constexpr double WARN_FORCE = 80'000;
@@ -39,6 +38,21 @@ const int MAX_COMPOUNDS = 0xFF;
 const int MAX_SOLVENTS = 0xFFFF;
 constexpr double CUTOFF = 5.0f;	//nm/
 
+
+
+
+const int BLOCKS_PER_SOLVENTKERNEL = 8;
+const int THREADS_PER_SOLVENTBLOCK = 64;
+
+
+
+
+
+
+
+//constexpr double SOLVENT_MASS = 18.01528f * 1e-3;	// kg/mol
+constexpr double SOLVENT_MASS = 12.0107 * 1e-3;	// kg/mol
+constexpr double COMPOUNDPARTICLE_MASS = 12.0107 * 1e-3;
 
 class Box {
 public:
@@ -119,10 +133,10 @@ public:
 
 	double box_size = BOX_LEN;	//nm
 	int blocks_per_dim;
-	int n_steps = 200;
+	int n_steps = 5000;
 	//int n_steps = 3000;
 	const double dt = 2 * 1e-6;		// ns, so first val corresponds to fs
-	int steps_per_render = 50;
+	int steps_per_render = 200;
 
 	//int n_bodies = N_BODIES_START;
 	Box* box;

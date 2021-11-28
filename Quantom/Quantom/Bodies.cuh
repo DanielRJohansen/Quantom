@@ -85,8 +85,6 @@ struct RenderMolecule {	// Just temporary, dont know howq to properly implement 
 
 constexpr double BODY_RADIUS = 0.2;		// CRITICAL VALUE!
 constexpr unsigned char UNUSED_BODY = 255;
-
-
 struct CompactParticle {	// Contains information only needed by the Ownerkernel
 	CompactParticle() {}	
 	CompactParticle(double mass, Float3 pos_sub1) : mass(mass), pos_tsub1(pos_sub1)  {}
@@ -104,7 +102,6 @@ struct CompactParticle {	// Contains information only needed by the Ownerkernel
 
 
 
-constexpr double SOLVENT_MASS = 18.01528f * 1e-3;	// kg/mol
 struct Solvent {
 	Solvent() {}
 	Solvent(Float3 pos, Float3 pos_tsub1) : pos(pos), pos_tsub1(pos_tsub1) {}

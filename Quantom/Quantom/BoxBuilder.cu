@@ -145,7 +145,7 @@ Compound BoxBuilder::createCompound(Float3 com, int compound_index, CompoundStat
 	Compound compound(compound_index, statebuffer_node);
 	for (int i = 0; i < n_atoms; i++) {
 		Float3 atom_pos_sub1 = statebuffer_node->positions[i] - compound_united_vel * dt;
-		compound.particles[i] = CompactParticle(12.0107*1e-3, atom_pos_sub1);
+		compound.particles[i] = CompactParticle(COMPOUNDPARTICLE_MASS, atom_pos_sub1);
 		compound.n_particles++;
 	}
 	return compound;

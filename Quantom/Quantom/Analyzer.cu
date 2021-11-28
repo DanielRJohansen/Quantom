@@ -6,7 +6,7 @@
 
 
 
-void __device__ applyHyperpos(Float3* static_particle, Float3* movable_particle) {
+void __device__ applyHyperposA(Float3* static_particle, Float3* movable_particle) {
 	for (int i = 0; i < 3; i++) {
 		*movable_particle->placeAt(i) += BOX_LEN * ((static_particle->at(i) - movable_particle->at(i)) > BOX_LEN_HALF);
 		*movable_particle->placeAt(i) -= BOX_LEN * ((static_particle->at(i) - movable_particle->at(i)) < -BOX_LEN_HALF);	// use at not X!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -24,10 +24,12 @@ void __global__ monitorCompoundEnergyKernel(Box* box, Float3* data_out) {		// ev
 	energy[threadIdx.x] = Float3(0, 0, 0);
 
 	if (threadIdx.x == 0) {
-		data_out[blockIdx.y + (step - 1) * N_MONITORBLOCKS_PER_STEP] = Float3(0, 0, 0);
+		//printf("index: %d\n", compound_index + (step - 1) * N_MONITORBLOCKS_PER_STEP);
+		data_out[compound_index + (step - 1) * box->n_compounds] = Float3(0, 0, 0);
 		//mass = box->compounds[compound_index].particles[0]
-		compound = box->compounds[blockIdx.y];
+		compound = box->compounds[compound_index];
 	}
+
 	__syncthreads();
 
 	if (threadIdx.x >= compound.n_particles) {
@@ -36,12 +38,11 @@ void __global__ monitorCompoundEnergyKernel(Box* box, Float3* data_out) {		// ev
 	__syncthreads();
 
 
-
 	double potE = box->potE_buffer[threadIdx.x + compound_index * PARTICLES_PER_COMPOUND + step * box->total_particles];	
 
 	Float3 pos_tsub1 = box->trajectory[threadIdx.x + compound_index * PARTICLES_PER_COMPOUND + (step - 1) * box->total_particles];
 	Float3 pos_tadd1 = box->trajectory[threadIdx.x + compound_index * PARTICLES_PER_COMPOUND + (step + 1) * box->total_particles];
-	applyHyperpos(&pos_tadd1, &pos_tsub1);
+	applyHyperposA(&pos_tadd1, &pos_tsub1);
 	
 
 	double vel = (pos_tadd1 - pos_tsub1).len() * 0.5f / box->dt;
@@ -59,7 +60,7 @@ void __global__ monitorCompoundEnergyKernel(Box* box, Float3* data_out) {		// ev
 	}
 
 	if (threadIdx.x == 0) {
-		data_out[blockIdx.y + (step - 1) * box->n_compounds] = energy[0];
+		data_out[compound_index + (step - 1) * box->n_compounds] = energy[0];
 	}
 }
 
@@ -86,7 +87,7 @@ void __global__ monitorSolventEnergyKernel(Box* box, Float3* data_out) {
 
 	Float3 pos_tsub1 = box->trajectory[compounds_offset + solvent_index + (step - 1) * box->total_particles];
 	Float3 pos_tadd1 = box->trajectory[compounds_offset + solvent_index + (step + 1) * box->total_particles];
-	applyHyperpos(&pos_tadd1, &pos_tsub1);
+	applyHyperposA(&pos_tadd1, &pos_tsub1);
 
 
 	double potE = box->potE_buffer[compounds_offset + solvent_index + step * box->total_particles];
@@ -188,18 +189,21 @@ Float3* Analyzer::analyzeSolvateEnergy(Simulation* simulation, int n_steps)
 
 Float3* Analyzer::analyzeCompoundEnergy(Simulation* simulation, int n_steps)
 {
+	int n_datapoints = simulation->box->n_compounds * n_steps;
+	printf("n steps: %d\n", n_steps);
 	dim3 block_dim(n_steps, simulation->box->n_compounds, 1);
 	Float3* average_compound_energy = new Float3[n_steps];
-	Float3* host_data = new Float3[simulation->box->n_compounds * n_steps];
+	Float3* host_data = new Float3[n_datapoints];
 	Float3* device_data;
-	cudaMalloc(&device_data, sizeof(Float3) * simulation->box->n_compounds * n_steps);
+	cudaMalloc(&device_data, sizeof(Float3) * n_datapoints);
 
 	monitorCompoundEnergyKernel << < block_dim, PARTICLES_PER_COMPOUND >> > (simulation->box, device_data);
 	cudaDeviceSynchronize();
-	cudaMemcpy(host_data, device_data, sizeof(Float3) * simulation->box->n_compounds * (n_steps), cudaMemcpyDeviceToHost);
+	cudaMemcpy(host_data, device_data, sizeof(Float3) * n_datapoints, cudaMemcpyDeviceToHost);
+	cudaDeviceSynchronize();
 
-
-
+	int nnn = simulation->box->n_compounds;
+	printf("What %d\n", simulation->box->n_compounds);
 	for (int step = 0; step < n_steps; step++) {
 		for (int i = 0; i < simulation->box->n_compounds; i++) {
 			//if (host_data[i + step * 256].x > 10000)

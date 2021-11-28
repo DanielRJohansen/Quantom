@@ -70,7 +70,7 @@ private:
 
 
 	// Simulation variables
-	cudaStream_t stream[N_STREAMS];
+	//cudaStream_t stream[N_STREAMS];
 	dim3 gridblock_size;
 	int threads_per_gridblock;
 
