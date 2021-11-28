@@ -27,6 +27,8 @@ public:
 
 	void analyzeEnergy(Simulation* simulation); // Prints a file of doubles: [step, molecule, atom, coordinate_dim]
 
+	Float3* analyzeSolvateEnergy(Simulation* simulation, int n_steps);
+	Float3* analyzeCompoundEnergy(Simulation* simulation, int n_steps);
 
 
 private:

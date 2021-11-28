@@ -5,7 +5,7 @@
 
 
 
-constexpr double BOX_LEN = 3.f;	// Multiple of FOCUS_LEN please!
+constexpr double BOX_LEN = 4.f;	// Multiple of FOCUS_LEN please!
 
 constexpr double BOX_LEN_HALF = BOX_LEN/2.f;
 constexpr double BOX_BASE = -BOX_LEN_HALF;
@@ -20,7 +20,7 @@ const int LOGBLOCK = 0;
 const int LOGTHREAD = 50;
 const int LOGTYPE = 0;	// 0 for solvent, 1 for compound
 //const int N_BODIES_START = 40;
-const int N_SOLVATE_MOLECULES = 4*4*4;// 60;
+const int N_SOLVATE_MOLECULES = 5*5*5;// 60;
 //const int N_SOLVATE_MOLECULES = 3;
 
 
@@ -119,10 +119,10 @@ public:
 
 	double box_size = BOX_LEN;	//nm
 	int blocks_per_dim;
-	int n_steps = 30000;
+	int n_steps = 200;
 	//int n_steps = 3000;
-	const double dt = 1 * 1e-6;		// ns, so first val corresponds to fs
-	int steps_per_render = 500;
+	const double dt = 2 * 1e-6;		// ns, so first val corresponds to fs
+	int steps_per_render = 50;
 
 	//int n_bodies = N_BODIES_START;
 	Box* box;
