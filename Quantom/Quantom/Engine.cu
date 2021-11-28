@@ -24,16 +24,16 @@ Simulation* Engine::prepSimulation(Simulation* simulation) {
 	return this->simulation;
 }
 /*
-float* Engine::getDatabuffer() {
-	float* host_data;
+double* Engine::getDatabuffer() {
+	double* host_data;
 	int n_datapoints = simulation->box->n_compounds * 3 * 2 * 10000;
-	host_data = new float[n_datapoints];
+	host_data = new double[n_datapoints];
 
-	//cudaMemcpy(host_data, box->data_buffer, sizeof(float) * box->n_compounds * 3 * 2 * 10000, cudaMemcpyDeviceToHost);
+	//cudaMemcpy(host_data, box->data_buffer, sizeof(double) * box->n_compounds * 3 * 2 * 10000, cudaMemcpyDeviceToHost);
 	for (int i = 0; i < n_datapoints; i++)
 		host_data[i] = 0;
-	printf("Copying %d floats, %d MB\n", n_datapoints, (int) (n_datapoints * sizeof(float)/1000000.f));
-	cudaMemcpy(host_data, simulation->box->data_buffer, sizeof(float) * n_datapoints, cudaMemcpyDeviceToHost);
+	printf("Copying %d doubles, %d MB\n", n_datapoints, (int) (n_datapoints * sizeof(double)/1000000.f));
+	cudaMemcpy(host_data, simulation->box->data_buffer, sizeof(double) * n_datapoints, cudaMemcpyDeviceToHost);
 	
 	cudaDeviceSynchronize();
 	return host_data;
@@ -111,12 +111,12 @@ void Engine::step() {
 
 // ------------------------------------------------------------------------------------------- DEVICE FUNCTIONS -------------------------------------------------------------------------------------------//
 
-__device__ float cudaMax(float a, float b) {
+__device__ double cudaMax(double a, double b) {
 	if (a > b)
 		return a;
 	return b;
 }
-__device__ float cudaMin(float a, float b) {
+__device__ double cudaMin(double a, double b) {
 	if (a < b)
 		return a;
 	return b;
@@ -142,7 +142,7 @@ __device__ Float3 getClosestMirrorPos(Float3 pos, Float3 block_center) {	// Bloc
 }
 
 
-__device__ float getAngle(Float3 v1, Float3 v2) {
+__device__ double getAngle(Float3 v1, Float3 v2) {
 	return acos((v1.dot(v2)) / (v1.len() * v2.len()));
 }
 
@@ -179,20 +179,20 @@ __device__ void applyPBC(Float3* current_position) {	// Only changes position if
 
 
 
-constexpr float sigma = 0.3923f;	//nm, basicllay break 0 point
-constexpr float epsilon = 0.5986 * 1'000.f; // J/mol
-__device__ Float3 calcLJForce(Float3* pos0, Float3* pos1, float* data_ptr) {	// Applying force to p0 only! Returns force in J/mol
-	float dist = (*pos0 - *pos1).len();
-	float fraction = sigma / dist;		//nm/nm, so unitless
+constexpr double sigma = 0.3923f;	//nm, basicllay break 0 point
+constexpr double epsilon = 0.5986 * 1'000.f; // J/mol
+__device__ Float3 calcLJForce(Float3* pos0, Float3* pos1, double* data_ptr) {	// Applying force to p0 only! Returns force in J/mol
+	double dist = (*pos0 - *pos1).len();
+	double fraction = sigma / dist;		//nm/nm, so unitless
 
-	float f2 = fraction * fraction;
-	float f6 = f2 * f2 * f2;
-	float f12 = f6 * f6;
+	double f2 = fraction * fraction;
+	double f6 = f2 * f2 * f2;
+	double f12 = f6 * f6;
 
-	//float force = 1.f / (dist) * f6 * (1.f - 2.f * f6);
-	float force = 24.f * (epsilon / dist) * f6 * (1.f - 2.f * f6);
+	//double force = 1.f / (dist) * f6 * (1.f - 2.f * f6);
+	double force = 24.f * (epsilon / dist) * f6 * (1.f - 2.f * f6);
 
-	float LJ_pot = 4 * epsilon * (f12 - f6);
+	double LJ_pot = 4 * epsilon * (f12 - f6);
 	Float3 force_unit_vector = (*pos1 - *pos0).norm();
 
 
@@ -201,9 +201,9 @@ __device__ Float3 calcLJForce(Float3* pos0, Float3* pos1, float* data_ptr) {	// 
 	data_ptr[1] = force;
 	data_ptr[2] = dist;
 
-	//if (dist < 0.18f) {
-	if (abs(LJ_pot) > 7000) {
-		printf("\nThread %d dist %f pot %f\n", threadIdx.x, (*pos0 - *pos1).len(), LJ_pot);
+	if (dist < 0.18f) {
+	//if (abs(LJ_pot) > 7000) {
+		printf("\nThread %d step %d dist %f pot %f\n", threadIdx.x, (int) data_ptr[3], (*pos0 - *pos1).len(), LJ_pot);
 		(*pos0 - *pos1).print('v');
 		(force_unit_vector * force).print('f');
 		//printf("\n\n KILOFORCE! Block %d thread %d\n", blockIdx.x, threadIdx.x);
@@ -214,11 +214,11 @@ __device__ Float3 calcLJForce(Float3* pos0, Float3* pos1, float* data_ptr) {	// 
 
 
 
-constexpr float kb = 17.5 * 1e+6;		//	J/(mol*nm^2)
-__device__ Float3 calcPairbondForce(Float3* self_pos, Float3* other_pos, float* reference_dist, float* potE) {
+constexpr double kb = 17.5 * 1e+6;		//	J/(mol*nm^2)
+__device__ Float3 calcPairbondForce(Float3* self_pos, Float3* other_pos, double* reference_dist, double* potE) {
 	Float3 v = *self_pos - *other_pos;
-	float dif = v.len() - *reference_dist;
-	float invert = v.len() > *reference_dist ? -1 : 1;
+	double dif = v.len() - *reference_dist;
+	double invert = v.len() > *reference_dist ? -1 : 1;
 	
 	Float3 force = v.norm() * kb * (-dif);
 
@@ -243,8 +243,8 @@ __device__ Float3 calcPairbondForce(Float3* self_pos, Float3* other_pos, float* 
 
 
 
-constexpr float ktheta = 65 * 1e+3;	// J/mol
-__device__ Float3 calcAngleForce(CompoundState* statebuffer, AngleBond* anglebond, float* potE) {	// We fix the middle particle and move the other particles so they are closest as possible
+constexpr double ktheta = 65 * 1e+3;	// J/mol
+__device__ Float3 calcAngleForce(CompoundState* statebuffer, AngleBond* anglebond, double* potE) {	// We fix the middle particle and move the other particles so they are closest as possible
 	// HOLY FUUUCK this shit is unsafe. Works if atoma are ordered left to right, with angles BELOW 180. Dont know which checks to implement yet
 
 	Float3 v1 = statebuffer->positions[anglebond->atom_indexes[0]] - statebuffer->positions[anglebond->atom_indexes[1]];
@@ -258,12 +258,12 @@ __device__ Float3 calcAngleForce(CompoundState* statebuffer, AngleBond* anglebon
 		
 
 
-	float angle = getAngle(v1, v2);
+	double angle = getAngle(v1, v2);
 	potE[1] = angle;					// Temp
-	float dif = angle - anglebond->reference_angle;
+	double dif = angle - anglebond->reference_angle;
 	dif = dif / 2.f / PI * 360.f;
 	*potE += 0.5 * ktheta * dif * dif * 0.5;
-	float force_scalar = ktheta * (dif);
+	double force_scalar = ktheta * (dif);
 
 
 	if (threadIdx.x == 1 && 0) {
@@ -288,7 +288,7 @@ __device__ Float3 calcAngleForce(CompoundState* statebuffer, AngleBond* anglebon
 
 
 
-__device__ Float3 computeLJForces(Box * box, Compound* compound, CompoundNeighborList* neighborlist, CompoundState* self_state, CompoundState* neighborstate_buffer, Float3* utility_buffer, float* data_ptr) {
+__device__ Float3 computeLJForces(Box * box, Compound* compound, CompoundNeighborList* neighborlist, CompoundState* self_state, CompoundState* neighborstate_buffer, Float3* utility_buffer, double* data_ptr) {
 	Float3 force(0, 0, 0);
 	for (int neighbor_index = 0; neighbor_index < neighborlist->n_neighbors; neighbor_index++) {
 		// ------------ Load and process neighbor molecule ------------ //
@@ -310,7 +310,7 @@ __device__ Float3 computeLJForces(Box * box, Compound* compound, CompoundNeighbo
 				force = force + calcLJForce(&self_state->positions[threadIdx.x], &neighborstate_buffer->positions[neighbor_particle_index], data_ptr);
 
 				if (threadIdx.x == LOGTHREAD && blockIdx.x == LOGBLOCK) {
-					float len = (self_state->positions[threadIdx.x] - neighborstate_buffer->positions[neighbor_particle_index]).len();
+					double len = (self_state->positions[threadIdx.x] - neighborstate_buffer->positions[neighbor_particle_index]).len();
 					self_state->positions[60].x = cudaMin(self_state->positions[60].x, len);
 				}
 			}
@@ -321,7 +321,7 @@ __device__ Float3 computeLJForces(Box * box, Compound* compound, CompoundNeighbo
 	return force;
 }
 
-__device__ Float3 computeLJForces(Box* box, Compound* compound, SolventNeighborList* neighborlist, CompoundState* self_state, Float3* utility_buffer, float* data_ptr) {
+__device__ Float3 computeLJForces(Box* box, Compound* compound, SolventNeighborList* neighborlist, CompoundState* self_state, Float3* utility_buffer, double* data_ptr) {
 	Float3 force(0, 0, 0);
 
 	// ------------ Load and process neighbor molecule ------------ //
@@ -342,7 +342,7 @@ __device__ Float3 computeLJForces(Box* box, Compound* compound, SolventNeighborL
 	//force = force * 24.f * epsilon;
 	return force;
 }
-__device__ Float3 computeLJForces(Box* box, Float3* self_pos, CompoundNeighborList* compoundneighbor_list, SolventNeighborList* solventneighbor_list,  float* data_ptr) {
+__device__ Float3 computeLJForces(Box* box, Float3* self_pos, CompoundNeighborList* compoundneighbor_list, SolventNeighborList* solventneighbor_list,  double* data_ptr) {
 	Float3 force(0, 0, 0);
 
 	// ------------ Load and process neighbor molecule ------------ //
@@ -362,7 +362,7 @@ __device__ Float3 computeLJForces(Box* box, Float3* self_pos, CompoundNeighborLi
 }
 
 
-__device__ Float3 computePairbondForces(Compound* compound, CompoundState* self_state, float* potE) {
+__device__ Float3 computePairbondForces(Compound* compound, CompoundState* self_state, double* potE) {
 	Float3 force(0, 0, 0);
 	for (int i = 0; i < compound->n_pairbonds; i++) {
 		PairBond* pb = &compound->pairbonds[i];
@@ -374,7 +374,7 @@ __device__ Float3 computePairbondForces(Compound* compound, CompoundState* self_
 	return force;
 }
 
-__device__ Float3 computeAnglebondForces(Compound* compound, CompoundState* self_state, float* potE) {
+__device__ Float3 computeAnglebondForces(Compound* compound, CompoundState* self_state, double* potE) {
 	Float3 force(0, 0, 0);
 	for (int i = 0; i < compound->n_anglebonds; i++) {
 		AngleBond* ab = &compound->anglebonds[i];
@@ -386,13 +386,13 @@ __device__ Float3 computeAnglebondForces(Compound* compound, CompoundState* self
 }
 
 
-__device__ void integratePosition(Float3* pos, Float3* pos_tsub1, Float3* force, float mass, float dt) {
+__device__ void integratePosition(Float3* pos, Float3* pos_tsub1, Float3* force, double mass, double dt) {
 	Float3 temp = *pos;
 	*pos = *pos * 2 - *pos_tsub1 + *force * (1.f / mass) * dt * dt;	// no *0.5?
 	*pos_tsub1 = temp;
 	//printf("force: %f\n", force->len());
 }
-__device__ void integratePosition(CompactParticle* particle, Float3* particle_pos, Float3* particle_force, float* dt) {
+__device__ void integratePosition(CompactParticle* particle, Float3* particle_pos, Float3* particle_force, double* dt) {
 	Float3 temp = *particle_pos;
 	*particle_pos = *particle_pos * 2 - particle->pos_tsub1 + *particle_force * (1.f / particle->mass) * *dt * *dt;	// no *0.5?
 	particle->pos_tsub1 = temp;
@@ -428,10 +428,10 @@ __global__ void forceKernel(Box* box) {
 
 
 	Float3 force(0, 0, 0);
-	float data_ptr[4];
+	double data_ptr[4];
 	for (int i = 0; i < 4; i++)
 		data_ptr[i] = 0;
-	float vel_approx = (self_state.positions[threadIdx.x] - compound.particles[threadIdx.x].pos_tsub1).len() * 1.f / box->dt;
+	double vel_approx = (self_state.positions[threadIdx.x] - compound.particles[threadIdx.x].pos_tsub1).len() * 1.f / box->dt;
 
 
 
@@ -547,7 +547,7 @@ __global__ void solventForceKernel(Box* box) {
 	int solvent_index = threadIdx.x + blockIdx.x * blockDim.x;
 	if (solvent_index >= box->n_solvents) { return; }
 
-	float data_ptr[4];	// Pot, force, ?, ?
+	double data_ptr[4];	// Pot, force, ?, ?
 	for (int i = 0; i < 4; i++)
 		data_ptr[i] = 0;
 	data_ptr[2] = 9999.f;
@@ -555,7 +555,7 @@ __global__ void solventForceKernel(Box* box) {
 
 
 	Solvent solvent = box->solvents[solvent_index];
-
+	data_ptr[3] = box->step;
 	force += computeLJForces(box, &solvent.pos, &box->compound_neighborlist_array[MAX_COMPOUNDS + solvent_index], &box->solvent_neighborlist_array[MAX_COMPOUNDS + solvent_index], data_ptr);
 
 	integratePosition(&solvent.pos, &solvent.pos_tsub1, &force, SOLVENT_MASS, box->dt);
@@ -573,7 +573,9 @@ __global__ void solventForceKernel(Box* box) {
 		int compounds_offset = box->n_compounds * PARTICLES_PER_COMPOUND;
 		box->potE_buffer[compounds_offset + solvent_index + (box->step) * box->total_particles] = data_ptr[0];
 		box->trajectory[compounds_offset + solvent_index + (box->step) * box->total_particles] = solvent.pos;
-		//box->trajectory[compounds_offset + solvent_index + (box->step) * box->total_particles].print('g');
+		if (box->step == 1305) {
+			//printf("\nPotE: %f \n", box->potE_buffer[compounds_offset + solvent_index + (box->step) * box->total_particles]);
+		}
 		if (solvent_index == LOGTHREAD && LOGTYPE == 0) {
 			//printf("\nindex: %d\n", compounds_offset + solvent_index + (box->step) * box->total_particles);			
 			//solvent.pos.print('p');
@@ -607,10 +609,10 @@ __global__ void solventForceKernel(Box* box) {
 
 
 /*	VELOCITY VERLET STORMER
-__device__ void integratePosition(CompactParticle* particle, Float3* particle_pos, Float3* particle_force, float* dt) {
+__device__ void integratePosition(CompactParticle* particle, Float3* particle_pos, Float3* particle_force, double* dt) {
 	*particle_pos = *particle_pos + (particle->vel + *particle_force * (0.5 / particle->mass) * *dt) * *dt;
 }
-__device__ void integrateVelocity(CompactParticle* particle, Float3* particle_force, float* dt) {
+__device__ void integrateVelocity(CompactParticle* particle, Float3* particle_force, double* dt) {
 	particle->vel = particle->vel + (*particle_force + particle->force_prev) * (0.5 / particle->mass) * *dt;
 }
 */

@@ -10,19 +10,19 @@ void Ray::reset() {
     log_particle = false;
 }
 
-__device__ bool Ray::hitsParticle(Float3* particle_center, float particle_radius) {
+__device__ bool Ray::hitsParticle(Float3* particle_center, double particle_radius) {
     return (distToPoint(*particle_center) < particle_radius);
 }
 
-__device__ float Ray::distToSphereIntersect(Float3* particle_center, float particle_radius) {
+__device__ double Ray::distToSphereIntersect(Float3* particle_center, double particle_radius) {
     Float3 projection_on_ray = origin + unit_vector * ((*particle_center - origin).dot(unit_vector) / unit_vector.dot(unit_vector));
-    float center_to_projection = (projection_on_ray - *particle_center).len();
-    float projection_to_intersect = sqrtf(particle_radius * particle_radius - center_to_projection * center_to_projection);
+    double center_to_projection = (projection_on_ray - *particle_center).len();
+    double projection_to_intersect = sqrtf(particle_radius * particle_radius - center_to_projection * center_to_projection);
     return (projection_on_ray - origin).len() - projection_to_intersect;
 }
 
 
-__device__ float Ray::distToPoint(Float3 point) {
+__device__ double Ray::distToPoint(Float3 point) {
     Float3 far_ray_point = origin + unit_vector * 99999999;	////BAAAAAAAAAAAAAD
     return (
         ((far_ray_point - origin).cross(origin - point)).len()
@@ -34,7 +34,7 @@ __device__ float Ray::distToPoint(Float3 point) {
 __device__ void Ray::searchCompound(CompoundState* state, Box* box, int compound_index) {
     for (int i = 0; i < state->n_particles; i++) {
         if (hitsParticle(&state->positions[i], 0.170)) {              // LOOK HERE at index 0....
-            float dist = distToSphereIntersect(&state->positions[i], 0.170);
+            double dist = distToSphereIntersect(&state->positions[i], 0.170);
             if (dist < closest_collision) {
                 closest_collision = dist;
                 atom_type = 0;
@@ -48,7 +48,7 @@ __device__ void Ray::searchCompound(CompoundState* state, Box* box, int compound
 __device__ bool Ray::searchSolvent(Float3* pos, Box* box, int solvent_index)
 {
     if (hitsParticle(pos, 0.150)) {
-        float dist = distToSphereIntersect(pos, 0.150);
+        double dist = distToSphereIntersect(pos, 0.150);
         if (dist < closest_collision) {
             closest_collision = dist;
             atom_type = 1;
@@ -72,8 +72,8 @@ Raytracer::Raytracer(Simulation* simulation, bool verbose) {
     setGPU();
 
 
-    float base = 0;
-	float principal_point_increment = (float) (BOX_LEN) / (float)RAYS_PER_DIM;
+    double base = 0;
+	double principal_point_increment = (double) (BOX_LEN) / (double)RAYS_PER_DIM;
 
 	Ray* host_rayptr = new Ray[NUM_RAYS];
 	focalpoint = Float3(BOX_LEN/2.f, -(BOX_LEN / 2.f) * FOCAL_LEN_RATIO - BOX_LEN, BOX_LEN / 2.f);
@@ -83,8 +83,8 @@ Raytracer::Raytracer(Simulation* simulation, bool verbose) {
 	int index = 0;
     for (int z_index = 0; z_index < RAYS_PER_DIM; z_index++) {
         for (int x_index = 0; x_index < RAYS_PER_DIM; x_index++) {
-            float z = base + principal_point_increment * (float)z_index;
-            float x = base + principal_point_increment * (float)x_index;
+            double z = base + principal_point_increment * (double)z_index;
+            double x = base + principal_point_increment * (double)x_index;
 			Float3 vector = Float3(x, base, z) - focalpoint;
             host_rayptr[index++] = Ray(vector.norm(), focalpoint);
 		}

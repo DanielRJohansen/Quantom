@@ -30,10 +30,10 @@ public:
 	Engine(){}
 
 	Simulation* prepSimulation(Simulation* simulation);
-	//float* getDatabuffer();
+	//double* getDatabuffer();
 	bool testFunction();
 	void step();
-	float* analyzeEnergy();
+	double* analyzeEnergy();
 
 
 	Int3 timings = Int3(0, 0, 0);
@@ -77,10 +77,10 @@ private:
 	bool finished = false;
 	int sim_blocks;
 
-	float block_dist;
+	double block_dist;
 	int bpd;
-	float box_base;				// Of box (left, back, down-most), is negative!
-	float block_center_base;	// Including that edge blocks focus area is halfway outside the box
+	double box_base;				// Of box (left, back, down-most), is negative!
+	double block_center_base;	// Including that edge blocks focus area is halfway outside the box
 	cudaError_t cuda_status;
 
 };
@@ -92,13 +92,13 @@ class DeviceFunctionCollection {
 public:
 	__device__ __host__ DeviceFunctionCollection(){}
 
-	__device__ static float getAngle(Float3 v1, Float3 v2);
+	__device__ static double getAngle(Float3 v1, Float3 v2);
 	__device__ static void determineMoleculerHyperposOffset(Float3* utility_buffer, Float3* compund_center, 
 		Float3* neighbor_center);	
 
 	__device__ static Float3 calcLJForce(Float3* pos0, Float3* pos1);
 
-	__device__ static Float3 calcPairbondForce(Float3* self_pos, Float3* other_pos, float* reference_dist);
+	__device__ static Float3 calcPairbondForce(Float3* self_pos, Float3* other_pos, double* reference_dist);
 	__device__ static Float3 calcAngleForce(CompoundState* statebuffer, AngleBond* anglebond);
 
 	__device__ static Float3 computeLJForces(Box* box, Compound* compound, CompoundNeighborList* neighborlist,

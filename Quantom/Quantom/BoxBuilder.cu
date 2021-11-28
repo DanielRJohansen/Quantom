@@ -65,10 +65,10 @@ void BoxBuilder::build(Simulation* simulation) {
 
 
 	int n_points = simulation->box->total_particles * simulation->n_steps;
-	cudaMalloc(&simulation->box->potE_buffer, sizeof(float) * n_points);	// Can only log molecules of size 3 for now...
+	cudaMalloc(&simulation->box->potE_buffer, sizeof(double) * n_points);	// Can only log molecules of size 3 for now...
 	cudaMalloc(&simulation->box->trajectory, sizeof(Float3) * n_points);
-	//cudaMemset(&simulation->box->trajectory, 0, sizeof(float) * traj_points * 3);	// uhhhhhhhhhhhhhhhhahahaha dunno bout this
-	cudaMallocManaged(&simulation->box->outdata, sizeof(float) * 10 * simulation->n_steps);	// 10 data streams for 10k steps. 1 step at a time.
+	//cudaMemset(&simulation->box->trajectory, 0, sizeof(double) * traj_points * 3);	// uhhhhhhhhhhhhhhhhahahaha dunno bout this
+	cudaMallocManaged(&simulation->box->outdata, sizeof(double) * 10 * simulation->n_steps);	// 10 data streams for 10k steps. 1 step at a time.
 	// 
 	// 
 	//cudaMalloc(&simulation->box->trajectory, sizeof(Float3) * simulation->box->n_compounds * 3 * simulation->n_steps);
@@ -79,7 +79,7 @@ void BoxBuilder::build(Simulation* simulation) {
 
 void BoxBuilder::placeMainMolecule(Simulation* simulation) {
 	Float3 compound_center = Float3(BOX_LEN_HALF, BOX_LEN_HALF, BOX_LEN_HALF);
-	float compound_radius = 0.2;
+	double compound_radius = 0.2;
 
 	simulation->box->compounds[simulation->box->n_compounds++] = createCompound(
 		compound_center,
@@ -97,9 +97,9 @@ int BoxBuilder::solvateBox(Simulation* simulation)
 	
 
 
-	int bodies_per_dim = ceil(cbrt((float)N_SOLVATE_MOLECULES));
-	float dist_between_compounds = (BOX_LEN) / (float)bodies_per_dim;	// dist_per_index
-	float base = box_base + dist_between_compounds / 2.f;
+	int bodies_per_dim = ceil(cbrt((double)N_SOLVATE_MOLECULES));
+	double dist_between_compounds = (BOX_LEN) / (double)bodies_per_dim;	// dist_per_index
+	double base = box_base + dist_between_compounds / 2.f;
 	printf("Bodies per dim: %d. Dist per dim: %.3f\n", bodies_per_dim, dist_between_compounds);
 
 
@@ -109,8 +109,8 @@ int BoxBuilder::solvateBox(Simulation* simulation)
 				if (simulation->box->n_solvents == N_SOLVATE_MOLECULES)
 					break;
 
-				Float3 solvent_center = Float3(base + dist_between_compounds * (float)x_index, base + dist_between_compounds * (float)y_index, base + dist_between_compounds * (float)z_index);
-				float solvent_radius = 0.2;
+				Float3 solvent_center = Float3(base + dist_between_compounds * (double)x_index, base + dist_between_compounds * (double)y_index, base + dist_between_compounds * (double)z_index);
+				double solvent_radius = 0.2;
 
 				if (spaceAvailable(simulation->box, solvent_center, solvent_radius)) {
 					simulation->box->solvents[simulation->box->n_solvents++] = createSolvent(
@@ -131,7 +131,7 @@ int BoxBuilder::solvateBox(Simulation* simulation)
 
 
 
-Compound BoxBuilder::createCompound(Float3 com, int compound_index, CompoundState* statebuffer_node, CompoundNeighborList* neighborinfo_node, float dt) {
+Compound BoxBuilder::createCompound(Float3 com, int compound_index, CompoundState* statebuffer_node, CompoundNeighborList* neighborinfo_node, double dt) {
 
 	int n_atoms = PARTICLES_PER_COMPOUND;
 	Float3 offsets[3] = { Float3(0,0,0), Float3(0.13, 0, 0), Float3(0, 0, -0.13) };
@@ -140,7 +140,7 @@ Compound BoxBuilder::createCompound(Float3 com, int compound_index, CompoundStat
 		statebuffer_node->n_particles++;
 	}
 	
-	//float vrms = 250;
+	//double vrms = 250;
 	Float3 compound_united_vel = Float3(v_rms , 0,0);
 	Compound compound(compound_index, statebuffer_node);
 	for (int i = 0; i < n_atoms; i++) {
@@ -153,16 +153,16 @@ Compound BoxBuilder::createCompound(Float3 com, int compound_index, CompoundStat
 
 
 
-Solvent BoxBuilder::createSolvent(Float3 com, float dt)	// Nodes obv. points to addresses in device global memory.
+Solvent BoxBuilder::createSolvent(Float3 com, double dt)	// Nodes obv. points to addresses in device global memory.
 {
 	Float3 solvent_vel = Float3(random(), random(), random()).norm() * v_rms;
 	return 	Solvent(com, com - solvent_vel * dt);
 }
 
-bool BoxBuilder::spaceAvailable(Box* box, Float3 com, float radius) {	// Too lazy to implement yet..
+bool BoxBuilder::spaceAvailable(Box* box, Float3 com, double radius) {	// Too lazy to implement yet..
 	for (int i = 0; i < box->n_compounds; i++) {
 		for (int j = 0; j < box->compounds[i].n_particles; j++) {
-			float dist = (box->compound_state_array[i].positions[j] - com).len();
+			double dist = (box->compound_state_array[i].positions[j] - com).len();
 			if (dist < radius)
 				return false;
 		}
@@ -236,9 +236,9 @@ void BoxBuilder::solvateCompoundCrosslinker(Simulation* simulation)
 /*
 int BoxBuilder::solvateBox(Simulation* simulation)
 {
-	int bodies_per_dim = ceil(cbrt((float)N_SOLVATE_MOLECULES));
-	float dist_between_compounds = (BOX_LEN) / (float)bodies_per_dim;	// dist_per_index
-	float base = box_base + dist_between_compounds / 2.f;
+	int bodies_per_dim = ceil(cbrt((double)N_SOLVATE_MOLECULES));
+	double dist_between_compounds = (BOX_LEN) / (double)bodies_per_dim;	// dist_per_index
+	double base = box_base + dist_between_compounds / 2.f;
 	printf("Bodies per dim: %d. Dist per dim: %.3f\n", bodies_per_dim, dist_between_compounds);
 
 
@@ -248,8 +248,8 @@ int BoxBuilder::solvateBox(Simulation* simulation)
 				if (simulation->box->n_compounds == N_SOLVATE_MOLECULES)
 					break;
 
-				Float3 compound_center = Float3(base + dist_between_compounds * (float)x_index, base + dist_between_compounds * (float)y_index, base + dist_between_compounds * (float)z_index);
-				float compound_radius = 0.2;
+				Float3 compound_center = Float3(base + dist_between_compounds * (double)x_index, base + dist_between_compounds * (double)y_index, base + dist_between_compounds * (double)z_index);
+				double compound_radius = 0.2;
 
 				if (spaceAvailable(compound_center, compound_radius)) {
 					simulation->box->compounds[simulation->box->n_compounds++] = createSolvent(

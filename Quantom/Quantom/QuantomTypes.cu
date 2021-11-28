@@ -1,7 +1,7 @@
 #include "QuantomTypes.cuh"
 
 
-//__host__ __device__ inline float Float3::len() { return (float) sqrtf(x * x + y * y + z * z); }
+//__host__ __device__ inline double Float3::len() { return (double) sqrtf(x * x + y * y + z * z); }
 
 /*
 __host__ __device__ Float3 rotateAroundOrigin(Float3 pitch_yaw_roll) {	//pitch around x, yaw around z, tilt around y
@@ -21,18 +21,18 @@ __host__ __device__ Float3 rotateAroundOrigin(Float3 pitch_yaw_roll) {	//pitch a
 	return v;
 
 
-	/*float sin_pitch = sin(pitch_yaw_roll.x);
-	float cos_pitch = cos(pitch_yaw_roll.x);
+	/*double sin_pitch = sin(pitch_yaw_roll.x);
+	double cos_pitch = cos(pitch_yaw_roll.x);
 
-	float sin_yaw = sin(pitch_yaw_roll.z);
-	float cos_yaw = cos(pitch_yaw_roll.z);
+	double sin_yaw = sin(pitch_yaw_roll.z);
+	double cos_yaw = cos(pitch_yaw_roll.z);
 
-	float sin_tilt = sin(pitch_yaw_roll.y);
-	float cos_tilt = cos(pitch_yaw_roll.y);
+	double sin_tilt = sin(pitch_yaw_roll.y);
+	double cos_tilt = cos(pitch_yaw_roll.y);
 
 	//Rotate around x
-	float y_x = cos_pitch * y + sin_pitch * z;
-	float z_x = -sin_pitch * y + cos_pitch * z;
+	double y_x = cos_pitch * y + sin_pitch * z;
+	double z_x = -sin_pitch * y + cos_pitch * z;
 
 	// Rotate 
 

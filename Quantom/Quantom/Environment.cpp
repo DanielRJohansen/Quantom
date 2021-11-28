@@ -54,7 +54,7 @@ void Environment::run() {
 
 
 		printf("\r\tStep #%06d", simulation->box->step);
-		float duration = (float) std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - t0).count();
+		double duration = (double) std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - t0).count();
 		int remaining_seconds = (int) (1.f/1000 * duration/simulation->steps_per_render * (simulation->n_steps - simulation->box->step));
 		printf("\tAverage step time: %.1fms (%d/%d/%d) \tRemaining: %04ds",  duration/simulation->steps_per_render, engine->timings.x/simulation->steps_per_render, engine->timings.y / simulation->steps_per_render, engine->timings.z / simulation->steps_per_render, remaining_seconds);
 		engine->timings = Int3(0, 0, 0);
@@ -98,7 +98,7 @@ void Environment::run() {
 }
 
 
-void Environment::printOut(float* data, int n_steps) {
+void Environment::printOut(double* data, int n_steps) {
 	std::ofstream myfile("D:\\Quantom\\log.csv");
 	for (int i = 0; i < 10; i++) {
 		myfile << "Data" << std::to_string(i+1) << ";";
@@ -148,7 +148,7 @@ void Environment::printTrajectory(Simulation* simulation) {
 void Environment::printDataBuffer(Box* box) {
 	std::ofstream myfile("D:\\Quantom\\energy.csv");
 
-	float* host_data = engine->getDatabuffer();
+	double* host_data = engine->getDatabuffer();
 
 	printf("Printing %d columns per step\n", box->n_compounds * 3 * 2);
 

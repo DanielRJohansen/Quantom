@@ -8,15 +8,15 @@
 
 struct Atom {
 	__host__ __device__ Atom() {}
-	__host__ Atom(Float3 pos, float r, float mass, uint8_t c[3]) : pos(pos), radius(r), mass(mass) {
+	__host__ Atom(Float3 pos, double r, double mass, uint8_t c[3]) : pos(pos), radius(r), mass(mass) {
 		mass *= 0.001f;	// Convert to kg/mol
 		for (int i = 0; i < 3; i++) {
 			color[i] = c[i];
 		}
 	}
 	Float3 pos;	// Relative	to CoM, and (0,0,0) rotation
-	float radius;	// in fm?
-	float mass;		// in kg/mol
+	double radius;	// in fm?
+	double mass;		// in kg/mol
 	uint8_t color[3] = { 0,100,0 };
 };
 
@@ -80,22 +80,22 @@ struct MoleculeLibrary {
 
 struct RenderMolecule {	// Just temporary, dont know howq to properly implement functionality for rendering.
 	uint8_t colors[3][3];
-	float radii[3];
+	double radii[3];
 };
 
-constexpr float BODY_RADIUS = 0.2;		// CRITICAL VALUE!
+constexpr double BODY_RADIUS = 0.2;		// CRITICAL VALUE!
 constexpr unsigned char UNUSED_BODY = 255;
 
 
 struct CompactParticle {	// Contains information only needed by the Ownerkernel
 	CompactParticle() {}	
-	CompactParticle(float mass, Float3 pos_sub1) : mass(mass), pos_tsub1(pos_sub1)  {}
+	CompactParticle(double mass, Float3 pos_sub1) : mass(mass), pos_tsub1(pos_sub1)  {}
 	//Float3 vel;						// nm/ns
 	//Float3 acc;						// nm/ns^2
 	//Float3 force_prev;				// For velocity verlet stormer integration
 	Float3 pos_tsub1;				// Must be initiated!
-	//float pot_E_prev = 999999999;			// MUST BE INITIATED BY CALCULATION, OR IT WILL FUCK SHIT UP!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-	float mass;								// g/mol
+	//double pot_E_prev = 999999999;			// MUST BE INITIATED BY CALCULATION, OR IT WILL FUCK SHIT UP!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	double mass;								// g/mol
 };
 
 
@@ -104,7 +104,7 @@ struct CompactParticle {	// Contains information only needed by the Ownerkernel
 
 
 
-constexpr float SOLVENT_MASS = 18.01528f * 1e-3;	// kg/mol
+constexpr double SOLVENT_MASS = 18.01528f * 1e-3;	// kg/mol
 struct Solvent {
 	Solvent() {}
 	Solvent(Float3 pos, Float3 pos_tsub1) : pos(pos), pos_tsub1(pos_tsub1) {}
@@ -122,27 +122,27 @@ struct Solvent {
 
 struct PairBond {	// IDS and indexes are used interchangeably here!
 	PairBond(){}
-	PairBond(float ref_dist, uint32_t particleindex_a, uint32_t particleindex_b) : 
+	PairBond(double ref_dist, uint32_t particleindex_a, uint32_t particleindex_b) : 
 		reference_dist(ref_dist) {
 		atom_indexes[0] = particleindex_a;
 		atom_indexes[1] = particleindex_b;
 	}
 
 	//uint32_t bond_index;	
-	float reference_dist;
+	double reference_dist;
 	uint32_t atom_indexes[2];	// Relative to the compund - NOT ABSOLUTE INDEX. Used in global table with compunds start-index
 };
 
 struct AngleBond {
 	AngleBond() {}
-	AngleBond(float ref_t, uint32_t particleindex_l, uint32_t particleindex_m, uint32_t particleindex_r) :
+	AngleBond(double ref_t, uint32_t particleindex_l, uint32_t particleindex_m, uint32_t particleindex_r) :
 		reference_angle(ref_t) {
 		atom_indexes[0] = particleindex_l;
 		atom_indexes[1] = particleindex_m;
 		atom_indexes[2] = particleindex_r;
 	}
 
-	float reference_angle;
+	double reference_angle;
 	uint32_t atom_indexes[3]; // i,j,k angle between i and k
 };
 
@@ -207,15 +207,15 @@ struct CompoundState {
 const int H2O_PARTICLES = 3;
 const int H2O_PAIRBONDS = 2;
 const int H2O_ANGLEBONDS = 1;
-const float OH_refdist = 0.095;			// nm
-const float HOH_refangle = 1.822996;	// radians
-const float max_LJ_dist = 1;			// nm
+const double OH_refdist = 0.095;			// nm
+const double HOH_refangle = 1.822996;	// radians
+const double max_LJ_dist = 1;			// nm
 
 const int MAX_PARTICLES = 16;
 const int MAX_PAIRBONDS = 16;
 const int MAX_ANGLEBONDS = 16;
-const float CC_refdist = 0.153; // nm
-const float CCC_reftheta = 1.953; // nm
+const double CC_refdist = 0.153; // nm
+const double CCC_reftheta = 1.953; // nm
 struct Compound {
 	__host__ Compound() {}	// {}
 	__host__ Compound(uint32_t index, CompoundState* states_host) {
@@ -253,7 +253,7 @@ struct Compound {
 	CompactParticle particles[MAX_PARTICLES];
 
 	Float3 center_of_mass = Float3(0, 0, 0);
-	float radius = 0;
+	double radius = 0;
 
 	uint16_t n_pairbonds = 0;
 	PairBond pairbonds[MAX_PAIRBONDS];

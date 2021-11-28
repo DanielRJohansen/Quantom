@@ -18,7 +18,7 @@ Molecule::Molecule() {	// Always returns a h2o molecule rn
 
 	// Calc com
 	CoM = Float3(0, 0, 0);
-	float accumulated_mass = 0;
+	double accumulated_mass = 0;
 	for (int i = 0; i < 3; i++) {
 		CoM = CoM + (atoms[i].pos * atoms[i].mass);
 		accumulated_mass += atoms[i].mass;

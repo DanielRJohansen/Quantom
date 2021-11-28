@@ -25,7 +25,7 @@ public:
 	Analyzer() {}
 
 
-	void analyzeEnergy(Simulation* simulation); // Prints a file of floats: [step, molecule, atom, coordinate_dim]
+	void analyzeEnergy(Simulation* simulation); // Prints a file of doubles: [step, molecule, atom, coordinate_dim]
 
 
 

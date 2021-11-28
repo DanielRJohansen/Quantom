@@ -15,9 +15,9 @@ private:
 	void placeMainMolecule(Simulation* simulation);
 	int solvateBox(Simulation* simulation);					// Returns # of solvate compounds placed
 	Compound createCompound(Float3 com, int compound_index,
-		CompoundState* statebuffer_node, CompoundNeighborList* neighborinfo_node, float dt);
-	Solvent createSolvent(Float3 com, float dt);
-	bool spaceAvailable(Box* box, Float3 com, float radius);
+		CompoundState* statebuffer_node, CompoundNeighborList* neighborinfo_node, double dt);
+	Solvent createSolvent(Float3 com, double dt);
+	bool spaceAvailable(Box* box, Float3 com, double radius);
 	void compoundLinker(Simulation* simulation);									// Temp function
 	void solvateLinker(Simulation* simulation);
 	void solvateCompoundCrosslinker(Simulation* simulation);
@@ -25,21 +25,21 @@ private:
 
 	// ---------------------------------------------------- Variables ---------------------------------------------------- //
 	Box box;	// Local host version
-	float box_len = BOX_LEN;
-	float box_base = 0;
+	double box_len = BOX_LEN;
+	double box_base = 0;
 
 
 
 
 
-	float m = 18.01528;					// g/mol
-	float M = m * 0.001;				// kg/mol
-	//float k_B = 8.617333262145 * 10e-5;	// Boltzmann constant
-	float k_B = 1.380 * 1e-23;
-	float T = 293;	// Kelvin
-	float R = 8.3144;					// J/(Kelvin*mol)
-	float mean_velocity = m / (2 * k_B * T);
-	float v_rms = sqrt(3 * R * T / M);
+	double m = 18.01528;					// g/mol
+	double M = m * 0.001;				// kg/mol
+	//double k_B = 8.617333262145 * 10e-5;	// Boltzmann constant
+	double k_B = 1.380 * 1e-23;
+	double T = 293;	// Kelvin
+	double R = 8.3144;					// J/(Kelvin*mol)
+	double mean_velocity = m / (2 * k_B * T);
+	double v_rms = sqrt(3 * R * T / M);
 
 
 
@@ -63,12 +63,12 @@ private:
 	// ---------------------------------------------------- Helper functions ---------------------------------------------------- //
 	Float3 get3Random(int resolution) {
 		return Float3(
-			rand() % resolution / (float)resolution - 0.5,
-			rand() % resolution / (float)resolution - 0.5,
-			rand() % resolution / (float)resolution - 0.5
+			rand() % resolution / (double)resolution - 0.5,
+			rand() % resolution / (double)resolution - 0.5,
+			rand() % resolution / (double)resolution - 0.5
 		);
 	}
-	float random() {
+	double random() {
 		return rand() % 10000 / 10000.f * 2 - 1.f;
 	}
 };

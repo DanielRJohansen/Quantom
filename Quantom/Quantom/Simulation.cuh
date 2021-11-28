@@ -5,19 +5,19 @@
 
 
 
-constexpr float BOX_LEN = 3.f;	// Multiple of FOCUS_LEN please!
+constexpr double BOX_LEN = 3.f;	// Multiple of FOCUS_LEN please!
 
-constexpr float BOX_LEN_HALF = BOX_LEN/2.f;
-constexpr float BOX_BASE = -BOX_LEN_HALF;
+constexpr double BOX_LEN_HALF = BOX_LEN/2.f;
+constexpr double BOX_BASE = -BOX_LEN_HALF;
 
-constexpr float FOCUS_LEN = 2;
-constexpr float BLOCK_LEN = FOCUS_LEN * 2;	//nm
-constexpr float FOCUS_LEN_HALF = BLOCK_LEN / 4.f;
+constexpr double FOCUS_LEN = 2;
+constexpr double BLOCK_LEN = FOCUS_LEN * 2;	//nm
+constexpr double FOCUS_LEN_HALF = BLOCK_LEN / 4.f;
 
 
 
 const int LOGBLOCK = 0;
-const int LOGTHREAD = 53;
+const int LOGTHREAD = 50;
 const int LOGTYPE = 0;	// 0 for solvent, 1 for compound
 //const int N_BODIES_START = 40;
 const int N_SOLVATE_MOLECULES = 4*4*4;// 60;
@@ -31,13 +31,13 @@ const int BLOCKS_PER_SM = 512;
 const int N_STREAMS = 50;			// 68 total, 0 is general purpose, 1 is for rendering.
 
 
-constexpr float WARN_FORCE = 80'000;
-constexpr float END_SIM_FORCE = 10'500'000;
+constexpr double WARN_FORCE = 80'000;
+constexpr double END_SIM_FORCE = 10'500'000;
 const int LOG_P_ID = 17;
 
 const int MAX_COMPOUNDS = 0xFF;
 const int MAX_SOLVENTS = 0xFFFF;
-constexpr float CUTOFF = 5.0f;	//nm/
+constexpr double CUTOFF = 5.0f;	//nm/
 
 
 class Box {
@@ -65,12 +65,12 @@ public:
 
 
 
-	float* outdata;			// Temp, for longging values to whatever
+	double* outdata;			// Temp, for longging values to whatever
 	uint32_t step = 0;
-	float dt;
+	double dt;
 
 
-	float* potE_buffer;		// For total energy summation
+	double* potE_buffer;		// For total energy summation
 	Float3* trajectory;
 
 
@@ -117,12 +117,12 @@ public:
 	//int step = 0;
 
 
-	float box_size = BOX_LEN;	//nm
+	double box_size = BOX_LEN;	//nm
 	int blocks_per_dim;
-	int n_steps = 1372;
+	int n_steps = 30000;
 	//int n_steps = 3000;
-	const float dt = 1 * 1e-6;		// ns, so first val corresponds to fs
-	int steps_per_render = 4000;
+	const double dt = 1 * 1e-6;		// ns, so first val corresponds to fs
+	int steps_per_render = 500;
 
 	//int n_bodies = N_BODIES_START;
 	Box* box;

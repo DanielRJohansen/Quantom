@@ -38,7 +38,7 @@ private:
 
 
 	// These should be in interface maybe?
-	void printOut(float* data, int n_steps);
+	void printOut(double* data, int n_steps);
 	//void printDataBuffer(Box* box);
 	void printTrajectory(Simulation* simulation);
 };

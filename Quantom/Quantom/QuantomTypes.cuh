@@ -11,7 +11,7 @@
 #include <iostream>
 
 
-constexpr float PI = 3.14159;
+constexpr double PI = 3.14159;
 
 
 struct Int3 {
@@ -28,28 +28,28 @@ struct Int3 {
 
 struct Float3 {
 	__host__ __device__ Float3() {}
-	__host__ __device__ Float3(float x, float y, float z) : x(x), y(y), z(z) {}
+	__host__ __device__ Float3(double x, double y, double z) : x(x), y(y), z(z) {}
 
-	__host__ __device__ inline Float3 operator * (const float a) const { return Float3(x * a, y * a, z * a); }
+	__host__ __device__ inline Float3 operator * (const double a) const { return Float3(x * a, y * a, z * a); }
 	__host__ __device__ inline Float3 operator * (const Float3 a) const { return Float3(x * a.x, y * a.y, z * a.z); }
 	__host__ __device__ inline Float3 operator + (const Float3 a) const { return Float3(x + a.x, y + a.y, z + a.z); }
 	__host__ __device__ inline Float3 operator - (const Float3 a) const { return Float3(x - a.x, y - a.y, z - a.z); }
 	__host__ __device__ inline bool operator == (const Float3 a) const { return (a.x == x && a.y == y && a.z == z); }
 	__host__ __device__ inline void operator += (const Float3 a) { x += a.x; y += a.y; z += a.z; }
-	__host__ __device__ inline void operator *= (const float a) { x *= a; y *= a; z *= a; }
+	__host__ __device__ inline void operator *= (const double a) { x *= a; y *= a; z *= a; }
 
 	__host__ __device__ Float3 norm() {
-		float l = len();
+		double l = len();
 		if (l)
 			return *this * (1.f / l); 
 		return Float3(0, 0, 0);
 	}
 	__host__ __device__ Float3 square() {return Float3(x * x, y * y, z * z);}
-	__host__ __device__ inline float len() {return (float)sqrtf(x * x + y * y + z * z); }
-	__host__ __device__ inline float lenSquared() { return (float)(x * x + y * y + z * z); }
-	__host__ __device__ Float3 zeroIfAbove(float a) { return Float3(x * (x < a), y * (y < a), z * (z < a)); }
-	__host__ __device__ Float3 zeroIfBelow(float a) { return Float3(x * (x > a), y * (y > a), z * (z > a)); }
-	__host__ __device__ Float3 elementwiseModulus(float a) {
+	__host__ __device__ inline double len() {return (double)sqrtf(x * x + y * y + z * z); }
+	__host__ __device__ inline double lenSquared() { return (double)(x * x + y * y + z * z); }
+	__host__ __device__ Float3 zeroIfAbove(double a) { return Float3(x * (x < a), y * (y < a), z * (z < a)); }
+	__host__ __device__ Float3 zeroIfBelow(double a) { return Float3(x * (x > a), y * (y > a), z * (z > a)); }
+	__host__ __device__ Float3 elementwiseModulus(double a) {
 		while (x > a)
 			x -= a;
 		while (y > a)
@@ -61,7 +61,7 @@ struct Float3 {
 
 
 	__host__ __device__ Float3 cross(Float3 a) const { return Float3(y * a.z - z * a.y, z * a.x - x * a.z, x * a.y - y * a.x); }
-	__host__ __device__ float dot(Float3 a) const { return (x * a.x + y * a.y + z * a.z); }
+	__host__ __device__ double dot(Float3 a) const { return (x * a.x + y * a.y + z * a.z); }
 	__host__ __device__ Float3 abs() const { return Float3(
 		std::abs(x),
 		std::abs(y), 
@@ -88,11 +88,11 @@ struct Float3 {
 		v = rodriguesRotatation(v, k, pitch_yaw_roll.z);
 		return v;
 	}
-	__host__ __device__ static Float3 rodriguesRotatation(Float3 v, Float3 k, float theta) {
+	__host__ __device__ static Float3 rodriguesRotatation(Float3 v, Float3 k, double theta) {
 		return v * cos(theta) + k.cross(v) * sin(theta) + k * (k.dot(v)) * (1 - cos(theta));
 	}
 
-	__host__ __device__ float at(int index) {
+	__host__ __device__ double at(int index) {
 		switch (index) {
 		case 0:
 			return x;
@@ -105,7 +105,7 @@ struct Float3 {
 		}
 	}
 
-	__host__ __device__ float* placeAt(int index) {
+	__host__ __device__ double* placeAt(int index) {
 		switch (index) {
 		case 0:
 			return &x;
@@ -117,7 +117,7 @@ struct Float3 {
 	}
 
 	// Not used right now!
-	__host__ __device__ static Float3 centerOfMass(Float3* arr_ptr, uint32_t arr_size) {	// Only run before sim, so we can cast to float without slowing sim
+	__host__ __device__ static Float3 centerOfMass(Float3* arr_ptr, uint32_t arr_size) {	// Only run before sim, so we can cast to double without slowing sim
 		Float3 sum = Float3(0,0,0);
 		for (uint32_t i = 0; i < arr_size; i++) {
 			sum = sum + arr_ptr[i];
@@ -127,7 +127,7 @@ struct Float3 {
 
 
 
-	float x = 0, y = 0, z = 0;
+	double x = 0, y = 0, z = 0;
 };
 
 /*
