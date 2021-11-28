@@ -156,7 +156,7 @@ Compound BoxBuilder::createCompound(Float3 com, int compound_index, CompoundStat
 Solvent BoxBuilder::createSolvent(Float3 com, double dt)	// Nodes obv. points to addresses in device global memory.
 {
 	Float3 solvent_vel = Float3(random(), random(), random()).norm() * v_rms;
-	return 	Solvent(com, com - solvent_vel * dt);
+	return Solvent(com, com - solvent_vel * dt);
 }
 
 bool BoxBuilder::spaceAvailable(Box* box, Float3 com, double radius) {	// Too lazy to implement yet..

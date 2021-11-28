@@ -132,6 +132,9 @@ void __global__ monitorSolventEnergyKernel(Box* box, Float3* data_out) {
 
 void Analyzer::analyzeEnergy(Simulation* simulation) {	// Calculates the avg J/mol // calculate energies separately for compounds and solvents. weigh averages based on amount of each
 	int analysable_steps = simulation->n_steps - 2;
+	if (analysable_steps < 1)
+		return;
+
 	Float3* average_energy = new Float3[analysable_steps];
 	
 
@@ -213,51 +216,6 @@ Float3* Analyzer::analyzeCompoundEnergy(Simulation* simulation, int n_steps)
 	return average_compound_energy;
 }
 
-
-/*
-void Analyzer::analyzeEnergy1(Simulation* simulation) {	// Calculates the avg J/mol
-
-	dim3 block_dim(simulation->n_steps, 256, 0);
-
-
-	int data_per_step = 3 * simulation->box->n_compounds;
-	int n_datapoints = data_per_step * simulation->n_steps;
-
-	printf("N Compounds: %d\n", simulation->box->n_compounds);
-
-	double* host_data = new double[n_datapoints];
-	double* device_data;
-	cudaMalloc(&device_data, sizeof(double) * n_datapoints);
-	cudaDeviceSynchronize();
-	int n_compounds = simulation->box->n_compounds;
-	for (int i = 1; i < (simulation->n_steps-1); i++) {
-		if (!((i+2) % 100))
-			printf("Analyzing step %d\r", i+2);
-		monitorCompoundEnergyKernel << <n_compounds, 3 >> > (simulation->box, &device_data[data_per_step * i], i);
-	}
-
-	cudaMemcpy(host_data, device_data, sizeof(double) * n_datapoints, cudaMemcpyDeviceToHost);
-
-	double* out_data = new double[3 * (simulation->n_steps-2)];
-	for (int step = 1; step < (simulation->n_steps-1); step++) {	
-		for (int energy_type = 0; energy_type < 3; energy_type++) {
-			out_data[energy_type + (step-1) * 3] = 0;
-			for (int m = 0; m < n_compounds; m++) {
-				out_data[energy_type + (step-1) * 3] += host_data[energy_type + m * 3 + step * data_per_step] / simulation->box->n_compounds;
-			}
-		}
-	}
-
-	printEnergies(out_data, simulation->n_steps);
-
-	cudaFree(device_data);
-	delete host_data, out_data;
-	
-
-	printf("\n########## Finished analyzing energies ##########\n\n");
-
-}
-*/
 
 void Analyzer::printEnergies(Float3* energy_data, int analysable_steps) {
 	std::ofstream myfile("D:\\Quantom\\energies.csv");

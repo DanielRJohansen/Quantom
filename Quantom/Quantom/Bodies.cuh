@@ -196,10 +196,6 @@ public:
 
 
 
-struct CompoundState {
-	Float3 positions[64];
-	uint8_t n_particles = 0;
-};
 
 
 
@@ -211,11 +207,17 @@ const double OH_refdist = 0.095;			// nm
 const double HOH_refangle = 1.822996;	// radians
 const double max_LJ_dist = 1;			// nm
 
-const int MAX_PARTICLES = 16;
+const int MAX_COMPOUND_PARTICLES = 64;
 const int MAX_PAIRBONDS = 16;
 const int MAX_ANGLEBONDS = 16;
 const double CC_refdist = 0.153; // nm
 const double CCC_reftheta = 1.953; // nm
+
+struct CompoundState {
+	Float3 positions[MAX_COMPOUND_PARTICLES];
+	uint8_t n_particles = 0;
+};
+
 struct Compound {
 	__host__ Compound() {}	// {}
 	__host__ Compound(uint32_t index, CompoundState* states_host) {
@@ -250,7 +252,7 @@ struct Compound {
 	//CompoundNeighborList* compound_neighborlist_ptr;
 
 	uint8_t n_particles = 0;
-	CompactParticle particles[MAX_PARTICLES];
+	CompactParticle particles[MAX_COMPOUND_PARTICLES];
 
 	Float3 center_of_mass = Float3(0, 0, 0);
 	double radius = 0;
