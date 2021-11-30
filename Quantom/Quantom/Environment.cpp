@@ -92,6 +92,7 @@ void Environment::run() {
 
 	printf("\n\n\n########################## SIMULATION FINISHED ##########################\n\n\n\n");
 	printTrajectory(simulation);
+	printWaterforce(simulation);
 	analyzer.analyzeEnergy(simulation);
 
 	printOut(simulation->box->outdata, simulation->n_steps);
@@ -100,12 +101,35 @@ void Environment::run() {
 
 void Environment::renderTrajectory(string trj_path)
 {
-	Trajectory trj(trj_path);
+	Trajectory* trj = new Trajectory(trj_path);
+	for (int i = 0; i < trj->n_particles; i++) {
+		trj->particle_type[i] = 0;
+	}
+	trj->particle_type[0] = 1;
+
+	display->animate(trj);
 }
 
-void Environment::makeVirtualTrajectory(string trj_path)
-{
+void Environment::makeVirtualTrajectory(string trj_path, string waterforce_path) {
+	Trajectory* trj = new Trajectory(trj_path);
+
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 void Environment::printOut(double* data, int n_steps) {
@@ -141,6 +165,20 @@ void Environment::printTrajectory(Simulation* simulation) {
 		}
 		myfile << "\n";
 	}
+	myfile.close();
+}
+
+void Environment::printWaterforce(Simulation* simulation)
+{
+	std::ofstream myfile("D:\\Quantom\\waterforce.csv");
+
+	for (int i = 0; i < simulation->n_steps; i++) {
+		myfile << simulation->box->outdata[7 + i * 10] << ";";
+		myfile << simulation->box->outdata[8 + i * 10] << ";";
+		myfile << simulation->box->outdata[9 + i * 10] << ";";
+		myfile << "\n";
+	}
+
 	myfile.close();
 }
 

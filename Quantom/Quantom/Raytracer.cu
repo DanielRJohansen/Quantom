@@ -45,14 +45,14 @@ __device__ void Ray::searchCompound(CompoundState* state, Box* box, int compound
     }
 }
 
-__device__ bool Ray::searchSolvent(Float3* pos, Box* box, int solvent_index)
+__device__ bool Ray::searchParticle(Float3* pos, int index)
 {
     if (hitsParticle(pos, 0.150)) {
         double dist = distToSphereIntersect(pos, 0.150);
         if (dist < closest_collision) {
             closest_collision = dist;
             atom_type = 1;
-            if (solvent_index == LOGTHREAD && LOGTYPE == 0)
+            if (index == LOGTHREAD && LOGTYPE == 0)
                 log_particle = true;
             return true;
         }
@@ -61,8 +61,28 @@ __device__ bool Ray::searchSolvent(Float3* pos, Box* box, int solvent_index)
 }
 
 
+__device__ void paintImage(uint8_t* image, Ray* ray) {
+    if (ray->atom_type == 0) {      // Carbon
+        image[0] = 40;
+        image[1] = 0;
+        image[2] = 40;
+        image[3] = 255;
+    }
+    else if (ray->atom_type == 1) {      // Solvent
+        image[0] = 200;
+        image[3] = 255;
+    }
+    else {
+        image[0] = 0xFE;
+        image[1] = 0xFE;
+        image[2] = 0xFA;
+        image[3] = 0xE2;
+    }
 
-
+    if (ray->log_particle) {
+        image[1] = 255;
+    }
+}
 
 
 
@@ -120,51 +140,30 @@ __global__ void renderKernel(Ray* rayptr, uint8_t* image, Box* box) {
     }
 
     for (int i = 0; i < box->n_solvents; i++) {
-        if (ray.searchSolvent(&box->solvents[i].pos, box, i)) {
+        if (ray.searchParticle(&box->solvents[i].pos, i)) {
             
         }
     }
     
     
-
-
-
-
-    if (ray.atom_type == 0) {      // Carbon
-        image[index * 4 + 0] = 40;
-        image[index * 4 + 1] = 0;
-        image[index * 4 + 2] = 40;
-        image[index * 4 + 3] = 255;
-    }
-    else if (ray.atom_type == 1) {      // Solvent
-        image[index * 4 + 0] = 200;
-        image[index * 4 + 3] = 255;
-    }
-    else {
-        image[index * 4 + 0] = 0xFE;
-        image[index * 4 + 1] = 0xFE;
-        image[index * 4 + 2] = 0xFA;
-        image[index * 4 + 3] = 0xE2;
-    }
-
-    if (ray.log_particle) {        
-        image[index * 4 + 1] = 255;
-    }
-    /*
-    for (int i = 0; i < 3; i++) {
-        image[index * 4 + i] = box->rendermolecule.colors[ray.atom_type][i];
-    }
-    if (ray.atom_type != -1)
-        image[index * 4 + 3] = 255;
-    else
-        image[index * 4 + 3] = 0;
-    
-    if (ray.log_particle)
-        image[index * 4 + 0] = 50;
-        */
+    paintImage(&image[index * 4], &ray);
 }
-    
 
+__global__ void renderKernel(Ray* rayptr, uint8_t* image, Trajectory* trajectory, int step) {
+    int  index = blockIdx.x * blockDim.x + threadIdx.x;
+    Ray ray = rayptr[index];
+    ray.reset();
+    
+    int step_offset = trajectory->n_particles * step;
+    for (int i = 0; i < trajectory->n_particles; i++) {
+        Float3* particle_pos = &trajectory->positions[step_offset + i];
+        if (ray.searchParticle(particle_pos, i)) {
+
+        }
+    }
+
+    paintImage(&image[index * 4], &ray);
+}
 
 
 
@@ -206,5 +205,21 @@ uint8_t* Raytracer::render(Simulation* simulation) {
     printf("\tRender time: %4d ms  ", duration.count());
     // First render: 666 ms
 
+    return image;
+}
+
+uint8_t* Raytracer::render(Trajectory* trajectory, int step)
+{
+    uint8_t* cuda_image;
+    int im_bytesize = NUM_RAYS * 4 * sizeof(uint8_t);
+    cudaMallocManaged(&cuda_image, im_bytesize);
+
+
+    renderKernel << < RAYS_PER_DIM, RAYS_PER_DIM>> > (rayptr, cuda_image, trajectory, step);
+    uint8_t* image = new uint8_t[NUM_RAYS * 4];
+    cudaMemcpy(image, cuda_image, im_bytesize, cudaMemcpyDeviceToHost);
+
+
+    cudaFree(cuda_image);
     return image;
 }

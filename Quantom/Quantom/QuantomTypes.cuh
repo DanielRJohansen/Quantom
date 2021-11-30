@@ -158,10 +158,35 @@ using namespace std;
 
 
 
+
+
+
+
+
+
+
+template<typename T>
+T* genericMoveToDevice(T* data_ptr, int n_elements) {
+	T* gpu_ptr;
+	int bytesize = n_elements * sizeof(T);
+
+	cudaMallocManaged(&gpu_ptr, bytesize);
+	cudaMemcpy(gpu_ptr, data_ptr, bytesize, cudaMemcpyHostToDevice);
+	delete[] data_ptr;
+
+	data_ptr = gpu_ptr;
+
+	printf("Moved %d bytes to device\n", bytesize);
+	return gpu_ptr;
+}
+
+
+
+
 struct Trajectory {
 	Trajectory() {}
 	Trajectory(std::string path) {
-		positions = new Float3[100 * 10000];
+		positions = new Float3[max_size];
 		double buffer[3];
 
 		printf("Path: ");
@@ -184,7 +209,7 @@ struct Trajectory {
 				if (dim == 3) {
 					positions[counter++] = Float3(buffer);
 					dim = 0;
-					positions[counter - 1].print();
+					//positions[counter - 1].print();
 				}
 			}
 			if (step_cnt == 0) {
@@ -192,8 +217,17 @@ struct Trajectory {
 			}
 			step_cnt++;
 		}
+
+		particle_type = new int[n_particles];
 		n_steps = step_cnt;
 		printf("Loaded trajectory with %d particles and %d steps\n", n_particles, n_steps);
+	}
+
+	void moveToDevice() {
+		positions = genericMoveToDevice(positions, max_size);
+		particle_type = genericMoveToDevice(particle_type, n_particles);
+		cudaDeviceSynchronize();
+		printf("Success\n");
 	}
 
 	string readFileIntoString(const string& path) {
@@ -208,28 +242,12 @@ struct Trajectory {
 		return ss.str();
 	}
 
+	int max_size = 100 * 10000;
+
 	Float3* positions;
 	int* particle_type;	//0 solvent, 1 compound, 2 virtual
 
 	int n_particles;
 	int n_steps;
 };
-
-
-
-template<typename T>
-
-T* genericMoveToDevice(T* data_ptr, int n_elements) {
-	T* gpu_ptr;
-	int bytesize = n_elements * sizeof(T);
-
-	cudaMallocManaged(&gpu_ptr, bytesize);
-	cudaMemcpy(gpu_ptr, data_ptr, bytesize, cudaMemcpyHostToDevice);
-	delete data_ptr;
-
-	data_ptr = gpu_ptr;
-
-	printf("Moved %d bytes to device\n", bytesize);
-	return gpu_ptr;
-}
 

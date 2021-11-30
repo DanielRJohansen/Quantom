@@ -26,9 +26,11 @@ public:
 
 	__device__ bool hitsParticle(Float3* particle_center, double particle_radius);
 	__device__ void searchCompound(CompoundState* compoundstate, Box* box, int i);	// I is for bugfinding.
-	__device__ bool searchSolvent(Float3* pos, Box* box, int solvent_index);
+	__device__ bool searchParticle(Float3* pos, int particle_index);	// Used for solvents, and trajectory
 	__device__ double distToPoint(Float3 point);
 	
+
+
 
 	Float3 origin;
 	Float3 unit_vector;
@@ -54,6 +56,8 @@ public:
 	Raytracer(){}
 	Raytracer(Simulation* simulation, bool verbose);
 	uint8_t* render(Simulation* simulation);
+	uint8_t* render(Trajectory* trajectory, int step);
+
 	//void renderKernel(Ray* rayptr, uint8_t* image, Float3 focalpoint);
 
 private:
