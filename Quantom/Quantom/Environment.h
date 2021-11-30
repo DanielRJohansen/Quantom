@@ -15,14 +15,17 @@
 
 
 
+
+
+
 class Environment
 {
 public:
 	Environment();
 
 	void run();
-
-
+	void renderTrajectory(string trj_path);
+	void makeVirtualTrajectory(string trj_path);
 
 	Simulation* simulation;
 

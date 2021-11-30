@@ -98,6 +98,14 @@ void Environment::run() {
 	//printDataBuffer(simulation->box);
 }
 
+void Environment::renderTrajectory(string trj_path)
+{
+}
+
+void Environment::makeVirtualTrajectory(string trj_path)
+{
+}
+
 
 void Environment::printOut(double* data, int n_steps) {
 	std::ofstream myfile("D:\\Quantom\\log.csv");

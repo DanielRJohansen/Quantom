@@ -10,8 +10,11 @@
 #include "math.h"
 #include <iostream>
 
+#include <string>
+#include <fstream>
 
 constexpr double PI = 3.14159;
+
 
 
 struct Int3 {
@@ -147,6 +150,35 @@ struct BlockMutex {
 	}
 };
 */
+
+
+
+
+
+
+struct Trajectory {
+	Trajectory() {}
+	Trajectory(std::string path) {
+		std::fstream file;
+		file.open(path);
+		std::string line;
+
+		while (getline(file, line)) {
+			std::cout << line << std::endl;
+			for (int i = 0; i < line.size(); i++)
+				std::cout << line[i] << std::endl;
+
+			exit(1);
+		}
+	}
+
+	Float3* positions;
+	int* particle_type;	//0 solvent, 1 compound, 2 virtual
+
+	int n_particles;
+	int n_steps;
+};
+
 
 
 template<typename T>

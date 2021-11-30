@@ -52,7 +52,7 @@ __device__ bool Ray::searchSolvent(Float3* pos, Box* box, int solvent_index)
         if (dist < closest_collision) {
             closest_collision = dist;
             atom_type = 1;
-            if (solvent_index == LOGTHREAD)
+            if (solvent_index == LOGTHREAD && LOGTYPE == 0)
                 log_particle = true;
             return true;
         }
