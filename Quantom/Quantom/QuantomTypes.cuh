@@ -32,6 +32,7 @@ struct Int3 {
 struct Float3 {
 	__host__ __device__ Float3() {}
 	__host__ __device__ Float3(double x, double y, double z) : x(x), y(y), z(z) {}
+	__host__ __device__ Float3(double* a) { x = a[0]; y = a[1]; z = a[2]; }
 
 	__host__ __device__ inline Float3 operator * (const double a) const { return Float3(x * a, y * a, z * a); }
 	__host__ __device__ inline Float3 operator * (const Float3 a) const { return Float3(x * a.x, y * a.y, z * a.z); }
@@ -151,25 +152,60 @@ struct BlockMutex {
 };
 */
 
+#include <sstream>
 
-
+using namespace std;
 
 
 
 struct Trajectory {
 	Trajectory() {}
 	Trajectory(std::string path) {
-		std::fstream file;
-		file.open(path);
-		std::string line;
+		positions = new Float3[100 * 10000];
+		double buffer[3];
 
-		while (getline(file, line)) {
-			std::cout << line << std::endl;
-			for (int i = 0; i < line.size(); i++)
-				std::cout << line[i] << std::endl;
+		printf("Path: ");
+		cout << path << std::endl;
 
-			exit(1);
+		string file_contents = readFileIntoString(path);
+		istringstream sstream(file_contents);
+		string record;
+
+		int counter = 0;
+
+		int step_cnt = 0;
+		while (std::getline(sstream, record)) {
+			istringstream line(record);
+
+			int dim = 0;
+			while (getline(line, record, ';')) {
+				buffer[dim++] = stod(record);
+
+				if (dim == 3) {
+					positions[counter++] = Float3(buffer);
+					dim = 0;
+					positions[counter - 1].print();
+				}
+			}
+			if (step_cnt == 0) {
+				n_particles = counter;
+			}
+			step_cnt++;
 		}
+		n_steps = step_cnt;
+		printf("Loaded trajectory with %d particles and %d steps\n", n_particles, n_steps);
+	}
+
+	string readFileIntoString(const string& path) {
+		auto ss = ostringstream{};
+		ifstream input_file(path);
+		if (!input_file.is_open()) {
+			cerr << "Could not open the file - '"
+				<< path << "'" << endl;
+			exit(EXIT_FAILURE);
+		}
+		ss << input_file.rdbuf();
+		return ss.str();
 	}
 
 	Float3* positions;

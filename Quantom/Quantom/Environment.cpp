@@ -91,7 +91,7 @@ void Environment::run() {
 
 
 	printf("\n\n\n########################## SIMULATION FINISHED ##########################\n\n\n\n");
-
+	printTrajectory(simulation);
 	analyzer.analyzeEnergy(simulation);
 
 	printOut(simulation->box->outdata, simulation->n_steps);
@@ -100,6 +100,7 @@ void Environment::run() {
 
 void Environment::renderTrajectory(string trj_path)
 {
+	Trajectory trj(trj_path);
 }
 
 void Environment::makeVirtualTrajectory(string trj_path)
@@ -128,20 +129,19 @@ void Environment::printOut(double* data, int n_steps) {
 void Environment::printTrajectory(Simulation* simulation) {
 	std::ofstream myfile("D:\\Quantom\\trajectory.csv");
 
-	Float3* traj_host = new Float3[simulation->box->n_compounds * 3 * simulation->n_steps];
-	cudaMemcpy(traj_host, simulation->box->trajectory, sizeof(Float3) * simulation->box->n_compounds * 3 * simulation->n_steps, cudaMemcpyDeviceToHost);
+	int n_points = simulation->box->total_particles * simulation->n_steps;
+	Float3* traj_host = new Float3[n_points];
+	cudaMemcpy(traj_host, simulation->box->trajectory, sizeof(Float3) * n_points, cudaMemcpyDeviceToHost);
 
 	for (int i = 0; i < simulation->box->step; i++) {
-		for (int j = 0; j < simulation->box->n_compounds * 3; j++) {
+		for (int j = 0; j < simulation->box->total_particles; j++) {
 			for (int k = 0; k < 3; k++) {
-				myfile << traj_host[j + i * 10].at(k) << ";";
+				myfile << traj_host[j + i * simulation->box->total_particles].at(k) << ";";
 			}			
 		}
 		myfile << "\n";
 	}
-
 	myfile.close();
-
 }
 
 

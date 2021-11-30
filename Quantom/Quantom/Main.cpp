@@ -21,7 +21,7 @@ int main() {
 	std::printf("Program starting...\n");
 	Environment Env;
 
-	Env.run();
-
+	//Env.run();
+	Env.renderTrajectory("D:\\Quantom\\trajectory.csv");
 	return 0;
 }

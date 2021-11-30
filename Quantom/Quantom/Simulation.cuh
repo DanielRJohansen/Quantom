@@ -133,7 +133,7 @@ public:
 
 	double box_size = BOX_LEN;	//nm
 	int blocks_per_dim;
-	int n_steps = 1000;
+	int n_steps = 100;
 	//int n_steps = 3000;
 	const double dt = 1 * 1e-6;		// ns, so first val corresponds to fs
 	int steps_per_render = 20;
