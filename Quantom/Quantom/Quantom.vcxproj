@@ -85,6 +85,7 @@
     <ClCompile Include="Environment.cpp" />
     <ClCompile Include="Interface.cpp" />
     <ClCompile Include="Main.cpp" />
+    <ClCompile Include="VirtualPathMaker.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Analyzer.cuh" />
@@ -98,6 +99,7 @@
     <ClInclude Include="QuantomTypes.cuh" />
     <ClInclude Include="Raytracer.cuh" />
     <ClInclude Include="Simulation.cuh" />
+    <ClInclude Include="VirtualPathMaker.h" />
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="Analyzer.cu" />

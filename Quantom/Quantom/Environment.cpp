@@ -112,6 +112,16 @@ void Environment::renderTrajectory(string trj_path)
 
 void Environment::makeVirtualTrajectory(string trj_path, string waterforce_path) {
 	Trajectory* trj = new Trajectory(trj_path);
+	Trajectory* force_buffer = new Trajectory(waterforce_path);
+	
+	Float3* particle_position = trj->positions;
+	Float3* forces = force_buffer->positions;
+	int n_steps = trj->n_steps;
+
+	VirtualPathMaker VPM;
+	Float3* vp_path = VPM.makeVirtualPath(particle_position, forces, n_steps);
+
+
 
 }
 

@@ -7,7 +7,7 @@
 #include "Engine.cuh"
 #include "Analyzer.cuh"
 #include "CompoundBuilder.h"
-
+#include "VirtualPathMaker.h"
 
 // For logging
 #include <fstream>

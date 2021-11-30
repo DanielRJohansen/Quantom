@@ -222,6 +222,9 @@ struct Trajectory {
 		n_steps = step_cnt;
 		printf("Loaded trajectory with %d particles and %d steps\n", n_particles, n_steps);
 	}
+	Trajectory(int size) {
+		positions = new Float3[size];
+	}
 
 	void moveToDevice() {
 		positions = genericMoveToDevice(positions, max_size);
