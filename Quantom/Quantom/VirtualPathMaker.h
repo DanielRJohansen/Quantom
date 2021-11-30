@@ -25,6 +25,7 @@ private:
 
 	double binarySearch(double lower, double middle, double upper, double force);
 	double calcForce(double distance);
+	double lengthOfPath(Float3* path, int n_steps);
 
 
 	const double sigma = 0.3923f;	//nm, basicllay break 0 point

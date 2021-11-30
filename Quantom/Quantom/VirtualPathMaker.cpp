@@ -8,8 +8,13 @@ Float3* VirtualPathMaker::makeVirtualPath(Float3* particle_positions, Float3* fo
     Float3** all_paths = generateAllPaths(particle_positions, forces, n_steps);
 
     int best_path_index = findIndexOfShortestPath(all_paths, n_steps);
+    for (int i = 0; i < n_steps; i++) {
+        virtual_path[i] = all_paths[best_path_index][i];
+    }
 
-
+    for (int i = 0; i < 8; i++)
+        delete[] all_paths[i];
+    delete[] all_paths;
 
     return virtual_path;
 }
@@ -58,6 +63,23 @@ int VirtualPathMaker::findIndexOfShortestStep(Float3 pos_prev, Float3* possible_
     }
     if (shortest_step > 999)
         printf("FUCKIIIIING LONG STEP\n");
+    return best_index;
+}
+
+int VirtualPathMaker::findIndexOfShortestPath(Float3** all_paths, int n_steps)
+{
+    double shortest_path = 1e+10;
+    int best_index = 0;
+
+    for (int i = 0; i < 8; i++) {
+        double dist = lengthOfPath(all_paths[i], n_steps);
+        printf("Dist: %f\n", dist);
+        if (dist < shortest_path) {
+            shortest_path = dist;
+            best_index = i;
+        }
+    }
+    printf("Shortest path %f\tindex: %d", shortest_path, best_index);
     return best_index;
 }
 
@@ -145,4 +167,13 @@ double VirtualPathMaker::calcForce(double dist)
 
     double force = -24.f * (epsilon / (dist * dist)) * f6 * (1.f - 2.f * f6);
     return force;
+}
+
+double VirtualPathMaker::lengthOfPath(Float3* path, int n_steps)
+{
+    double length = 0;
+    for (int i = 1; i < n_steps; i++) {
+        length += (path[i] - path[i - 1]).len();
+    }
+    return length;
 }
