@@ -45,14 +45,14 @@ __device__ void Ray::searchCompound(CompoundState* state, Box* box, int compound
     }
 }
 
-__device__ bool Ray::searchParticle(Float3* pos, int index)
+__device__ bool Ray::searchParticle(Float3* pos, int index, bool is_virtual)
 {
     if (hitsParticle(pos, 0.150)) {
         double dist = distToSphereIntersect(pos, 0.150);
         if (dist < closest_collision) {
             closest_collision = dist;
             atom_type = 1;
-            if (index == LOGTHREAD && LOGTYPE == 0)
+            if ((index == LOGTHREAD && LOGTYPE == 0) || is_virtual)
                 log_particle = true;
             return true;
         }
@@ -80,7 +80,9 @@ __device__ void paintImage(uint8_t* image, Ray* ray) {
     }
 
     if (ray->log_particle) {
-        image[1] = 255;
+        image[0] = 0x53;
+        image[1] = 0xAF;
+        image[2] = 0x8B;
     }
 }
 
@@ -157,7 +159,8 @@ __global__ void renderKernel(Ray* rayptr, uint8_t* image, Trajectory* trajectory
     int step_offset = trajectory->n_particles * step;
     for (int i = 0; i < trajectory->n_particles; i++) {
         Float3* particle_pos = &trajectory->positions[step_offset + i];
-        if (ray.searchParticle(particle_pos, i)) {
+        bool is_virtual = (i == 1);
+        if (ray.searchParticle(particle_pos, i, is_virtual)) {
 
         }
     }

@@ -5,7 +5,7 @@
 
 
 
-constexpr double BOX_LEN = 4.f;	
+constexpr double BOX_LEN = 3.f;	
 
 constexpr double BOX_LEN_HALF = BOX_LEN/2.f;
 constexpr double BOX_BASE = -BOX_LEN_HALF;
@@ -133,9 +133,9 @@ public:
 
 	double box_size = BOX_LEN;	//nm
 	int blocks_per_dim;
-	int n_steps = 100;
+	int n_steps = 400;
 	//int n_steps = 3000;
-	const double dt = 1 * 1e-6;		// ns, so first val corresponds to fs
+	const double dt = 2 * 1e-6;		// ns, so first val corresponds to fs
 	int steps_per_render = 20;
 	//int n_bodies = N_BODIES_START;
 	Box* box;

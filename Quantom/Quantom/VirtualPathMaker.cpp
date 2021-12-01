@@ -9,7 +9,7 @@ Float3* VirtualPathMaker::makeVirtualPath(Float3* particle_positions, Float3* fo
 
     int best_path_index = findIndexOfShortestPath(all_paths, n_steps);
     for (int i = 0; i < n_steps; i++) {
-        virtual_path[i] = all_paths[best_path_index][i];
+        virtual_path[i] = all_paths[best_path_index][i] + particle_positions[i];
     }
 
     for (int i = 0; i < 8; i++)
@@ -73,7 +73,7 @@ int VirtualPathMaker::findIndexOfShortestPath(Float3** all_paths, int n_steps)
 
     for (int i = 0; i < 8; i++) {
         double dist = lengthOfPath(all_paths[i], n_steps);
-        printf("Dist: %f\n", dist);
+        //printf("Dist: %f\n", dist);
         if (dist < shortest_path) {
             shortest_path = dist;
             best_index = i;
@@ -107,8 +107,8 @@ Float3* VirtualPathMaker::generateAllPositions(Float3 particle_position, Float3 
         }
     }
 
-    for (int i = 0; i < 8; i++)
-        possible_positions[i].print();
+    //for (int i = 0; i < 8; i++)
+      //  possible_positions[i].print();
 
     return possible_positions;
 }
@@ -122,8 +122,8 @@ double VirtualPathMaker::getAtttractivePosition(double force)
         return force > 0 ? 9999 : -9999;
     }
 
-    double fake_pos = binarySearch(lower, m, upper, abs(force));
-    double pos = force < 0 ? fake_pos * -1 : fake_pos;
+    double pos_right_of_particle = binarySearch(lower, m, upper, abs(force));
+    double pos = force < 0 ? pos_right_of_particle * -1 : pos_right_of_particle;
 
 
     return pos;
@@ -136,8 +136,8 @@ double VirtualPathMaker::getRepulsivePosition(double force)
     double upper = 0.1;
     double m = (lower + upper) / 2.f;
     //printf("m: %f\n", m);
-    double fake_pos = binarySearch(lower, m, upper, abs(force));
-    double pos = force < 0 ? fake_pos : fake_pos * -1;
+    double pos_right_of_particle = binarySearch(lower, m, upper, abs(force));
+    double pos = force < 0 ? pos_right_of_particle : pos_right_of_particle * -1;
 
     return pos;
 }

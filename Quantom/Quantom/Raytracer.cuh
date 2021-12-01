@@ -26,7 +26,7 @@ public:
 
 	__device__ bool hitsParticle(Float3* particle_center, double particle_radius);
 	__device__ void searchCompound(CompoundState* compoundstate, Box* box, int i);	// I is for bugfinding.
-	__device__ bool searchParticle(Float3* pos, int particle_index);	// Used for solvents, and trajectory
+	__device__ bool searchParticle(Float3* pos, int particle_index, bool is_virtual=false);	// Used for solvents, and trajectory
 	__device__ double distToPoint(Float3 point);
 	
 

@@ -39,14 +39,14 @@ void Display::animate(Trajectory* trj)
     trj = genericMoveToDevice(trj, 1);
 
 
-    trj->n_steps = 10;  // TEMPTYEMPTEMP
+    //trj->n_steps = 50;  // TEMPTYEMPTEMP
 
     for (int i = 0; i < trj->n_steps; i++) {
         printf("Frame %d\n", i);
         animation[i] = raytracer->render(trj, i);
     }
 
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < 100; i++) {
         for (int t = 0; t < trj->n_steps; t++) {
             draw(animation[t]);
             sleep(50);
