@@ -29,7 +29,7 @@ class Engine {
 public:
 	Engine(){}
 
-	Simulation* prepSimulation(Simulation* simulation);
+	Simulation* prepSimulation(Simulation* simulation, Compound* main_molecule);
 	//double* getDatabuffer();
 	bool testFunction();
 	void step();

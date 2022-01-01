@@ -8,11 +8,10 @@ Environment::Environment() {
 	engine = new Engine;
 
 	
-	//Molecule1 molecule = compoundbuilder.buildMolecule("D:\\Quantom\\17T_-_clean_peptide.pdb");
+	Compound main_molecule = compoundbuilder.buildMolecule("D:\\Quantom\\m40.pdb", "D:\\Quantom\\dpc.itp");
 
 
-
-	simulation = engine->prepSimulation(simulation);
+	simulation = engine->prepSimulation(simulation, &main_molecule);
 	printf("Engine ready\n");
 	if (!verifySimulationParameters()) {
 		exit(0);

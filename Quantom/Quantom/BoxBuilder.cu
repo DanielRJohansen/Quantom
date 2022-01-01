@@ -2,7 +2,7 @@
 
 
 
-void BoxBuilder::build(Simulation* simulation) {
+void BoxBuilder::build(Simulation* simulation, Compound* main_molecule) {
 	simulation->box->compounds = new Compound[MAX_COMPOUNDS];
 	//simulation->box->solvents = new Compound[MAX_COMPOUNDS];
 	//compoundneighborlists_host = new CompoundNeighborList[MAX_COMPOUNDS];
@@ -27,17 +27,22 @@ void BoxBuilder::build(Simulation* simulation) {
 
 	//cudaMalloc(&simulation->box->solvents, sizeof(Solvent) * MAX_SOLVENTS);
 
-	if (N_SOLVATE_MOLECULES > 256) {
+	if (N_SOLVATE_MOLECULES > 256) {			// Oh fuck, i forgot
 		printf("Critical indexing failure\n");
 		exit(1);
 	}
 
 
 
+	if (main_molecule == nullptr)
+		placeMainMolecule(simulation);
+	else
+		placeMainMolecule(simulation, main_molecule);
 
-	placeMainMolecule(simulation);
 	solvateBox(simulation);	// Always do after placing compounds
 	simulation->box->total_particles = simulation->box->n_compounds * PARTICLES_PER_COMPOUND + simulation->box->n_solvents;
+
+
 
 	compoundLinker(simulation);
 	solvateLinker(simulation);
@@ -88,6 +93,25 @@ void BoxBuilder::placeMainMolecule(Simulation* simulation) {
 		&simulation->box->compound_neighborlist_array[simulation->box->n_compounds],
 		simulation->dt
 	);
+}
+
+void BoxBuilder::placeMainMolecule(Simulation* simulation, Compound* main_compound)
+{
+	Float3 compound_center = Float3(BOX_LEN_HALF, BOX_LEN_HALF, BOX_LEN_HALF);
+
+	Float3 offset = compound_center - main_compound->getCOM();
+	for (int i = 0; i < main_compound->n_particles; i++) {
+		main_compound->particles[i].pos_tsub1 += offset;
+	}
+
+	
+	simulation->box->compounds[simulation->box->n_compounds++] = *createCompound(
+		main_compound,
+		simulation
+	);
+
+	//for (int i = 0; i < simulation->box->compound_state_array[0].n_particles; i++)
+		//simulation->box->compound_state_array[0].positions[i].print('p');
 }
 
 int BoxBuilder::solvateBox(Simulation* simulation)
@@ -141,13 +165,34 @@ Compound BoxBuilder::createCompound(Float3 com, int compound_index, CompoundStat
 	}
 	
 	//double vrms = 250;
-	Float3 compound_united_vel = Float3(v_rms , 0,0) * 0;
+
+	Float3 compound_united_vel = Float3(random(), random(), random()).norm() * v_rms * 0.1;
 	Compound compound(compound_index, statebuffer_node);
 	for (int i = 0; i < n_atoms; i++) {
 		Float3 atom_pos_sub1 = statebuffer_node->positions[i] - compound_united_vel * dt;
 		compound.particles[i] = CompactParticle(COMPOUNDPARTICLE_MASS, atom_pos_sub1);
 		compound.n_particles++;
 	}
+	return compound;
+}
+
+Compound* BoxBuilder::createCompound(Compound* compound, Simulation* simulation)
+{
+	compound->init(simulation->box->n_compounds);
+	CompoundState* statebuffer_node = &simulation->box->compound_state_array[compound->index];
+	Float3 compound_united_vel = Float3(random(), random(), random()).norm() * v_rms * 0.1;
+
+	for (int i = 0; i < compound->n_particles; i++) {
+		statebuffer_node->positions[i] = compound->particles[i].pos_tsub1;
+		statebuffer_node->n_particles++;
+	}
+
+
+	for (int i = 0; i < compound->n_particles; i++) {
+		Float3 atom_pos_sub1 = statebuffer_node->positions[i] - compound_united_vel * simulation->dt;
+		compound->particles[i].pos_tsub1 = atom_pos_sub1;												// Overwrite prev pos here, since we have assigned the former prev pos to the state buffer.
+	}
+	printf("UHHHH %d\n", (*compound).n_particles);
 	return compound;
 }
 
@@ -220,7 +265,7 @@ void BoxBuilder::solvateCompoundCrosslinker(Simulation* simulation)
 			}
 		}
 	}
-	printf("Compound 0 solvents: %d\n", simulation->box->solvent_neighborlist_array[0].n_neighbors);
+	printf("Compound n0 solvents: %d\n", simulation->box->solvent_neighborlist_array[0].n_neighbors);
 }
 
 

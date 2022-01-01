@@ -5,7 +5,7 @@
 
 
 
-constexpr double BOX_LEN = 3.f;	
+constexpr double BOX_LEN = 2.f;	
 
 constexpr double BOX_LEN_HALF = BOX_LEN/2.f;
 constexpr double BOX_BASE = -BOX_LEN_HALF;
@@ -21,10 +21,10 @@ const int LOGTHREAD = 0;
 const int LOGTYPE = 1;	// 0 for solvent, 1 for compound
 //const int N_BODIES_START = 40;
 //const int N_SOLVATE_MOLECULES = 5*5*5;// 60;
-const int N_SOLVATE_MOLECULES = 64;
+const int N_SOLVATE_MOLECULES = 4;
 
 
-const int PARTICLES_PER_COMPOUND = 1;
+const int PARTICLES_PER_COMPOUND = 3;
 const int BLOCKS_PER_SM = 512;
 //const int GRIDBLOCKS_PER_BODY = 16;
 //const int THREADS_PER_GRIDBLOCK = MAX_BLOCK_BODIES / GRIDBLOCKS_PER_BODY;
@@ -133,10 +133,10 @@ public:
 
 	double box_size = BOX_LEN;	//nm
 	int blocks_per_dim;
-	int n_steps = 400;
+	int n_steps = 10000;
 	//int n_steps = 3000;
 	const double dt = 2 * 1e-6;		// ns, so first val corresponds to fs
-	int steps_per_render = 20;
+	int steps_per_render = 10;
 	//int n_bodies = N_BODIES_START;
 	Box* box;
 

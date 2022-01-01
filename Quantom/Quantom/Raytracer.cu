@@ -51,9 +51,13 @@ __device__ bool Ray::searchParticle(Float3* pos, int index, bool is_virtual)
         double dist = distToSphereIntersect(pos, 0.150);
         if (dist < closest_collision) {
             closest_collision = dist;
-            atom_type = 1;
-            if ((index == LOGTHREAD && LOGTYPE == 0) || is_virtual)
-                log_particle = true;
+            if (index == 0)
+                atom_type = 0;
+            else
+                atom_type = 1;
+            atom_type = 0;
+            //if ((index == LOGTHREAD && LOGTYPE == 0) || is_virtual)
+              //  log_particle = true;
             return true;
         }
     }

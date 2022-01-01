@@ -2,10 +2,10 @@
 
 
 
-Simulation* Engine::prepSimulation(Simulation* simulation) {
+Simulation* Engine::prepSimulation(Simulation* simulation, Compound* main_molecule) {
 	this->simulation = simulation;
 	srand(290128301);
-	boxbuilder.build(simulation);
+	boxbuilder.build(simulation, main_molecule);
 	printf("Boxbuild complete!\n");
 
 	//updateNeighborLists();
@@ -63,7 +63,7 @@ void Engine::step() {
 
 	auto t0 = std::chrono::high_resolution_clock::now();
 	forceKernel <<< simulation->box->n_compounds, MAX_COMPOUND_PARTICLES >>> (simulation->box);
-	solventForceKernel <<<BLOCKS_PER_SOLVENTKERNEL, THREADS_PER_SOLVENTBLOCK >>> (simulation->box);
+	//solventForceKernel <<<BLOCKS_PER_SOLVENTKERNEL, THREADS_PER_SOLVENTBLOCK >>> (simulation->box);
 
 	cudaDeviceSynchronize();
 	auto t1 = std::chrono::high_resolution_clock::now();
@@ -74,7 +74,7 @@ void Engine::step() {
 	// FOR THIS IT WOULD BE OPTIMAL TO ALSO KEEP THE PREVIOUS POSITIONS SEPARATE.
 
 	cudaMemcpy(simulation->box->compound_state_array, simulation->box->compound_state_array_next, sizeof(CompoundState) * MAX_COMPOUNDS, cudaMemcpyDeviceToDevice);	// Update all positions, after all forces have been calculated
-	cudaMemcpy(simulation->box->solvents, simulation->box->solvents_next, sizeof(Solvent) * MAX_SOLVENTS, cudaMemcpyDeviceToDevice);
+	//cudaMemcpy(simulation->box->solvents, simulation->box->solvents_next, sizeof(Solvent) * MAX_SOLVENTS, cudaMemcpyDeviceToDevice);
 	cudaDeviceSynchronize();
 	auto t2 = std::chrono::high_resolution_clock::now();
 
@@ -281,7 +281,7 @@ __device__ Float3 computeLJForces(Box* box, Compound* compound, SolventNeighborL
 		int solvent_index = threadIdx.x + i;
 		if ((solvent_index) < neighborlist->n_neighbors) {				// Dont think we have enough threads for this...
 			utility_buffer[solvent_index] = box->solvents[neighborlist->neighborsolvent_indexes[solvent_index]].pos;
-			applyHyperpos(&self_state->positions[threadIdx.x], &utility_buffer[solvent_index]);
+			//applyHyperpos(&self_state->positions[threadIdx.x], &utility_buffer[solvent_index]);
 			//utility_buffer[solvent_index] = utility_buffer[solvent_index] + getSolventHyperposOffset(&self_state->positions[threadIdx.x], &utility_buffer[solvent_index]);
 		}
 	}
@@ -332,7 +332,7 @@ __device__ Float3 computeLJForces(Box* box, Float3* self_pos, CompoundNeighborLi
 
 	for (int i = 0; i < solventneighbor_list->n_neighbors; i++) {
 		Float3 other_pos = box->solvents[solventneighbor_list->neighborsolvent_indexes[i]].pos;
-		applyHyperpos(self_pos, &other_pos);
+		//applyHyperpos(self_pos, &other_pos);
 		force += calcLJForce(self_pos, &other_pos, data_ptr);
 	}
 	return force;
@@ -399,9 +399,6 @@ __global__ void forceKernel(Box* box) {
 	else
 		self_state.positions[threadIdx.x] = Float3(0, 0, 0);
 
-	//printf("n neighbors")
-
-
 
 	double data_ptr[4];
 	for (int i = 0; i < 4; i++)
@@ -409,24 +406,30 @@ __global__ void forceKernel(Box* box) {
 	data_ptr[2] = 9999;
 
 
-
-
 	Float3 force(0, 0, 0);
+
+
+	
+	// ------------------------------------------------------------ Intramolecular Operations ------------------------------------------------------------ //
+	applyHyperpos(&self_state.positions[0], &self_state.positions[threadIdx.x]);
+
+	force = force + computePairbondForces(&compound, &self_state, &data_ptr[2]);
+
+	//force = force + computeAnglebondForces(&compound, &self_state, &data_ptr[2]);
+	// ----------------------------------------------------------------------------------------------------------------------------------------------- //
+
+
+
+
 	// --------------------------------------------------------------- Intermolecular forces --------------------------------------------------------------- //
 	//force = force + computeLJForces(box, &compound, &neighborlist, &self_state, &neighborstate_buffer, utility_buffer, data_ptr);
-	Float3 waterforce = computeLJForces(box, &compound, &box->solvent_neighborlist_array[blockIdx.x], &self_state, utility_buffer, data_ptr);
-	force += waterforce;
+	//Float3 waterforce = computeLJForces(box, &compound, &box->solvent_neighborlist_array[blockIdx.x], &self_state, utility_buffer, data_ptr);
+	//force += waterforce;
 	// ------------------------------------------------------------------------------------------------------------------------------------------------------ //
 	if (blockIdx.x == LOGBLOCK && threadIdx.x == LOGTHREAD && LOGTYPE == 1) {
 		//waterforce.print('\n');
 	}
 
-
-	// ------------------------------------------------------------ Intramolecular forces ------------------------------------------------------------ //
-	//force = force + computePairbondForces(&compound, &self_state, &data_ptr[2]);
-
-	//force = force + computeAnglebondForces(&compound, &self_state, &data_ptr[2]);
-	// ----------------------------------------------------------------------------------------------------------------------------------------------- //
 
 
 
@@ -518,9 +521,9 @@ __global__ void forceKernel(Box* box) {
 			box->outdata[6 + box->step * 10] = data_ptr[1];// force.len();
 
 
-			box->outdata[7 + box->step * 10] = waterforce.x;
+			/*box->outdata[7 + box->step * 10] = waterforce.x;
 			box->outdata[8 + box->step * 10] = waterforce.y;
-			box->outdata[9 + box->step * 10] = waterforce.z;
+			box->outdata[9 + box->step * 10] = waterforce.z;*/
 		}
 	}
 	
@@ -558,7 +561,7 @@ __global__ void solventForceKernel(Box* box) {
 	integratePosition(&solvent.pos, &solvent.pos_tsub1, &force, SOLVENT_MASS, box->dt);
 
 	
-	applyPBC(&solvent.pos);	// forcePositionToInsideBox
+	//applyPBC(&solvent.pos);	// forcePositionToInsideBox	// This break the integration, as that doesn't accound for PBC in the vel conservation
 
 
 

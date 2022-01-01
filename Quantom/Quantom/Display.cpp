@@ -39,7 +39,7 @@ void Display::animate(Trajectory* trj)
     trj = genericMoveToDevice(trj, 1);
 
 
-    //trj->n_steps = 50;  // TEMPTYEMPTEMP
+    //trj->n_steps = 10;  // TEMPTYEMPTEMP
 
     for (int i = 0; i < trj->n_steps; i++) {
         printf("Frame %d\n", i);
@@ -49,7 +49,7 @@ void Display::animate(Trajectory* trj)
     for (int i = 0; i < 100; i++) {
         for (int t = 0; t < trj->n_steps; t++) {
             draw(animation[t]);
-            sleep(50);
+            sleep(10);
         }
     }
 

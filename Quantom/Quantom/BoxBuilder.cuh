@@ -7,16 +7,20 @@ class BoxBuilder
 {
 public:
 	BoxBuilder() {};
-	void build(Simulation* simulation);
+	void build(Simulation* simulation, Compound* main_molecule=nullptr);
 
 
 private:
 
 	void placeMainMolecule(Simulation* simulation);
+	void placeMainMolecule(Simulation* simulation, Compound* main_compound);
 	int solvateBox(Simulation* simulation);					// Returns # of solvate compounds placed
+
 	Compound createCompound(Float3 com, int compound_index,
 		CompoundState* statebuffer_node, CompoundNeighborList* neighborinfo_node, double dt);
+	Compound* createCompound(Compound* compound, Simulation* simulation);
 	Solvent createSolvent(Float3 com, double dt);
+
 	bool spaceAvailable(Box* box, Float3 com, double radius);
 	void compoundLinker(Simulation* simulation);									// Temp function
 	void solvateLinker(Simulation* simulation);

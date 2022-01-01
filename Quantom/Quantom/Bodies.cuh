@@ -205,8 +205,8 @@ const double HOH_refangle = 1.822996;	// radians
 const double max_LJ_dist = 1;			// nm
 
 const int MAX_COMPOUND_PARTICLES = 64;
-const int MAX_PAIRBONDS = 16;
-const int MAX_ANGLEBONDS = 16;
+const int MAX_PAIRBONDS = 32;
+const int MAX_ANGLEBONDS = 32;
 const double CC_refdist = 0.153; // nm
 const double CCC_reftheta = 1.953; // nm
 
@@ -217,6 +217,9 @@ struct CompoundState {
 
 struct Compound {
 	__host__ Compound() {}	// {}
+
+
+	//---------------------------------------------------------------------------------//
 	__host__ Compound(uint32_t index, CompoundState* states_host) {
 		this->index = index;
 		//compound_neighborlist_ptr = neighborlist_device;
@@ -238,8 +241,23 @@ struct Compound {
 		radius = pairbonds[0].reference_dist * states_host->n_particles;					// TODO: Shitty estimate, do better later
 	};
 	
+	__host__ void init(uint32_t index) {	// Only call this if the compound has already been assigned particles & bonds
+		this->index = index;
+		center_of_mass = getCOM();
+		//printf("")
+		radius = pairbonds[0].reference_dist * n_particles * 0.5f;
+		center_of_mass.print('C');
+		printf("Radius %f\n", radius);
+	}
 
+	//---------------------------------------------------------------------------------//
 
+	__host__ Float3 getCOM() {
+		Float3 com;
+		for (int i = 0; i < n_particles; i++)
+			com += (particles[i].pos_tsub1 * (1.f / (double) n_particles));
+		return com;
+	}
 	__host__ bool intersects(Compound a) {
 		return (a.center_of_mass - center_of_mass).len() < (a.radius + radius + max_LJ_dist);
 	}
@@ -248,7 +266,7 @@ struct Compound {
 	//CompoundState* compound_state_ptr;
 	//CompoundNeighborList* compound_neighborlist_ptr;
 
-	uint8_t n_particles = 0;
+	uint8_t n_particles = 0;					// MAX 256 particles!!!!0
 	CompactParticle particles[MAX_COMPOUND_PARTICLES];
 
 	Float3 center_of_mass = Float3(0, 0, 0);
