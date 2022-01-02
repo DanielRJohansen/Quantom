@@ -62,9 +62,14 @@ struct Float3 {
 			z -= a;
 		return *this;
 	}
+	
 	__host__ __device__ inline static double getAngle(Float3 v1, Float3 v2) {
 		return acos((v1.dot(v2)) / (v1.len() * v2.len()));
 	}
+	__host__ __device__ static double getAngle(Float3 a, Float3 middle, Float3 b) {
+		return getAngle(a - middle, b - middle);
+	}
+
 
 	__host__ __device__ Float3 cross(Float3 a) const { return Float3(y * a.z - z * a.y, z * a.x - x * a.z, x * a.y - y * a.x); }
 	__host__ __device__ double dot(Float3 a) const { return (x * a.x + y * a.y + z * a.z); }

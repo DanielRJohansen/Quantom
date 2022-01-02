@@ -131,8 +131,10 @@ void CompoundBuilder::addBond(Compound* compound, vector<string>* record)
 			return;
 	}
 
-
-	compound->pairbonds[compound->n_pairbonds++] = PairBond(OH_refdist, particle_indexes[0], particle_indexes[1]);
+	double dist = (compound->particles[particle_indexes[0]].pos_tsub1 - compound->particles[particle_indexes[1]].pos_tsub1).len();
+	printf("Calculated ref dist: %f\n", dist);
+	compound->pairbonds[compound->n_pairbonds++] = PairBond(dist, particle_indexes[0], particle_indexes[1]);
+	//printf("Pairbond error: %f\n", OH_refdist - ();
 }
 
 void CompoundBuilder::addAngle(Compound* compound, vector<string>* record)
@@ -147,7 +149,8 @@ void CompoundBuilder::addAngle(Compound* compound, vector<string>* record)
 			return;
 	}
 
-	compound->anglebonds[compound->n_anglebonds++] = AngleBond(HOH_refangle, particle_indexes[0], particle_indexes[1], particle_indexes[2]);
+	double angle = Float3::getAngle(compound->particles[particle_indexes[0]].pos_tsub1, compound->particles[particle_indexes[1]].pos_tsub1, compound->particles[particle_indexes[2]].pos_tsub1);
+	compound->anglebonds[compound->n_anglebonds++] = AngleBond(angle, particle_indexes[0], particle_indexes[1], particle_indexes[2]);
 }
 
 void CompoundBuilder::addDihedral(Compound* compound, vector<string>* record)

@@ -111,9 +111,16 @@ __device__ double cudaMin(double a, double b) {
 
 
 void __device__ applyHyperpos(Float3* static_particle, Float3* movable_particle) {
+	Float3 tmp = *movable_particle;
 	for (int i = 0; i < 3; i++) {
 		*movable_particle->placeAt(i) += BOX_LEN * ((static_particle->at(i) - movable_particle->at(i)) > BOX_LEN_HALF);
 		*movable_particle->placeAt(i) -= BOX_LEN * ((static_particle->at(i) - movable_particle->at(i)) < -BOX_LEN_HALF);	// use at not X!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	}
+
+	if ((*movable_particle - tmp).len() > 0.1 && !(tmp == Float3(0,0,0))) {
+		static_particle->print('s');
+		tmp.print('f');
+		movable_particle->print('t');
 	}
 }
 
@@ -171,13 +178,16 @@ __device__ Float3 calcPairbondForce(Float3* self_pos, Float3* other_pos, double*
 	
 	Float3 force = v.norm() * kb * (-dif);
 
+
+	*potE += 0.5 * kb * (dif * dif) * 0.5;// *1 * 10e+4;
+
 	if (abs(*potE) > 300000) {
 		printf("\n");
-		printf("threadid %d from: %f to: %f\n", threadIdx.x, *potE, 0.5 * kb * (dif * dif) * 0.5);
+		printf("threadid %d from: %f to: %f\n", threadIdx.x, *potE - 0.5 * kb * (dif * dif) * 0.5, *potE);
 
 		self_pos->print('s');
 		other_pos->print('o');
-		printf("len %f, force %f\n", v.len(), force.len());
+		printf("len %f\tdif: %f\t force %f\n", v.len(), dif, force.len());
 	}
 
 	// Logging stuff
@@ -185,7 +195,6 @@ __device__ Float3 calcPairbondForce(Float3* self_pos, Float3* other_pos, double*
 		//self_pos[63 - threadIdx.x].x = v.len();
 		//self_pos[63 - threadIdx.x].y = *potE;
 	}
-	*potE += 0.5 * kb * (dif * dif) * 0.5;// *1 * 10e+4;
 	return force;
 	//return v.norm() * (0.5 * kb * (dif * dif) * invert) *1.99 * 10e+4;
 }

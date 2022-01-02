@@ -5,7 +5,7 @@
 
 
 
-constexpr double BOX_LEN = 2.f;	
+constexpr double BOX_LEN = 4.f;		// Must be > twice the len of largest compound
 
 constexpr double BOX_LEN_HALF = BOX_LEN/2.f;
 constexpr double BOX_BASE = -BOX_LEN_HALF;
