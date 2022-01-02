@@ -17,7 +17,7 @@ private:
 	int solvateBox(Simulation* simulation);					// Returns # of solvate compounds placed
 
 	Compound createCompound(Float3 com, int compound_index,
-		CompoundState* statebuffer_node, CompoundNeighborList* neighborinfo_node, double dt);
+		CompoundState* statebuffer_node, double dt);
 	Compound* createCompound(Compound* compound, Simulation* simulation);
 	Solvent createSolvent(Float3 com, double dt);
 

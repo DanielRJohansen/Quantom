@@ -21,7 +21,7 @@ const int LOGTHREAD = 0;
 const int LOGTYPE = 1;	// 0 for solvent, 1 for compound
 //const int N_BODIES_START = 40;
 //const int N_SOLVATE_MOLECULES = 5*5*5;// 60;
-const int N_SOLVATE_MOLECULES = 4;
+const int N_SOLVATE_MOLECULES = 32;
 
 
 const int PARTICLES_PER_COMPOUND = 3;
@@ -42,8 +42,10 @@ constexpr double CUTOFF = 5.0f;	//nm/
 
 
 const int BLOCKS_PER_SOLVENTKERNEL = 8;
-const int THREADS_PER_SOLVENTBLOCK = 64;
+const int THREADS_PER_SOLVENTBLOCK = 64;	// Must be >= N_SOLVATE_MOLECULES
 
+
+const int THREADS_PER_COMPOUNDBLOCK = 64; // Must be >= max comp particles
 
 
 
@@ -62,7 +64,6 @@ public:
 	uint32_t n_compounds = 0;
 	uint16_t n_solvents = 0;
 	uint32_t total_particles = 0;
-	//uint32_t n_solvents = 0;
 
 	RenderMolecule rendermolecule;	// Not proud, TEMP
 
@@ -70,8 +71,8 @@ public:
 	CompoundState* compound_state_array;	
 	CompoundState* compound_state_array_next;
 
-	CompoundNeighborList* compound_neighborlist_array;	// First (MAX_COMPUNDS) lists belonging to compounds, then solvents
-	SolventNeighborList* solvent_neighborlist_array;	// First (MAX_COMPUNDS) lists belonging to compounds, then solvents
+	NeighborList* compound_neighborlists;
+	NeighborList* solvent_neighborlists;
 	//------------------------------------//
 
 	Solvent* solvents;
@@ -96,9 +97,9 @@ public:
 		compound_state_array = genericMoveToDevice(compound_state_array, MAX_COMPOUNDS);
 
 
-
-		compound_neighborlist_array = genericMoveToDevice(compound_neighborlist_array, MAX_COMPOUNDS + MAX_SOLVENTS);
-		solvent_neighborlist_array = genericMoveToDevice(solvent_neighborlist_array, MAX_COMPOUNDS + MAX_SOLVENTS);
+		//printf("Here\n");
+		compound_neighborlists = genericMoveToDevice(compound_neighborlists, MAX_COMPOUNDS);
+		solvent_neighborlists = genericMoveToDevice(solvent_neighborlists, MAX_SOLVENTS);
 
 
 		
@@ -136,7 +137,7 @@ public:
 	int n_steps = 10000;
 	//int n_steps = 3000;
 	const double dt = 2 * 1e-6;		// ns, so first val corresponds to fs
-	int steps_per_render = 10;
+	int steps_per_render = 50;
 	//int n_bodies = N_BODIES_START;
 	Box* box;
 

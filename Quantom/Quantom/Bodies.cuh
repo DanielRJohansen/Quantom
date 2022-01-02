@@ -4,7 +4,20 @@
 #include <SFML/Graphics.hpp>
 #include <iostream>
 
-//enum Atom{Oxygen};
+const int MAX_COMPOUND_PARTICLES = 64;
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 struct Atom {
 	__host__ __device__ Atom() {}
@@ -88,11 +101,8 @@ constexpr unsigned char UNUSED_BODY = 255;
 struct CompactParticle {	// Contains information only needed by the Ownerkernel
 	CompactParticle() {}	
 	CompactParticle(double mass, Float3 pos_sub1) : mass(mass), pos_tsub1(pos_sub1)  {}
-	//Float3 vel;						// nm/ns
-	//Float3 acc;						// nm/ns^2
 	//Float3 force_prev;				// For velocity verlet stormer integration
 	Float3 pos_tsub1;				// Must be initiated!
-	//double pot_E_prev = 999999999;			// MUST BE INITIATED BY CALCULATION, OR IT WILL FUCK SHIT UP!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	double mass;								// g/mol
 };
 
@@ -147,24 +157,63 @@ struct AngleBond {
 
 
 // ------------------------------------------------- COMPOUNDS ------------------------------------------------- //
+const int NEIGHBORLIST_MAX_COMPOUNDS = 32;
+const int NEIGHBORLIST_MAX_SOLVENTS = 256;
 
 class NeighborList {
 public:
-	__host__ void init(uint16_t* index_buffer, int max_indexes) {
-		for (int i = 0; i < max_indexes; i++) {
-			index_buffer[i] = 0xFFFF;
+	enum NEIGHBOR_TYPE {COMPOUND, SOLVENT};
+	__host__ void init() {
+		for (int i = 0; i < NEIGHBORLIST_MAX_COMPOUNDS; i++) {
+			neighborcompound_indexes[i] = 0xFFFF;
+		}
+		for (int i = 0; i < NEIGHBORLIST_MAX_SOLVENTS; i++) {
+			neighborsolvent_indexes[i] = 0xFFFF;
 		}
 	}
-	__host__ void addIndex(int new_index, uint16_t* index_buffer, int max_indexes, uint8_t* neighbor_cnt) {
-		for (int i = 0; i < max_indexes; i++) {
-			if (index_buffer[i] == 0xFFFF) {
-				index_buffer[i] = new_index;
-				(*neighbor_cnt)++;
-				return;
+
+	__host__ bool addIndex(int new_index, NEIGHBOR_TYPE nt) {
+		switch (nt)
+		{
+		case NeighborList::COMPOUND:
+			if (n_compound_neighbors < NEIGHBORLIST_MAX_COMPOUNDS) {
+				neighborcompound_indexes[n_compound_neighbors++] = new_index;
+				return true;
 			}
+			break;
+		case NeighborList::SOLVENT:
+			if (n_solvent_neighbors < NEIGHBORLIST_MAX_SOLVENTS) {
+				neighborsolvent_indexes[n_solvent_neighbors++] = new_index;
+				return true;
+			}
+			break;
+		default:
+			break;
+		}
+		printf("Failed!\n");
+		return false;
+	}
+
+	__device__ void loadMeta(NeighborList* nl_ptr) {	// Called from thread 0
+		n_compound_neighbors = nl_ptr->n_compound_neighbors;
+		n_solvent_neighbors = nl_ptr->n_solvent_neighbors;
+	}
+	__device__ void loadData(NeighborList* nl_ptr) {
+		if (threadIdx.x < n_compound_neighbors)
+			neighborcompound_indexes[threadIdx.x] = nl_ptr->neighborcompound_indexes[threadIdx.x];
+		for (int i = threadIdx.x;  i < n_solvent_neighbors; i += blockDim.x) {// Same as THREADS_PER_COMPOUNDBLOCK
+			neighborsolvent_indexes[i] = nl_ptr->neighborsolvent_indexes[i];
+			i += blockDim.x;	
 		}
 	}
+
+	uint16_t neighborcompound_indexes[NEIGHBORLIST_MAX_COMPOUNDS];
+	uint8_t n_compound_neighbors = 0;
+	uint16_t neighborsolvent_indexes[NEIGHBORLIST_MAX_SOLVENTS];
+	uint8_t n_solvent_neighbors = 0;
 };
+
+/*
 class CompoundNeighborList : public NeighborList {	// Both compounds and solvents have one of these
 public:
 	CompoundNeighborList() {
@@ -188,7 +237,7 @@ public:
 	uint16_t neighborsolvent_indexes[256]; 
 	uint8_t n_neighbors = 0;
 };
-
+*/
 
 
 
@@ -204,7 +253,6 @@ const double OH_refdist = 0.095;			// nm
 const double HOH_refangle = 1.822996;	// radians
 const double max_LJ_dist = 1;			// nm
 
-const int MAX_COMPOUND_PARTICLES = 64;
 const int MAX_PAIRBONDS = 32;
 const int MAX_ANGLEBONDS = 32;
 const double CC_refdist = 0.153; // nm
@@ -214,6 +262,7 @@ struct CompoundState {
 	Float3 positions[MAX_COMPOUND_PARTICLES];
 	uint8_t n_particles = 0;
 };
+
 
 struct Compound {
 	__host__ Compound() {}	// {}

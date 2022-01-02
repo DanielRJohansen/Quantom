@@ -69,7 +69,17 @@ void CompoundBuilder::loadParticles(Compound* compound, vector<vector<string>>* 
 
 
 			compound->particles[compound->n_particles++] = CompactParticle(mass, coord);
-			
+
+
+
+
+
+
+
+
+
+			if (compound->n_particles == 5)
+				break;
 		}
 	}
 }
@@ -132,7 +142,7 @@ void CompoundBuilder::addBond(Compound* compound, vector<string>* record)
 	}
 
 	double dist = (compound->particles[particle_indexes[0]].pos_tsub1 - compound->particles[particle_indexes[1]].pos_tsub1).len();
-	printf("Calculated ref dist: %f\n", dist);
+	//printf("Calculated ref dist: %f\n", dist);
 	compound->pairbonds[compound->n_pairbonds++] = PairBond(dist, particle_indexes[0], particle_indexes[1]);
 	//printf("Pairbond error: %f\n", OH_refdist - ();
 }

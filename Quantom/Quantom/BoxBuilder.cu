@@ -16,16 +16,19 @@ void BoxBuilder::build(Simulation* simulation, Compound* main_molecule) {
 	cudaMalloc(&simulation->box->compound_state_array_next, sizeof(CompoundState) * MAX_COMPOUNDS);
 	cudaMalloc(&simulation->box->solvents_next, sizeof(Solvent) * MAX_SOLVENTS);
 
-	simulation->box->solvent_neighborlist_array = new SolventNeighborList[MAX_COMPOUNDS + MAX_SOLVENTS];	// These are divided since both compounds and solvents will be near many more solvents than compounds
-	simulation->box->compound_neighborlist_array = new CompoundNeighborList[MAX_COMPOUNDS + MAX_SOLVENTS];
 
 
 
-	//cudaMalloc(&simulation->box->compound_state_array, sizeof(CompoundState) * MAX_COMPOUNDS);
-	//cudaMalloc(&simulation->box->compound_state_array_next, sizeof(CompoundState) * MAX_COMPOUNDS);
-	//cudaMalloc(&simulation->box->compound_neighborlist_array, sizeof(CompoundNeighborList) * MAX_COMPOUNDS);
+	simulation->box->solvent_neighborlists = new NeighborList[MAX_SOLVENTS];	
+	simulation->box->compound_neighborlists = new NeighborList[MAX_COMPOUNDS];
+	for (int i = 0; i < MAX_COMPOUNDS; i++) {
+		simulation->box->compound_neighborlists->init();
+	}
+	for (int i = 0; i < MAX_SOLVENTS; i++) {
+		simulation->box->solvent_neighborlists->init();
+	}
 
-	//cudaMalloc(&simulation->box->solvents, sizeof(Solvent) * MAX_SOLVENTS);
+
 
 	if (N_SOLVATE_MOLECULES > 256) {			// Oh fuck, i forgot
 		printf("Critical indexing failure\n");
@@ -44,6 +47,8 @@ void BoxBuilder::build(Simulation* simulation, Compound* main_molecule) {
 
 
 
+
+	
 	compoundLinker(simulation);
 	solvateLinker(simulation);
 	solvateCompoundCrosslinker(simulation);
@@ -90,7 +95,7 @@ void BoxBuilder::placeMainMolecule(Simulation* simulation) {
 		compound_center,
 		simulation->box->n_compounds,
 		&simulation->box->compound_state_array[simulation->box->n_compounds],
-		&simulation->box->compound_neighborlist_array[simulation->box->n_compounds],
+		//&simulation->box->compound_neighborlist_array[simulation->box->n_compounds],
 		simulation->dt
 	);
 }
@@ -109,9 +114,6 @@ void BoxBuilder::placeMainMolecule(Simulation* simulation, Compound* main_compou
 		main_compound,
 		simulation
 	);
-
-	//for (int i = 0; i < simulation->box->compound_state_array[0].n_particles; i++)
-		//simulation->box->compound_state_array[0].positions[i].print('p');
 }
 
 int BoxBuilder::solvateBox(Simulation* simulation)
@@ -155,7 +157,7 @@ int BoxBuilder::solvateBox(Simulation* simulation)
 
 
 
-Compound BoxBuilder::createCompound(Float3 com, int compound_index, CompoundState* statebuffer_node, CompoundNeighborList* neighborinfo_node, double dt) {
+Compound BoxBuilder::createCompound(Float3 com, int compound_index, CompoundState* statebuffer_node, double dt) {
 
 	int n_atoms = PARTICLES_PER_COMPOUND;
 	Float3 offsets[3] = { Float3(0,0,0), Float3(0.13, 0, 0), Float3(0, 0, -0.13) };
@@ -180,7 +182,7 @@ Compound* BoxBuilder::createCompound(Compound* compound, Simulation* simulation)
 {
 	compound->init(simulation->box->n_compounds);
 	CompoundState* statebuffer_node = &simulation->box->compound_state_array[compound->index];
-	Float3 compound_united_vel = Float3(random(), random(), random()).norm() * v_rms * 0.1;
+	Float3 compound_united_vel = Float3(random(), random(), random()).norm() * v_rms * 0;
 
 	for (int i = 0; i < compound->n_particles; i++) {
 		statebuffer_node->positions[i] = compound->particles[i].pos_tsub1;
@@ -192,7 +194,6 @@ Compound* BoxBuilder::createCompound(Compound* compound, Simulation* simulation)
 		Float3 atom_pos_sub1 = statebuffer_node->positions[i] - compound_united_vel * simulation->dt;
 		compound->particles[i].pos_tsub1 = atom_pos_sub1;												// Overwrite prev pos here, since we have assigned the former prev pos to the state buffer.
 	}
-	printf("UHHHH %d\n", (*compound).n_particles);
 	return compound;
 }
 
@@ -223,10 +224,8 @@ void BoxBuilder::compoundLinker(Simulation* simulation) {
 	for (int i = 0; i < simulation->box->n_compounds; i++) {
 		for (int j = 0; j < simulation->box->n_compounds; j++) {
 			if (i != j) {
-				simulation->box->compound_neighborlist_array[i].addIndex(j);
-				//CompoundNeighborList* nlist = &compoundneighborlists_host[i];
-				//CompoundNeighborList* nlist = &simulation->box->compound_neighborlist_array[i];
-				//nlist->neighborcompound_indexes[nlist->n_neighbors++] = j;
+				simulation->box->compound_neighborlists[i].addIndex(j, NeighborList::NEIGHBOR_TYPE::COMPOUND);
+				simulation->box->compound_neighborlists[j].addIndex(i, NeighborList::NEIGHBOR_TYPE::COMPOUND);
 			}
 		}
 	}
@@ -240,10 +239,8 @@ void BoxBuilder::solvateLinker(Simulation* simulation)
 			Solvent* other = &simulation->box->solvents[j];
 			if (i != j) {
 				if ((self->pos - other->pos).len() < CUTOFF) {
-					simulation->box->solvent_neighborlist_array[i + MAX_COMPOUNDS].addIndex(j);
-					simulation->box->solvent_neighborlist_array[j + MAX_COMPOUNDS].addIndex(i);
-					//self->addNeighbor(j);		// WRONG INDEX
-					//other->addNeighbor(i);		// WRONG INDEX
+					simulation->box->solvent_neighborlists[i].addIndex(j, NeighborList::NEIGHBOR_TYPE::SOLVENT);
+					simulation->box->solvent_neighborlists[j].addIndex(i, NeighborList::NEIGHBOR_TYPE::SOLVENT);
 				}
 			}
 		}
@@ -257,15 +254,12 @@ void BoxBuilder::solvateCompoundCrosslinker(Simulation* simulation)
 		for (int j = 0; j < simulation->box->n_solvents; j++) {
 			Solvent* solvent= &simulation->box->solvents[j];
 			if ((compound->center_of_mass - solvent->pos).len() < CUTOFF) {
-				simulation->box->solvent_neighborlist_array[i].addIndex(j);
-				simulation->box->compound_neighborlist_array[j + MAX_COMPOUNDS].addIndex(i);
-
-				//CompoundNeighborList* nlist = &compoundneighborlists_host[i];
-				//nlist->neighborcompound_indexes[nlist->n_neighbors++] = j;
+				simulation->box->compound_neighborlists[i].addIndex(j, NeighborList::NEIGHBOR_TYPE::SOLVENT);
+				simulation->box->solvent_neighborlists[j].addIndex(i, NeighborList::NEIGHBOR_TYPE::COMPOUND);
 			}
 		}
 	}
-	printf("Compound n0 solvents: %d\n", simulation->box->solvent_neighborlist_array[0].n_neighbors);
+	printf("Compound n0 solvents: %d\n", simulation->box->compound_neighborlists[0].n_solvent_neighbors);
 }
 
 
