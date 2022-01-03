@@ -171,6 +171,7 @@ __device__ Float3 calcLJForce(Float3* pos0, Float3* pos1, double* data_ptr) {	//
 
 
 constexpr double kb = 17.5 * 1e+6;		//	J/(mol*nm^2)
+/*
 __device__ Float3 calcPairbondForce(Float3* self_pos, Float3* other_pos, double* reference_dist, double* potE) {
 	Float3 v = *self_pos - *other_pos;
 	double dif = v.len() - *reference_dist;
@@ -198,13 +199,24 @@ __device__ Float3 calcPairbondForce(Float3* self_pos, Float3* other_pos, double*
 	return force;
 	//return v.norm() * (0.5 * kb * (dif * dif) * invert) *1.99 * 10e+4;
 }
+*/
 
+__device__ void calcPairbondForces(Float3* pos_a, Float3* pos_b, double* reference_dist, Float3* results, double* potE) {
+	Float3 vec1 = *pos_a - *pos_b;
+	double error = vec1.len() - *reference_dist;
+
+	*potE += 0.5 * kb * (error * error) * 0.5;// *1 * 10e+4;
+
+	vec1 = vec1.norm();
+	double force_scalar = -kb * error;
+	results[0] = vec1 * force_scalar;
+	results[1] = vec1 * force_scalar * -1;
+}
 
 
 constexpr double ktheta = 65 * 1e+3;	// J/mol
 __device__ Float3 calcAngleForce(CompoundState* statebuffer, AngleBond* anglebond, double* potE) {	// We fix the middle particle and move the other particles so they are closest as possible
 	// HOLY FUUUCK this shit is unsafe. Works if atoma are ordered left to right, with angles BELOW 180. Dont know which checks to implement yet
-
 	Float3 v1 = statebuffer->positions[anglebond->atom_indexes[0]] - statebuffer->positions[anglebond->atom_indexes[1]];
 	Float3 v2 = statebuffer->positions[anglebond->atom_indexes[2]] - statebuffer->positions[anglebond->atom_indexes[1]];
 	Float3 plane_normal = v1.cross(v2);
@@ -235,14 +247,35 @@ __device__ Float3 calcAngleForce(CompoundState* statebuffer, AngleBond* anglebon
 		//printf("\nAngle %f ref %f\n", angle, anglebond->reference_angle);
 		//(force_direction * force_scalar).print('f');
 	}
-	
 
-	
 	//force_scalar = dif < 0 ? force_scalar * -1 : force_scalar;	// Invert force if we need to push outwards
 	
 	return force_direction * force_scalar;
 }
+__device__ void calcAnglebondForces(Float3* pos_left, Float3* pos_middle, Float3* pos_right, double* reference_angle, Float3* results, double* potE) {
+	Float3 v1 = *pos_left - *pos_middle;
+	Float3 v2 = *pos_right - *pos_middle;
+	Float3 normal1 = v1.cross(v2);
+	Float3 normal2 = v2.cross(v1);
 
+	Float3 inward_force_direction1 = (v1.cross(normal1)).norm();
+	Float3 inward_force_direction2 = (v2.cross(normal2)).norm();
+
+	double angle = Float3::getAngle(v1, v2);
+	double error = angle - *reference_angle;
+
+	//error = (error / (2.f * PI)) * 360.f;
+
+	*potE += 0.5 * ktheta * error * error * 0.5;
+	double force_scalar = ktheta * (error);
+
+	results[0] = inward_force_direction1 * force_scalar;
+	results[2] = inward_force_direction2 * force_scalar;
+	results[1] = (results[0] + results[2]) * -1;
+
+	//if (abs(error) > 0.0001)
+		//printf("Error %f force %f \n", error, force_scalar);
+}
 
 
 
@@ -356,7 +389,7 @@ __device__ Float3 computeLJForces(Float3* self_pos, int n_particles, Float3* pos
 	}
 	return force;
 }
-
+/*
 __device__ Float3 computePairbondForces(Compound* compound, CompoundState* self_state, double* potE) {
 	Float3 force(0, 0, 0);
 	for (int i = 0; i < compound->n_pairbonds; i++) {
@@ -368,6 +401,7 @@ __device__ Float3 computePairbondForces(Compound* compound, CompoundState* self_
 	}
 	return force;
 }
+
 
 __device__ Float3 computeAnglebondForces(Compound* compound, CompoundState* self_state, double* potE) {
 	Float3 force(0, 0, 0);
@@ -383,6 +417,71 @@ __device__ Float3 computeAnglebondForces(Compound* compound, CompoundState* self
 
 
 	return force;
+}
+*/
+
+__device__ Float3 computePairbondForces(Compound* compound, CompoundState* compound_state, Float3* utility_buffer, double* potE) {	// only works if n threads >= n bonds
+	utility_buffer[threadIdx.x] = Float3(0, 0, 0);
+	for (int i = 0; (i * blockDim.x) < compound->n_pairbonds; i++) {					
+		PairBond* pb = nullptr;
+		Float3 forces[2];
+		int bond_index = threadIdx.x + i * blockDim.x;
+
+		if (bond_index < compound->n_pairbonds) {
+			pb = &compound->pairbonds[bond_index];
+
+			calcPairbondForces(
+				&compound_state->positions[pb->atom_indexes[0]],
+				&compound_state->positions[pb->atom_indexes[1]],
+				&pb->reference_dist,
+				forces, potE
+			);
+		}
+
+
+		for (int i = 0; i < blockDim.x; i++) {
+			if (threadIdx.x == i && pb != nullptr) {
+				utility_buffer[pb->atom_indexes[0]] += forces[0];
+				utility_buffer[pb->atom_indexes[1]] += forces[1];
+			}
+			__syncthreads();
+		}
+	}
+
+	return utility_buffer[threadIdx.x];
+}
+
+__device__ Float3 computeAnglebondForces(Compound* compound, CompoundState* compound_state, Float3* utility_buffer, double* potE) {
+	utility_buffer[threadIdx.x] = Float3(0, 0, 0);
+	for (int i = 0; (i * blockDim.x) < compound->n_anglebonds; i++) {
+		AngleBond* ab = nullptr;
+		Float3 forces[3];
+		int bond_index = threadIdx.x + i * blockDim.x;
+
+		if (bond_index < compound->n_pairbonds) {
+			ab = &compound->anglebonds[bond_index];
+
+			calcAnglebondForces(
+				&compound_state->positions[ab->atom_indexes[0]],
+				&compound_state->positions[ab->atom_indexes[1]],
+				&compound_state->positions[ab->atom_indexes[2]],
+				&ab->reference_angle,
+				forces, potE
+			);
+		}
+
+
+		for (int i = 0; i < blockDim.x; i++) {
+			if (threadIdx.x == i && ab != nullptr) {
+				utility_buffer[ab->atom_indexes[0]] += forces[0];
+				utility_buffer[ab->atom_indexes[1]] += forces[1];
+				utility_buffer[ab->atom_indexes[2]] += forces[2];
+			}
+			__syncthreads();
+		}
+	}
+
+	return utility_buffer[threadIdx.x];
 }
 
 
@@ -406,9 +505,6 @@ __global__ void forceKernel(Box* box) {
 	__shared__ Compound compound;
 	__shared__ CompoundState self_state;
 	__shared__ NeighborList neighborlist;
-	//__shared__ CompoundState neighborstate_buffer;
-	//__shared__ CompoundNeighborList neighborlist;
-	//__shared__ Float3 utility_buffer[MAX_COMPOUND_PARTICLES];
 	__shared__ Float3 utility_buffer[NEIGHBORLIST_MAX_SOLVENTS];							// waaaaay to biggg
 	
 
@@ -439,10 +535,11 @@ __global__ void forceKernel(Box* box) {
 
 	
 	// ------------------------------------------------------------ Intramolecular Operations ------------------------------------------------------------ //
-	//applyHyperpos(&self_state.positions[0], &self_state.positions[threadIdx.x]);
+	applyHyperpos(&self_state.positions[0], &self_state.positions[threadIdx.x]);
 
-	force = force + computePairbondForces(&compound, &self_state, &data_ptr[2]);
-	force = force + computeAnglebondForces(&compound, &self_state, &data_ptr[2]);
+	force = force + computePairbondForces(&compound, &self_state, utility_buffer, &data_ptr[2]);
+	//
+	force = force + computeAnglebondForces(&compound, &self_state, utility_buffer, &data_ptr[2]);
 	// ----------------------------------------------------------------------------------------------------------------------------------------------- //
 
 
@@ -462,7 +559,7 @@ __global__ void forceKernel(Box* box) {
 		utility_buffer[i] = box->solvents[neighborlist.neighborsolvent_indexes[i]].pos;
 		applyHyperpos(&self_state.positions[0], &utility_buffer[i]);
 	}
-	if (threadIdx.x < compound.n_particles && box->step < 100000)
+	if (threadIdx.x < compound.n_particles)
 		force += computeLJForces(&self_state.positions[threadIdx.x], neighborlist.n_solvent_neighbors, utility_buffer, data_ptr);
 	//if (threadIdx.x <)
 	//force = force + computeLJForces(box, &compound, &neighborlist, &self_state, &neighborstate_buffer, utility_buffer, data_ptr);
@@ -497,44 +594,6 @@ __global__ void forceKernel(Box* box) {
 
 	// ------------------------------------ PERIODIC BOUNDARY CONDITION ------------------------------------------------------------------------------------------------- // 
 	{
-		/*
-		//for (int i = threadIdx.x; i < 256; i+= MAX_COMPOUND_PARTICLES)
-			//utility_buffer[i] = Float3(0, 0, 0);
-		utility_buffer[threadIdx.x] = Float3(0, 0, 0);
-		if (threadIdx.x < compound.n_particles)
-			utility_buffer[threadIdx.x] = self_state.positions[threadIdx.x];
-		__syncthreads();
-
-		for (int i = 1; i < 64; i *= 2) {
-			if (threadIdx.x + i < 64)
-				utility_buffer[threadIdx.x] = utility_buffer[threadIdx.x] + utility_buffer[threadIdx.x + i];
-			__syncthreads();
-		}
-
-		if (threadIdx.x == 0) {
-			if (utility_buffer[0].x < -10) {
-				printf("\nBlock %d Thread %d\n", blockIdx.x, threadIdx.x);
-				utility_buffer[0].print('u');
-				force.print('f');
-				self_state.positions[0].print('0');
-				self_state.positions[1].print('1');
-				self_state.positions[2].print('2');
-				compound.particles[0].pos_tsub1.print('a');
-				compound.particles[1].pos_tsub1.print('b');
-				compound.particles[2].pos_tsub1.print('c');
-			}
-
-			utility_buffer[0] = utility_buffer[0] * (1.f / compound.n_particles);
-			hyperpos_offset.x = 1 * (utility_buffer[0].x < 0) - 1 * (utility_buffer[0].x > BOX_LEN);
-			hyperpos_offset.y = 1 * (utility_buffer[0].y < 0) - 1 * (utility_buffer[0].y > BOX_LEN);
-			hyperpos_offset.z = 1 * (utility_buffer[0].z < 0) - 1 * (utility_buffer[0].z > BOX_LEN);
-			hyperpos_offset = hyperpos_offset * Float3(BOX_LEN, BOX_LEN, BOX_LEN);
-			box->compounds[blockIdx.x].center_of_mass = utility_buffer[0] + hyperpos_offset;
-		}
-		__syncthreads();
-		applyPBC()
-		//self_state.positions[threadIdx.x] = self_state.positions[threadIdx.x] + hyperpos_offset;	// Uhh, move hyperpos to utilbuffer?
-		*/
 		applyPBC(&self_state.positions[threadIdx.x]);
 		if (threadIdx.x == 0) {
 			box->compounds[blockIdx.x].center_of_mass = self_state.positions[0];	//// yeeeeeeeeeeeeeeeeeeaaah, dunno.

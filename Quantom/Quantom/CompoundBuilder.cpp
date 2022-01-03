@@ -78,8 +78,8 @@ void CompoundBuilder::loadParticles(Compound* compound, vector<vector<string>>* 
 
 
 
-			if (compound->n_particles == 5)
-				break;
+			//if (compound->n_particles == 5)
+				//break;
 		}
 	}
 }

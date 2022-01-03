@@ -213,32 +213,6 @@ public:
 	uint8_t n_solvent_neighbors = 0;
 };
 
-/*
-class CompoundNeighborList : public NeighborList {	// Both compounds and solvents have one of these
-public:
-	CompoundNeighborList() {
-		init(neighborcompound_indexes, 32);
-	}
-	__host__ void addIndex(int new_index) {
-		NeighborList::addIndex(new_index, neighborcompound_indexes, 32, &n_neighbors);
-	}
-	uint16_t neighborcompound_indexes[32]; // For now so we dont need to track, adjust to 16 or 32 later!!
-	uint8_t n_neighbors = 0;					// adjust too?
-};
-
-class SolventNeighborList : public NeighborList{						// Both compounds and solvents have one of these
-public:
-	SolventNeighborList() {
-		init(neighborsolvent_indexes, 256);
-	}
-	__host__ void addIndex(int new_index) {
-		NeighborList::addIndex(new_index, neighborsolvent_indexes, 256, &n_neighbors);
-	}
-	uint16_t neighborsolvent_indexes[256]; 
-	uint8_t n_neighbors = 0;
-};
-*/
-
 
 
 
@@ -253,8 +227,8 @@ const double OH_refdist = 0.095;			// nm
 const double HOH_refangle = 1.822996;	// radians
 const double max_LJ_dist = 1;			// nm
 
-const int MAX_PAIRBONDS = 32;
-const int MAX_ANGLEBONDS = 32;
+const int MAX_PAIRBONDS = 64;
+const int MAX_ANGLEBONDS = 64;
 const double CC_refdist = 0.153; // nm
 const double CCC_reftheta = 1.953; // nm
 
@@ -297,6 +271,10 @@ struct Compound {
 		radius = pairbonds[0].reference_dist * n_particles * 0.5f;
 		center_of_mass.print('C');
 		printf("Radius %f\n", radius);
+	}
+
+	__host__ bool sort() {
+
 	}
 
 	//---------------------------------------------------------------------------------//
