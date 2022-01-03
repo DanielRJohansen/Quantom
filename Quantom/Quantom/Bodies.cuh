@@ -109,9 +109,6 @@ struct CompactParticle {	// Contains information only needed by the Ownerkernel
 
 
 
-
-
-
 struct Solvent {
 	Solvent() {}
 	Solvent(Float3 pos, Float3 pos_tsub1) : pos(pos), pos_tsub1(pos_tsub1) {}
@@ -233,6 +230,15 @@ const double CC_refdist = 0.153; // nm
 const double CCC_reftheta = 1.953; // nm
 
 struct CompoundState {
+	__device__ void setMeta(int n_p) {
+		n_particles = n_p;
+	}
+	__device__ void loadData(CompoundState* state) {
+		if (threadIdx.x < n_particles)
+			positions[threadIdx.x] = state->positions[threadIdx.x];
+	}
+
+
 	Float3 positions[MAX_COMPOUND_PARTICLES];
 	uint8_t n_particles = 0;
 };
@@ -243,10 +249,8 @@ struct Compound {
 
 
 	//---------------------------------------------------------------------------------//
-	__host__ Compound(uint32_t index, CompoundState* states_host) {
+	__host__ Compound(uint32_t index, CompoundState* states_host) {		// Default for testing only!
 		this->index = index;
-		//compound_neighborlist_ptr = neighborlist_device;
-		//compound_state_ptr = state_device;
 
 		pairbonds[0] = PairBond(CC_refdist, 0, 1);
 		n_pairbonds++;
@@ -273,12 +277,6 @@ struct Compound {
 		printf("Radius %f\n", radius);
 	}
 
-	__host__ bool sort() {
-
-	}
-
-	//---------------------------------------------------------------------------------//
-
 	__host__ Float3 getCOM() {
 		Float3 com;
 		for (int i = 0; i < n_particles; i++)
@@ -288,6 +286,31 @@ struct Compound {
 	__host__ bool intersects(Compound a) {
 		return (a.center_of_mass - center_of_mass).len() < (a.radius + radius + max_LJ_dist);
 	}
+	//---------------------------------------------------------------------------------//
+
+	__device__ void loadMeta(Compound* compound) {
+		n_particles = compound->n_particles;
+		n_pairbonds = compound->n_pairbonds;
+		n_anglebonds = compound->n_anglebonds;
+	}
+	__device__ void loadData(Compound* compound) {
+		if (threadIdx.x < n_particles) {
+			particles[threadIdx.x] = compound->particles[threadIdx.x];
+		}
+		for (int i = 0; (i * blockDim.x) < n_pairbonds; i++) {
+			int index = i * blockDim.x + threadIdx.x;
+			if (index < n_pairbonds)
+				pairbonds[index] = compound->pairbonds[index];
+		}
+		for (int i = 0; (i * blockDim.x) < n_anglebonds; i++) {
+			int index = i * blockDim.x + threadIdx.x;
+			if (index < n_anglebonds)
+				anglebonds[index] = compound->anglebonds[index];
+		}
+	}
+
+
+
 
 	uint32_t index;										// Is this necessary
 	//CompoundState* compound_state_ptr;

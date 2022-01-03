@@ -72,8 +72,13 @@ void Engine::step() {
 	//IMPORTANT TODOOOOOOOOOOOOOOO!!
 	// INSTEAD OF MOVING THE DATA AROUND, FREE THE OLD POINTERS, AND SIMPLY POINT TO THE NEW LOCATION IN VRAM. THEN MAKE ALLOC A NEW ARRAY FOR NEXT STEP'S ARRAY_NEXT !
 	// FOR THIS IT WOULD BE OPTIMAL TO ALSO KEEP THE PREVIOUS POSITIONS SEPARATE.
-
-	cudaMemcpy(simulation->box->compound_state_array, simulation->box->compound_state_array_next, sizeof(CompoundState) * MAX_COMPOUNDS, cudaMemcpyDeviceToDevice);	// Update all positions, after all forces have been calculated
+	CompoundState* temp = simulation->box->compound_state_array;
+	simulation->box->compound_state_array = simulation->box->compound_state_array_next;
+	simulation->box->compound_state_array_next = temp;
+	//cudaMemcpy(simulation->box->compound_state_array, simulation->box->compound_state_array_next, sizeof(CompoundState) * MAX_COMPOUNDS, cudaMemcpyDeviceToDevice);	// Update all positions, after all forces have been calculated
+	
+	
+	
 	//cudaMemcpy(simulation->box->solvents, simulation->box->solvents_next, sizeof(Solvent) * MAX_SOLVENTS, cudaMemcpyDeviceToDevice);
 	cudaDeviceSynchronize();
 	auto t2 = std::chrono::high_resolution_clock::now();
@@ -503,7 +508,7 @@ __device__ void integratePosition(Float3* pos, Float3* pos_tsub1, Float3* force,
 
 __global__ void forceKernel(Box* box) {
 	__shared__ Compound compound;
-	__shared__ CompoundState self_state;
+	__shared__ CompoundState compound_state;
 	__shared__ NeighborList neighborlist;
 	__shared__ Float3 utility_buffer[NEIGHBORLIST_MAX_SOLVENTS];							// waaaaay to biggg
 	
@@ -511,16 +516,13 @@ __global__ void forceKernel(Box* box) {
 
 
 	if (threadIdx.x == 0) {
-		compound = box->compounds[blockIdx.x];
-		self_state.n_particles = box->compound_state_array[blockIdx.x].n_particles;
+		compound.loadMeta(&box->compounds[blockIdx.x]);
+		compound_state.setMeta(compound.n_particles);
 		neighborlist.loadMeta(&box->compound_neighborlists[blockIdx.x]);
 	}
 	__syncthreads();
-	if (threadIdx.x < compound.n_particles)
-		self_state.positions[threadIdx.x] = box->compound_state_array[blockIdx.x].positions[threadIdx.x];
-	else
-		self_state.positions[threadIdx.x] = Float3(0, 0, 0);
-
+	compound.loadData(&box->compounds[blockIdx.x]);
+	compound_state.loadData(&box->compound_state_array[blockIdx.x]);
 	neighborlist.loadData(&box->compound_neighborlists[blockIdx.x]);
 
 
@@ -535,11 +537,11 @@ __global__ void forceKernel(Box* box) {
 
 	
 	// ------------------------------------------------------------ Intramolecular Operations ------------------------------------------------------------ //
-	applyHyperpos(&self_state.positions[0], &self_state.positions[threadIdx.x]);
+	applyHyperpos(&compound_state.positions[0], &compound_state.positions[threadIdx.x]);
 
-	force = force + computePairbondForces(&compound, &self_state, utility_buffer, &data_ptr[2]);
-	//
-	force = force + computeAnglebondForces(&compound, &self_state, utility_buffer, &data_ptr[2]);
+	force = force + computePairbondForces(&compound, &compound_state, utility_buffer, &data_ptr[2]);
+
+	force = force + computeAnglebondForces(&compound, &compound_state, utility_buffer, &data_ptr[2]);
 	// ----------------------------------------------------------------------------------------------------------------------------------------------- //
 
 
@@ -557,22 +559,16 @@ __global__ void forceKernel(Box* box) {
 	// --------------------------------------------------------------- Solvation forces --------------------------------------------------------------- //
 	for (int i = threadIdx.x; i < neighborlist.n_solvent_neighbors; i += blockDim.x) {
 		utility_buffer[i] = box->solvents[neighborlist.neighborsolvent_indexes[i]].pos;
-		applyHyperpos(&self_state.positions[0], &utility_buffer[i]);
+		applyHyperpos(&compound_state.positions[0], &utility_buffer[i]);
 	}
-	if (threadIdx.x < compound.n_particles)
-		force += computeLJForces(&self_state.positions[threadIdx.x], neighborlist.n_solvent_neighbors, utility_buffer, data_ptr);
-	//if (threadIdx.x <)
-	//force = force + computeLJForces(box, &compound, &neighborlist, &self_state, &neighborstate_buffer, utility_buffer, data_ptr);
-	//Float3 waterforce = computeLJForces(box, &compound, &box->solvent_neighborlist_array[blockIdx.x], &self_state, utility_buffer, data_ptr);
-	//force += waterforce;
+	if (threadIdx.x < compound.n_particles) {
+		force += computeLJForces(&compound_state.positions[threadIdx.x], neighborlist.n_solvent_neighbors, utility_buffer, data_ptr);
+	}		
 	// ------------------------------------------------------------------------------------------------------------------------------------------------ //
 
 
 
 
-	if (blockIdx.x == LOGBLOCK && threadIdx.x == LOGTHREAD && LOGTYPE == 1) {
-		//waterforce.print('\n');
-	}
 
 
 
@@ -582,7 +578,7 @@ __global__ void forceKernel(Box* box) {
 	
 	// ------------------------------------------------------------ Integration ------------------------------------------------------------ //
 	if (threadIdx.x < compound.n_particles) {
-		integratePosition(&self_state.positions[threadIdx.x], &compound.particles[threadIdx.x].pos_tsub1, &force, compound.particles[threadIdx.x].mass, box->dt);
+		integratePosition(&compound_state.positions[threadIdx.x], &compound.particles[threadIdx.x].pos_tsub1, &force, compound.particles[threadIdx.x].mass, box->dt);
 		box->compounds[blockIdx.x].particles[threadIdx.x].pos_tsub1 = compound.particles[threadIdx.x].pos_tsub1;
 	}
 	__syncthreads();
@@ -593,12 +589,7 @@ __global__ void forceKernel(Box* box) {
 
 
 	// ------------------------------------ PERIODIC BOUNDARY CONDITION ------------------------------------------------------------------------------------------------- // 
-	{
-		applyPBC(&self_state.positions[threadIdx.x]);
-		if (threadIdx.x == 0) {
-			box->compounds[blockIdx.x].center_of_mass = self_state.positions[0];	//// yeeeeeeeeeeeeeeeeeeaaah, dunno.
-		}
-	}
+	applyPBC(&compound_state.positions[threadIdx.x]);
 	// ------------------------------------------------------------------------------------------------------------------------------------------------------------------ //
 	
 
@@ -608,7 +599,7 @@ __global__ void forceKernel(Box* box) {
 	{
 		if (threadIdx.x < 3) {	// TODO: UPDATE 3 TO PARTICLES_PER_COMPOUND
 			box->potE_buffer[threadIdx.x + blockIdx.x * PARTICLES_PER_COMPOUND + box->step * box->total_particles] = data_ptr[0] + data_ptr[2];
-			box->trajectory[threadIdx.x + blockIdx.x * PARTICLES_PER_COMPOUND + (box->step) * box->total_particles] = self_state.positions[threadIdx.x];
+			box->trajectory[threadIdx.x + blockIdx.x * PARTICLES_PER_COMPOUND + (box->step) * box->total_particles] = compound_state.positions[threadIdx.x];
 		}
 		__syncthreads();
 
@@ -620,8 +611,8 @@ __global__ void forceKernel(Box* box) {
 
 
 			Float3 pos_temp = compound.particles[threadIdx.x].pos_tsub1;
-			applyHyperpos(&self_state.positions[threadIdx.x], &pos_temp);
-			box->outdata[4 + box->step * 10] = (self_state.positions[threadIdx.x] - pos_temp).len() / box->dt;
+			applyHyperpos(&compound_state.positions[threadIdx.x], &pos_temp);
+			box->outdata[4 + box->step * 10] = (compound_state.positions[threadIdx.x] - pos_temp).len() / box->dt;
 
 			box->outdata[5 + box->step * 10] = data_ptr[2];// closest particle
 			box->outdata[6 + box->step * 10] = data_ptr[1];// force.len();
@@ -637,10 +628,7 @@ __global__ void forceKernel(Box* box) {
 
 
 	
-
-	if (threadIdx.x == 0) {
-		box->compound_state_array_next[blockIdx.x] = self_state;
-	}	
+	box->compound_state_array_next[blockIdx.x].loadData(&compound_state);
 }
 
 

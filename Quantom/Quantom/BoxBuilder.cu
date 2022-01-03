@@ -3,11 +3,6 @@
 
 
 void BoxBuilder::build(Simulation* simulation, Compound* main_molecule) {
-	simulation->box->compounds = new Compound[MAX_COMPOUNDS];
-	//simulation->box->solvents = new Compound[MAX_COMPOUNDS];
-	//compoundneighborlists_host = new CompoundNeighborList[MAX_COMPOUNDS];
-	//compoundstates_host = new CompoundState[MAX_COMPOUNDS];
-
 
 	simulation->box->compounds = new Compound[MAX_COMPOUNDS];
 	simulation->box->solvents = new Solvent[MAX_SOLVENTS];
@@ -46,6 +41,10 @@ void BoxBuilder::build(Simulation* simulation, Compound* main_molecule) {
 	simulation->box->total_particles = simulation->box->n_compounds * PARTICLES_PER_COMPOUND + simulation->box->n_solvents;
 
 
+	cudaMemcpy(simulation->box->compound_state_array_next, simulation->box->compound_state_array, sizeof(CompoundState) * MAX_COMPOUNDS, cudaMemcpyHostToDevice);	// Just make sure they have the same n_particles info...
+
+
+
 
 
 	
@@ -68,6 +67,9 @@ void BoxBuilder::build(Simulation* simulation, Compound* main_molecule) {
 	}
 
 	simulation->box->dt = simulation->dt;
+
+
+
 
 
 
