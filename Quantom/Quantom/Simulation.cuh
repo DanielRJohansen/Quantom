@@ -41,8 +41,8 @@ constexpr double CUTOFF = 5.0f;	//nm/
 
 
 
-const int BLOCKS_PER_SOLVENTKERNEL = 8;
-const int THREADS_PER_SOLVENTBLOCK = 64;	// Must be >= N_SOLVATE_MOLECULES
+const int BLOCKS_PER_SOLVENTKERNEL = 2;
+const int THREADS_PER_SOLVENTBLOCK = 256;	// Must be >= N_SOLVATE_MOLECULES
 
 
 const int THREADS_PER_COMPOUNDBLOCK = 64; // Must be >= max comp particles
