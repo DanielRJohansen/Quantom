@@ -6,6 +6,7 @@ Ray::Ray(Float3 unit_vector, Float3 origin) : unit_vector(unit_vector), origin(o
 
 void Ray::reset() {
     closest_collision = 999999999;
+    illumination = 1.f;
     atom_type = NONE;
     log_particle = false;
 }
@@ -55,7 +56,8 @@ __device__ int Ray::searchCompound(CompoundState* state, Box* box, int compound_
             if (dist < closest_collision) {
                 closest_collision = dist;
                 index = i;
-                atom_type = ATOM_TYPE::C;
+                //atom_type = ATOM_TYPE::C;
+                illumination = (((origin + unit_vector * dist).z - state->positions[i].z) + 0.150) / 0.300;
 
                 //if (compound_index == LOGBLOCK && i == LOGTHREAD)
                   //  log_particle = true;        // Temp
@@ -71,6 +73,9 @@ __device__ bool Ray::searchParticle(Float3* pos, int index, bool is_virtual)
         double dist = distToSphereIntersect(pos, 0.150);
         if (dist < closest_collision) {
             closest_collision = dist;
+            
+            //illumination = (((origin + unit_vector * dist).z - pos->z) + 0.150) / 0.300;   // + 
+            illumination = (((origin + unit_vector * dist).z - pos->z) + 0.200) / 0.350;   // Offset by 50 to avoid black atoms
             return true;
         }
     }
@@ -82,26 +87,24 @@ __device__ void paintImage(uint8_t* image, Ray* ray) {
     switch (ray->atom_type)
     {
     case ATOM_TYPE::O:
-        image[0] = 200;
-        image[1] = 0;
-        image[2] = 0;
+        image[0] = 240;
+        image[1] = 20;
+        image[2] = 20;
         image[3] = 255;
         break;
     case ATOM_TYPE::C:
         image[0] = 40;
-        image[1] = 0;
-        image[2] = 40;
-        image[3] = 155;
+        image[1] = 10;
+        image[2] = 180;
+        image[3] = 255;
         break;
     case ATOM_TYPE::P:
-        //printf("Doing this!");
         image[0] = 0xFC;
         image[1] = 0xF7;
         image[2] = 0x5E;
         image[3] = 0xFF;
         break;
     case ATOM_TYPE::N:
-        //printf("Doing that!");
         image[0] = 0x2E;
         image[1] = 0x8B;
         image[2] = 0x57;
@@ -111,12 +114,16 @@ __device__ void paintImage(uint8_t* image, Ray* ray) {
         image[0] = 0xFE;
         image[1] = 0xFE;
         image[2] = 0xFA;
-        image[3] = 0xE2;
+        image[3] = 0x42;
         break;
     default:
         image[3] = 0x00;
         break;
     }
+
+    if (ray->illumination > 1.f)
+        ray->illumination = 1;
+    image[3] *= ray->illumination;
 
     if (ray->log_particle) {
         image[0] = 0x53;

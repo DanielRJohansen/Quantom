@@ -42,7 +42,7 @@ public:
 	double closest_collision = 0;
 	ATOM_TYPE atom_type = NONE;
 	bool log_particle = false;
-
+	double illumination = 1.f;
 
 private:
 	__device__ double distToSphereIntersect(Float3* particle_center, double particle_radius);
