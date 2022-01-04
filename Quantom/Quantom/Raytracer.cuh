@@ -25,7 +25,7 @@ public:
 	__device__ void reset();
 
 	__device__ bool hitsParticle(Float3* particle_center, double particle_radius);
-	__device__ void searchCompound(CompoundState* compoundstate, Box* box, int i);	// I is for bugfinding.
+	__device__ int searchCompound(CompoundState* compoundstate, Box* box, int i);	// I is for bugfinding. 
 	__device__ bool searchParticle(Float3* pos, int particle_index, bool is_virtual=false);	// Used for solvents, and trajectory
 	__device__ double distToPoint(Float3 point);
 	
@@ -39,7 +39,7 @@ public:
 
 	// Changing with each render step
 	double closest_collision = 0;
-	int atom_type = -1;
+	ATOM_TYPE atom_type = NONE;
 	bool log_particle = false;
 
 

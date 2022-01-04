@@ -6,8 +6,24 @@ Ray::Ray(Float3 unit_vector, Float3 origin) : unit_vector(unit_vector), origin(o
 
 void Ray::reset() {
     closest_collision = 999999999;
-    atom_type = -1;
+    atom_type = NONE;
     log_particle = false;
+}
+
+
+__device__ ATOM_TYPE getTypeFromMass(double mass) {
+    mass *= 1000.f;   //convert to g
+    if (mass < 4)
+        return ATOM_TYPE::H;
+    if (mass < 14)
+        return ATOM_TYPE::C;
+    if (mass < 15)
+        return ATOM_TYPE::N;
+    if (mass < 18)
+        return ATOM_TYPE::O;
+    if (mass < 32)
+        return ATOM_TYPE::P;
+    return ATOM_TYPE::NONE;
 }
 
 __device__ bool Ray::hitsParticle(Float3* particle_center, double particle_radius) {
@@ -31,18 +47,22 @@ __device__ double Ray::distToPoint(Float3 point) {
         );
 }
     
-__device__ void Ray::searchCompound(CompoundState* state, Box* box, int compound_index) {
+__device__ int Ray::searchCompound(CompoundState* state, Box* box, int compound_index) {    // Returns compound-local index of hit particle
+    int index = -1;
     for (int i = 0; i < state->n_particles; i++) {
         if (hitsParticle(&state->positions[i], 0.170)) {              // LOOK HERE at index 0....
             double dist = distToSphereIntersect(&state->positions[i], 0.170);
             if (dist < closest_collision) {
                 closest_collision = dist;
-                atom_type = 0;
+                index = i;
+                atom_type = ATOM_TYPE::C;
+
                 //if (compound_index == LOGBLOCK && i == LOGTHREAD)
                   //  log_particle = true;        // Temp
             }
         }
     }
+    return index;
 }
 
 __device__ bool Ray::searchParticle(Float3* pos, int index, bool is_virtual)
@@ -51,13 +71,6 @@ __device__ bool Ray::searchParticle(Float3* pos, int index, bool is_virtual)
         double dist = distToSphereIntersect(pos, 0.150);
         if (dist < closest_collision) {
             closest_collision = dist;
-            if (index == 0)
-                atom_type = 0;
-            else
-                atom_type = 1;
-            atom_type = 0;
-            //if ((index == LOGTHREAD && LOGTYPE == 0) || is_virtual)
-              //  log_particle = true;
             return true;
         }
     }
@@ -66,21 +79,40 @@ __device__ bool Ray::searchParticle(Float3* pos, int index, bool is_virtual)
 
 
 __device__ void paintImage(uint8_t* image, Ray* ray) {
-    if (ray->atom_type == 0) {      // Carbon
+    switch (ray->atom_type)
+    {
+    case ATOM_TYPE::O:
+        image[0] = 200;
+        image[3] = 255;
+        break;
+    case ATOM_TYPE::C:
         image[0] = 40;
         image[1] = 0;
         image[2] = 40;
-        image[3] = 255;
-    }
-    else if (ray->atom_type == 1) {      // Solvent
-        image[0] = 200;
-        image[3] = 255;
-    }
-    else {
+        image[3] = 155;
+        break;
+    case ATOM_TYPE::P:
+        //printf("Doing this!");
+        image[0] = 0xFC;
+        image[1] = 0xF7;
+        image[2] = 0x5E;
+        image[3] = 0xFF;
+        break;
+    case ATOM_TYPE::N:
+        //printf("Doing that!");
+        image[0] = 0x2E;
+        image[1] = 0x8B;
+        image[2] = 0x57;
+        image[3] = 0xFF;
+        break;
+    case ATOM_TYPE::NONE:
         image[0] = 0xFE;
         image[1] = 0xFE;
         image[2] = 0xFA;
         image[3] = 0xE2;
+        break;
+    default:
+        break;
     }
 
     if (ray->log_particle) {
@@ -140,14 +172,17 @@ __global__ void renderKernel(Ray* rayptr, uint8_t* image, Box* box) {
     
     
 
-    for (int i = 0; i < box->n_compounds; i++) {
-        CompoundState* compoundstate = &box->compound_state_array[i];
-        ray.searchCompound(compoundstate, box, i);
+    for (int compound_index = 0; compound_index < box->n_compounds; compound_index++) {
+        CompoundState* compoundstate = &box->compound_state_array[compound_index];
+        int particle_index = ray.searchCompound(compoundstate, box, compound_index);
+        if (particle_index != -1) {            
+            ray.atom_type = getTypeFromMass(box->compounds[compound_index].particles[particle_index].mass);
+        }
     }
 
     for (int i = 0; i < box->n_solvents; i++) {
         if (ray.searchParticle(&box->solvents[i].pos, i)) {
-            
+            ray.atom_type = ATOM_TYPE::O;
         }
     }
     

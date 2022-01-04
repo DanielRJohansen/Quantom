@@ -63,7 +63,7 @@ void Engine::step() {
 
 	auto t0 = std::chrono::high_resolution_clock::now();
 	forceKernel <<< simulation->box->n_compounds, THREADS_PER_COMPOUNDBLOCK >>> (simulation->box);
-	//solventForceKernel <<<BLOCKS_PER_SOLVENTKERNEL, THREADS_PER_SOLVENTBLOCK >>> (simulation->box);
+	solventForceKernel <<<BLOCKS_PER_SOLVENTKERNEL, THREADS_PER_SOLVENTBLOCK >>> (simulation->box);
 
 	cudaDeviceSynchronize();
 	auto t1 = std::chrono::high_resolution_clock::now();
