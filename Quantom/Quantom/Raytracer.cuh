@@ -12,10 +12,11 @@
 
 const double FOCAL_LEN_RATIO = 1;
 const double FOCAL_Y_OFFSET = -1;
-const int RAYS_PER_DIM = 1000;	// Can't launch kernels if above 1024
+const int WINDOW_SIZE = 1200;
+const int RAYS_PER_DIM = WINDOW_SIZE/4;	// Can't launch kernels if above 1024
 const int NUM_RAYS = RAYS_PER_DIM * RAYS_PER_DIM;
-const int THREADS_PER_BLOCK = 1024;
-const int MAX_RAY_BLOCKS = 80;
+//const int THREADS_PER_BLOCK = 1024;
+//const int MAX_RAY_BLOCKS = 80;
 
 
 class Ray {

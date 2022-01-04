@@ -83,6 +83,8 @@ __device__ void paintImage(uint8_t* image, Ray* ray) {
     {
     case ATOM_TYPE::O:
         image[0] = 200;
+        image[1] = 0;
+        image[2] = 0;
         image[3] = 255;
         break;
     case ATOM_TYPE::C:
@@ -112,6 +114,7 @@ __device__ void paintImage(uint8_t* image, Ray* ray) {
         image[3] = 0xE2;
         break;
     default:
+        image[3] = 0x00;
         break;
     }
 
@@ -225,27 +228,25 @@ uint8_t* Raytracer::render(Simulation* simulation) {
 
 
 
-    cudaStream_t renderstream;
-    cudaStreamCreate(&renderstream);
-
-
     uint8_t* cuda_image;
     int im_bytesize = NUM_RAYS * 4 * sizeof(uint8_t);
     cudaMallocManaged(&cuda_image, im_bytesize);
 
-
+    cudaDeviceSynchronize();
     renderKernel << < RAYS_PER_DIM, RAYS_PER_DIM, 0>>> ( rayptr, cuda_image, simulation->box);
+    cudaDeviceSynchronize();
+
     uint8_t* image = new uint8_t[NUM_RAYS * 4];
     cudaMemcpy(image, cuda_image, im_bytesize, cudaMemcpyDeviceToHost);
-
+    cudaDeviceSynchronize();
 
     cudaFree(cuda_image);
-    cudaStreamDestroy(renderstream);
+    //cudaStreamDestroy(renderstream);
+    cudaDeviceSynchronize();
 
     auto stop = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
     printf("\tRender time: %4d ms  ", duration.count());
-    // First render: 666 ms
 
     return image;
 }

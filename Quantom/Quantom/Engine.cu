@@ -163,7 +163,7 @@ __device__ Float3 calcLJForce(Float3* pos0, Float3* pos1, double* data_ptr) {	//
 	data_ptr[1] += force;
 	data_ptr[2] = cudaMin(data_ptr[2], dist);
 
-	if (dist < 0.18f) {
+	if (dist < 0.1f) {
 	//if (abs(LJ_pot) > 7000) {
 		printf("\nThread %d step %d dist %f pot %f\n", threadIdx.x, (int) data_ptr[3], (*pos0 - *pos1).len(), LJ_pot);
 		//(*pos0 - *pos1).print('v');
