@@ -37,7 +37,7 @@ Molecule::Molecule() {	// Always returns a h2o molecule rn
 		asin(atoms[0].pos.x / atoms[0].pos.len()),
 		0
 	);
-	Float3 molecule_normal = Float3(0, 0, 1).rotateAroundOrigin(pitch_yaw_roll * -1);
+	Float3 molecule_normal = Float3(0, 0, 1)._rotateAroundOrigin(pitch_yaw_roll * -1);
 	for (int i = 0; i < n_atoms; i++) {
 		atoms[i].pos = atoms[i].pos.rotateAroundVector(pitch_yaw_roll, molecule_normal);
 		//printf("Atom %d pos: %f %f %f\n",i,  atoms[i].pos.x, atoms[i].pos.y, atoms[i].pos.z);

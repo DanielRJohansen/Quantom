@@ -250,8 +250,6 @@ struct Compound {
 
 	//---------------------------------------------------------------------------------//
 	__host__ Compound(uint32_t index, CompoundState* states_host) {		// Default for testing only!
-		this->index = index;
-
 		pairbonds[0] = PairBond(CC_refdist, 0, 1);
 		n_pairbonds++;
 
@@ -268,8 +266,7 @@ struct Compound {
 		radius = pairbonds[0].reference_dist * states_host->n_particles;					// TODO: Shitty estimate, do better later
 	};
 	
-	__host__ void init(uint32_t index) {	// Only call this if the compound has already been assigned particles & bonds
-		this->index = index;
+	__host__ void init() {	// Only call this if the compound has already been assigned particles & bonds
 		center_of_mass = getCOM();
 		//printf("")
 		radius = pairbonds[0].reference_dist * n_particles * 0.5f;
@@ -310,9 +307,6 @@ struct Compound {
 	}
 
 
-
-
-	uint32_t index;										// Is this necessary
 	//CompoundState* compound_state_ptr;
 	//CompoundNeighborList* compound_neighborlist_ptr;
 

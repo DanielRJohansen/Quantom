@@ -31,11 +31,13 @@ void BoxBuilder::build(Simulation* simulation, Compound* main_molecule) {
 	}
 
 
-
+	/*
 	if (main_molecule == nullptr)
 		placeMainMolecule(simulation);
 	else
 		placeMainMolecule(simulation, main_molecule);
+		*/
+	placeMultipleCompoundsRandomly(simulation, main_molecule, 5);
 
 	solvateBox(simulation);	// Always do after placing compounds
 	simulation->box->total_particles = simulation->box->n_compounds * PARTICLES_PER_COMPOUND + simulation->box->n_solvents;
@@ -93,12 +95,13 @@ void BoxBuilder::placeMainMolecule(Simulation* simulation) {
 	Float3 compound_center = Float3(BOX_LEN_HALF, BOX_LEN_HALF, BOX_LEN_HALF);
 	double compound_radius = 0.2;
 
-	simulation->box->compounds[simulation->box->n_compounds++] = createCompound(
+	//simulation->box->compounds[simulation->box->n_compounds++] = 
+	integrateCompound(
 		compound_center,
 		simulation->box->n_compounds,
 		&simulation->box->compound_state_array[simulation->box->n_compounds],
-		//&simulation->box->compound_neighborlist_array[simulation->box->n_compounds],
-		simulation->dt
+		simulation->dt,
+		simulation
 	);
 }
 
@@ -112,7 +115,8 @@ void BoxBuilder::placeMainMolecule(Simulation* simulation, Compound* main_compou
 	}
 
 	
-	simulation->box->compounds[simulation->box->n_compounds++] = *createCompound(
+	//simulation->box->compounds[simulation->box->n_compounds++] = 
+	integrateCompound(
 		main_compound,
 		simulation
 	);
@@ -159,7 +163,7 @@ int BoxBuilder::solvateBox(Simulation* simulation)
 
 
 
-Compound BoxBuilder::createCompound(Float3 com, int compound_index, CompoundState* statebuffer_node, double dt) {
+void BoxBuilder::integrateCompound(Float3 com, int compound_index, CompoundState* statebuffer_node, double dt, Simulation* simulation) {
 
 	int n_atoms = PARTICLES_PER_COMPOUND;
 	Float3 offsets[3] = { Float3(0,0,0), Float3(0.13, 0, 0), Float3(0, 0, -0.13) };
@@ -177,26 +181,31 @@ Compound BoxBuilder::createCompound(Float3 com, int compound_index, CompoundStat
 		compound.particles[i] = CompactParticle(COMPOUNDPARTICLE_MASS, atom_pos_sub1);
 		compound.n_particles++;
 	}
-	return compound;
+	simulation->box->compounds[simulation->box->n_compounds++] = compound;
+
+	//return compound;
 }
 
-Compound* BoxBuilder::createCompound(Compound* compound, Simulation* simulation)
+void BoxBuilder::integrateCompound(Compound* compound, Simulation* simulation)
 {
-	compound->init(simulation->box->n_compounds);
-	CompoundState* statebuffer_node = &simulation->box->compound_state_array[compound->index];
+	compound->init();
+	CompoundState* state = &simulation->box->compound_state_array[simulation->box->n_compounds];
 	Float3 compound_united_vel = Float3(random(), random(), random()).norm() * v_rms * 0;
 
 	for (int i = 0; i < compound->n_particles; i++) {
-		statebuffer_node->positions[i] = compound->particles[i].pos_tsub1;
-		statebuffer_node->n_particles++;
+		state->positions[i] = compound->particles[i].pos_tsub1;
+		state->n_particles++;
 	}
 
 
 	for (int i = 0; i < compound->n_particles; i++) {
-		Float3 atom_pos_sub1 = statebuffer_node->positions[i] - compound_united_vel * simulation->dt;
+		Float3 atom_pos_sub1 = state->positions[i] - compound_united_vel * simulation->dt;
 		compound->particles[i].pos_tsub1 = atom_pos_sub1;												// Overwrite prev pos here, since we have assigned the former prev pos to the state buffer.
 	}
-	return compound;
+
+	simulation->box->compounds[simulation->box->n_compounds++] = *compound;
+
+	//return compound;
 }
 
 
@@ -262,6 +271,88 @@ void BoxBuilder::solvateCompoundCrosslinker(Simulation* simulation)
 		}
 	}
 	printf("Compound n0 solvents: %d\n", simulation->box->compound_neighborlists[0].n_solvent_neighbors);
+}
+
+void BoxBuilder::placeMultipleCompoundsRandomly(Simulation* simulation, Compound* template_compound, int n_copies)
+{
+	int copies_placed = 0;
+	while (copies_placed < n_copies) {
+		Compound* c = randomizeCompound(template_compound);
+
+		if (spaceAvailable(simulation->box, calcCompoundBoundingBox(c))) {
+			integrateCompound(c, simulation);
+			copies_placed++;
+		}
+		delete c;
+	}
+}
+
+Compound* BoxBuilder::randomizeCompound(Compound* original_compound)
+{
+	Compound* compound = new Compound;
+	*compound = *original_compound;
+
+	Float3 xyz_rot = get3Random() * (2.f*PI);
+	rotateCompound(compound, xyz_rot);
+
+	Float3 xyz_mov = get3Random() * BOX_LEN;
+	moveCompound(compound, xyz_mov);
+
+	return compound;
+}
+
+void BoxBuilder::moveCompound(Compound* compound, Float3 vector)
+{
+	for (int i = 0; i < compound->n_particles; i++)
+		compound->particles[i].pos_tsub1 += vector;
+}
+
+Float3 BoxBuilder::calcCompoundCom(Compound* compound)
+{
+	Float3 com = Float3(0, 0, 0);
+	for (int i = 0; i < compound->n_particles; i++)
+		com += compound->particles[i].pos_tsub1;
+	com *= (1.f / compound->n_particles);
+
+	return com;
+}
+
+void BoxBuilder::rotateCompound(Compound* compound, Float3 xyz_rot)
+{
+	Float3 vec_to_origo = Float3(0, 0, 0) - calcCompoundCom(compound);
+	moveCompound(compound, vec_to_origo);
+
+	for (int i = 0; i < compound->n_particles; i++)
+		compound->particles[i].pos_tsub1.rotateAroundOrigo(xyz_rot);
+
+	moveCompound(compound, vec_to_origo * -1);
+}
+
+BoundingBox BoxBuilder::calcCompoundBoundingBox(Compound* compound)
+{
+	BoundingBox bb(Float3(9999, 9999, 9999), Float3(-9999, -9999, -9999));
+	//return bb;
+	for (int i = 0; i < compound->n_particles; i++) {
+		Float3 pos = compound->particles[i].pos_tsub1;
+		for (int dim = 0; dim < 3; dim++) {
+			*bb.min.placeAt(dim) = min(bb.min.at(dim), pos.at(dim));
+			*bb.max.placeAt(dim) = max(bb.max.at(dim), pos.at(dim));
+		}
+	}
+	//exit(0);
+	return bb;
+}
+
+bool BoxBuilder::spaceAvailable(Box* box, BoundingBox compound_bb)
+{
+	for (int c_index = 0; c_index < box->n_compounds; c_index++) {
+		BoundingBox bb = calcCompoundBoundingBox(&box->compounds[c_index]);
+		if (compound_bb.intersects(bb)) {
+			return false;
+			
+		}
+	}
+	return true;
 }
 
 

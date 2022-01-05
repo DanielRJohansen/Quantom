@@ -66,7 +66,6 @@ void CompoundBuilder::loadParticles(Compound* compound, vector<vector<string>>* 
 
 			particle_id_map[particle_id] = compound->n_particles;
 			float mass = mass_from_atom(atom_name[0]) / 1000.f;							// kg/mol;
-			printf("mass: %f\n", mass);
 
 			compound->particles[compound->n_particles++] = CompactParticle(mass, coord);
 

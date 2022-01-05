@@ -6,7 +6,7 @@
 Display::Display(Simulation* simulation) {
     sf::ContextSettings settings;
     settings.antialiasingLevel = 8;
-    window = new sf::RenderWindow(sf::VideoMode(WINDOW_SIZE, WINDOW_SIZE), "Quantom Simulation");
+    window = new sf::RenderWindow(sf::VideoMode(WINDOW_SIZE, WINDOW_SIZE), "LIMA DYNAMICS");
     //window = new sf::RenderWindow(sf::VideoMode(300, 300), "Quantom Simulation");
 
     raytracer = new Raytracer(simulation, false);
@@ -114,9 +114,6 @@ uint8_t* mean(uint8_t* a, uint8_t* b) {
 uint8_t* Display::enhance(uint8_t* im, int from_size)   //doubles res
 {
     uint8_t* image = new uint8_t[WINDOW_SIZE * WINDOW_SIZE * 4];
-
-
-    //printf("\n::::: %d %d\n", RAYS_PER_DIM, WINDOW_SIZE);
     int s = from_size;
     int b = s*2;
 
@@ -125,7 +122,6 @@ uint8_t* Display::enhance(uint8_t* im, int from_size)   //doubles res
             set(&image[xyToIndex(x * 2, y * 2, b)], &im[xyToIndex(x, y, s)]);
         }
     }
-    //return image;
     for (int y = 1; y < b-1; y+=2) {
         for (int x = 0; x < b-1; x+=2) {
             uint8_t* y_mean = mean(&im[xyToIndex(x/2, (y - 1)/2, s)], &im[xyToIndex(x/2, (y + 1)/2, s)]);

@@ -43,6 +43,9 @@ struct Float3 {
 	__host__ __device__ inline void operator += (const Float3 a) { x += a.x; y += a.y; z += a.z; }
 	__host__ __device__ inline void operator *= (const double a) { x *= a; y *= a; z *= a; }
 
+	__host__ __device__ inline bool operator < (const Float3 a) {return x < a.x && y < a.y && z < a.z; }
+	__host__ __device__ inline bool operator > (const Float3 a) { return x > a.x&& y > a.y&& z > a.z; }
+
 	__host__ __device__ Float3 norm() {
 		double l = len();
 		if (l)
@@ -83,7 +86,17 @@ struct Float3 {
 
 	__host__ __device__ void print(char c='_') { printf("%c %f %f %f\n", c, x, y, z); }
 
-	__host__ __device__ Float3 rotateAroundOrigin(Float3 pitch_yaw_roll) {	//pitch around x, yaw around z, tilt around y
+
+	__host__ __device__ void rotateAroundOrigo(Float3 pitch_yaw_roll) {	//pitch around x, yaw around z, tilt around y
+		// pitch and yaw is relative to global coordinates. 
+
+		*this = rodriguesRotatation(*this, Float3(1, 0, 0), pitch_yaw_roll.x);
+		*this = rodriguesRotatation(*this, Float3(0, 1, 0), pitch_yaw_roll.y);
+		*this = rodriguesRotatation(*this, Float3(0, 0, 1), pitch_yaw_roll.y);
+	}
+
+	// I think the one below is wrong...
+	__host__ __device__ Float3 _rotateAroundOrigin(Float3 pitch_yaw_roll) {	//pitch around x, yaw around z, tilt around y
 		// pitch and yaw is relative to global coordinates. Tilt is relative to body direction
 
 		Float3 v = rodriguesRotatation(*this, Float3(1, 0, 0), pitch_yaw_roll.x);
@@ -113,6 +126,7 @@ struct Float3 {
 		case 2:
 			return z;
 		default:
+
 			return -404;
 		}
 	}
@@ -141,6 +155,27 @@ struct Float3 {
 
 	double x = 0, y = 0, z = 0;
 };
+
+struct BoundingBox {
+	BoundingBox(){}
+	BoundingBox(Float3 min, Float3 max): min(min), max(max) {}
+
+
+	Float3 min, max;
+
+	bool intersects(BoundingBox b) {
+		return
+			min.x <= b.min.x && max.x >= b.min.x &&
+			min.y <= b.max.y && max.y >= b.min.y &&
+			min.z <= b.max.z && max.z >= b.min.z;
+	}
+	bool pointIsInBox(Float3 point) {
+		return (min < point) && (point < max);
+	}
+};
+
+
+
 
 /*
 struct BlockMutex {
