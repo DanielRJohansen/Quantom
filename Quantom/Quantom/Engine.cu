@@ -4,7 +4,7 @@
 
 Simulation* Engine::prepSimulation(Simulation* simulation, Compound* main_molecule) {
 	this->simulation = simulation;
-	srand(290128301);
+	srand(290128309);
 	boxbuilder.build(simulation, main_molecule);
 	printf("Boxbuild complete!\n");
 
@@ -12,8 +12,12 @@ Simulation* Engine::prepSimulation(Simulation* simulation, Compound* main_molecu
 	//printf("Neighborlists ready\n");
 
 
-
+	if (cudaGetLastError() != cudaSuccess) {
+		fprintf(stderr, "Error before Simulation Host->Device transfer\n");
+		exit(1);
+	}
 	simulation->moveToDevice();
+
 
 	//initKernel << < simulation->box->n_compounds, 64 >> > (simulation->box);
 	//cudaDeviceSynchronize();
@@ -63,7 +67,7 @@ void Engine::step() {
 
 	auto t0 = std::chrono::high_resolution_clock::now();
 	forceKernel <<< simulation->box->n_compounds, THREADS_PER_COMPOUNDBLOCK >>> (simulation->box);
-	solventForceKernel <<<BLOCKS_PER_SOLVENTKERNEL, THREADS_PER_SOLVENTBLOCK >>> (simulation->box);
+	solventForceKernel <<< BLOCKS_PER_SOLVENTKERNEL, THREADS_PER_SOLVENTBLOCK >>> (simulation->box);
 
 	cudaDeviceSynchronize();
 	auto t1 = std::chrono::high_resolution_clock::now();
@@ -133,8 +137,16 @@ void __device__ applyHyperpos(Float3* static_particle, Float3* movable_particle)
 }
 
 __device__ void applyPBC(Float3* current_position) {	// Only changes position if position is outside of box;
-	*current_position += Float3(BOX_LEN, BOX_LEN, BOX_LEN);
-	*current_position = current_position->elementwiseModulus(BOX_LEN);
+	for (int dim = 0; dim < 3; dim++) {
+		*current_position->placeAt(dim) += BOX_LEN * (current_position->at(dim) < 0);
+		*current_position->placeAt(dim) -= BOX_LEN * (current_position->at(dim) > BOX_LEN);
+	}
+	
+	/**current_position += Float3(BOX_LEN, BOX_LEN, BOX_LEN);
+	current_position->x -= BOX_LEN * (current_position->x > BOX_LEN);
+	current_position->y -= BOX_LEN * (current_position->y > BOX_LEN);
+	current_position->z -= BOX_LEN * (current_position->z > BOX_LEN);
+	//*current_position = current_position->elementwiseModulus(BOX_LEN);*/
 }
 
 
@@ -152,7 +164,7 @@ __device__ Float3 calcLJForce(Float3* pos0, Float3* pos1, double* data_ptr) {	//
 
 	//double force = 1.f / (dist) * f6 * (1.f - 2.f * f6);
 	//double force = 24.f * (epsilon / dist) * f6 * (1.f - 2.f * f6);
-	double force = 24.f * (epsilon / (dist*dist)) * f6 * (1.f - 2.f * f6);
+	double force = 24.f * (epsilon / (dist)) * f6 * (1.f - 2.f * f6);
 
 	double LJ_pot = 4.f * epsilon * (f12 - f6);
 	Float3 force_unit_vector = (*pos1 - *pos0).norm();
@@ -162,14 +174,14 @@ __device__ Float3 calcLJForce(Float3* pos0, Float3* pos1, double* data_ptr) {	//
 	data_ptr[0] += LJ_pot *0.5 * 2;																	// WATCH OUT FOR 2 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	data_ptr[1] += force;
 	data_ptr[2] = cudaMin(data_ptr[2], dist);
-
-	if (dist < 0.1f) {
+	//|| (threadIdx.x == 0 && blockIdx.x == 1)
+	if (dist < 0.1f || abs(force) > 100e+6 ) {
 	//if (abs(LJ_pot) > 7000) {
-		printf("\nThread %d step %d dist %f pot %f\n", threadIdx.x, (int) data_ptr[3], (*pos0 - *pos1).len(), LJ_pot);
+		printf("\nThread %d Block %d step %d dist %f force %f\n", threadIdx.x, blockIdx.x, (int) data_ptr[3], (*pos0 - *pos1).len(), force);
 		//(*pos0 - *pos1).print('v');
 		//(force_unit_vector * force).print('f');
-		pos0->print('0');
-		pos1->print('1');
+		//pos0->print('0');
+		//pos1->print('1');
 		//printf("\n\n KILOFORCE! Block %d thread %d\n", blockIdx.x, threadIdx.x);
 		//(force_unit_vector * force).print('f');
 	}
@@ -482,6 +494,11 @@ __device__ void integratePosition(Float3* pos, Float3* pos_tsub1, Float3* force,
 	Float3 temp = *pos;
 	*pos = *pos * 2 - *pos_tsub1 + *force * (1.f / mass) * dt * dt;	// no *0.5?
 	*pos_tsub1 = temp;
+	if (force->len() > 100e+6) {
+		printf("\nThread %d blockId %d\tForce %f \tFrom %f %f %f\tTo %f %f %f\n", threadIdx.x, blockIdx.x, force->len(), pos_tsub1->x, pos_tsub1->y, pos_tsub1->z, pos->x, pos->y, pos->z);
+		while(true)
+		{ }
+	}
 	//printf("force: %f\n", force->len());
 }
 
@@ -518,27 +535,30 @@ __global__ void forceKernel(Box* box) {
 	for (int i = 0; i < 4; i++)
 		data_ptr[i] = 0;
 	data_ptr[2] = 9999;
-
+	data_ptr[3] = box->step + 1;
 
 	Float3 force(0, 0, 0);
 
-
-	
 	// ------------------------------------------------------------ Intramolecular Operations ------------------------------------------------------------ //
 	applyHyperpos(&compound_state.positions[0], &compound_state.positions[threadIdx.x]);
-
 	force = force + computePairbondForces(&compound, &compound_state, utility_buffer, &data_ptr[2]);
-
 	force = force + computeAnglebondForces(&compound, &compound_state, utility_buffer, &data_ptr[2]);
 	// ----------------------------------------------------------------------------------------------------------------------------------------------- //
 
 
-
-
 	// --------------------------------------------------------------- Intermolecular forces --------------------------------------------------------------- //
-	//force = force + computeLJForces(box, &compound, &neighborlist, &self_state, &neighborstate_buffer, utility_buffer, data_ptr);
-	//Float3 waterforce = computeLJForces(box, &compound, &box->solvent_neighborlist_array[blockIdx.x], &self_state, utility_buffer, data_ptr);
-	//force += waterforce;
+	for (int i = 0; i < box->n_compounds; i++) {
+		if (i == blockIdx.x)	// Only needed untill we have proper neighbor lists
+			continue;
+		int n_particles = box->compound_state_array[i].n_particles;
+
+		if (threadIdx.x < n_particles) {	
+			utility_buffer[threadIdx.x] = box->compound_state_array[i].positions[threadIdx.x];
+			applyHyperpos(&compound_state.positions[0], &utility_buffer[threadIdx.x]);
+		}
+		__syncthreads();
+		force += computeLJForces(&compound_state.positions[threadIdx.x], n_particles, utility_buffer, data_ptr);
+	}
 	// ------------------------------------------------------------------------------------------------------------------------------------------------------ //
 
 
@@ -549,6 +569,7 @@ __global__ void forceKernel(Box* box) {
 		utility_buffer[i] = box->solvents[neighborlist.neighborsolvent_indexes[i]].pos;
 		applyHyperpos(&compound_state.positions[0], &utility_buffer[i]);
 	}
+	__syncthreads();
 	if (threadIdx.x < compound.n_particles) {
 		force += computeLJForces(&compound_state.positions[threadIdx.x], neighborlist.n_solvent_neighbors, utility_buffer, data_ptr);
 	}		
@@ -577,8 +598,12 @@ __global__ void forceKernel(Box* box) {
 
 
 	// ------------------------------------ PERIODIC BOUNDARY CONDITION ------------------------------------------------------------------------------------------------- // 
-	if (threadIdx.x == 0)
+	if (threadIdx.x == 0) {
 		applyPBC(&compound_state.positions[threadIdx.x]);
+		//if (blockIdx.x == 0 && ((compound_state.positions[0]-Float3(0.f)).len() > BOX_LEN))
+		//compound_state.positions[0].print('s');
+	}
+	applyHyperpos(&compound_state.positions[0], &compound_state.positions[threadIdx.x]);	// So all particles follows p0
 	// ------------------------------------------------------------------------------------------------------------------------------------------------------------------ //
 	
 
@@ -617,6 +642,14 @@ __global__ void forceKernel(Box* box) {
 
 
 
+
+
+
+
+
+
+
+
 __global__ void solventForceKernel(Box* box) {
 	__shared__ Float3 solvent_positions[THREADS_PER_SOLVENTBLOCK];
 	__shared__ Float3 utility_buffer[MAX_COMPOUND_PARTICLES];
@@ -649,25 +682,28 @@ __global__ void solventForceKernel(Box* box) {
 			utility_buffer[threadIdx.x] = box->compound_state_array[i].positions[threadIdx.x];
 		}
 		__syncthreads();
-		if (threadIdx.x < n_particles) {
-			applyHyperpos(&utility_buffer[0], &utility_buffer[threadIdx.x]);
-		}
+
 		//Only do if mol is neighbor to the particular solvent
 		applyHyperpos(&utility_buffer[0], &solvent_positions[threadIdx.x]);
 		force += computeLJForces(&solvent_positions[threadIdx.x], n_particles, utility_buffer, data_ptr);
 
 	}
 	// ----------------------------------------------------------------------------------------------------------------------------------------------------- //
-
-	force += computeSolventToSolventLJForces(&solvent.pos, threadIdx.x, box->n_solvents, solvent_positions, data_ptr);
-
-
-
-
-	integratePosition(&solvent.pos, &solvent.pos_tsub1, &force, SOLVENT_MASS, box->dt);
-
+	if (threadIdx.x < box->n_solvents) {
+		//applyHyperpos
+		force += computeSolventToSolventLJForces(&solvent.pos, threadIdx.x, box->n_solvents, solvent_positions, data_ptr);
+	}
 	
-	applyPBC(&solvent.pos);	// forcePositionToInsideBox	// This break the integration, as that doesn't accound for PBC in the vel conservation
+
+
+
+	if (threadIdx.x < box->n_solvents) {
+		integratePosition(&solvent.pos, &solvent.pos_tsub1, &force, SOLVENT_MASS, box->dt);
+	}
+
+	if (threadIdx.x < box->n_solvents) {
+		applyPBC(&solvent.pos);	// forcePositionToInsideBox	// This break the integration, as that doesn't accound for PBC in the vel conservation
+	}
 
 
 
@@ -692,8 +728,9 @@ __global__ void solventForceKernel(Box* box) {
 	// ----------------------------------------------------------------------------- //
 
 
-
-	box->solvents_next[threadIdx.x] = solvent;
+	if (threadIdx.x < box->n_solvents) {
+		box->solvents_next[threadIdx.x] = solvent;
+	}
 }
 
 

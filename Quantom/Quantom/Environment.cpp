@@ -17,11 +17,17 @@ Environment::Environment() {
 		exit(0);
 	}
 
+	if (cudaGetLastError() != cudaSuccess) {
+		fprintf(stderr, "Error before Display Initiation\n");
+		exit(1);
+	}
 
 	display = new Display(simulation);
 	interface = new Interface(display->window);
-
-
+	if (cudaGetLastError() != cudaSuccess) {
+		fprintf(stderr, "Error during Display Initiation\n");
+		exit(1);
+	}
 
 }
 
@@ -55,7 +61,7 @@ void Environment::run() {
 		printf("\r\tStep #%06d", simulation->box->step);
 		double duration = (double) std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - t0).count();
 		int remaining_seconds = (int) (1.f/1000 * duration/simulation->steps_per_render * (simulation->n_steps - simulation->box->step));
-		printf("\tAverage step time: %.1fms (%d/%d/%d) \tRemaining: %04ds",  duration/simulation->steps_per_render, engine->timings.x/simulation->steps_per_render, engine->timings.y / simulation->steps_per_render, engine->timings.z / simulation->steps_per_render, remaining_seconds);
+		printf("\tAvg. step time: %.1fms (%d/%d/%d) \tRemaining: %04ds",  duration/simulation->steps_per_render, engine->timings.x/simulation->steps_per_render, engine->timings.y / simulation->steps_per_render, engine->timings.z / simulation->steps_per_render, remaining_seconds);
 		engine->timings = Int3(0, 0, 0);
 
 		if (!(simulation->box->step % simulation->steps_per_render)) {

@@ -2,11 +2,12 @@
 #include "Bodies.cuh"
 #include "Simulation.cuh"
 
-
 class BoxBuilder
 {
 public:
-	BoxBuilder() {};
+	BoxBuilder() {
+
+	};
 	void build(Simulation* simulation, Compound* main_molecule=nullptr);
 
 
@@ -35,8 +36,9 @@ private:
 	Float3 calcCompoundCom(Compound* compound);
 	void rotateCompound(Compound* compound, Float3 xyz_rot);
 	BoundingBox calcCompoundBoundingBox(Compound* compound);
-	bool spaceAvailable(Box* box, BoundingBox compound_bb);
+	bool spaceAvailable(Box* box, Compound* compound);
 	bool spaceAvailable(Box* box, Float3 particle_center);	// Ignore radius for this, as it just check against bounding boxes. 
+	bool verifyPairwiseParticleMindist(Compound* a, Compound* b);
 	//What about other solvents then? Not problem now while solvents are placed on a grid, but what about later?
 
 	// ------------------------------------------------------------------------------------ //
@@ -63,7 +65,7 @@ private:
 	double v_rms = sqrt(3 * R * T / M);
 
 
-
+	double MIN_NONBONDED_DIST = 0.24;
 
 
 
@@ -79,14 +81,12 @@ private:
 	
 	
 
-
-
 	// ---------------------------------------------------- Helper functions ---------------------------------------------------- //
-	Float3 get3Random(int resolution = 100000) {	// Returns 3 numbers between 0-1
+	Float3 get3Random() {	// Returns 3 numbers between 0-1
 		return Float3(
-			rand() % resolution / (double)resolution,
-			rand() % resolution / (double)resolution,
-			rand() % resolution / (double)resolution
+			rand() % RAND_MAX / (double) RAND_MAX,
+			rand() % RAND_MAX / (double)RAND_MAX,
+			rand() % RAND_MAX / (double)RAND_MAX
 		);
 	}
 

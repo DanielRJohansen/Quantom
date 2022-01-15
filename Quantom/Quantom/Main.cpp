@@ -6,6 +6,7 @@
 #include "Engine.cuh"
 
 struct Test {
+
 	int arr[4];
 };
 /*
@@ -18,6 +19,7 @@ int main() {
 
 
 int main() {
+
 	/*
 	uint8_t* a;
 	a = new uint8_t[4];
@@ -35,7 +37,6 @@ int main() {
 	
 	exit(0);
 	*/
-
 
 	std::printf("Program starting...\n");
 	Environment Env;

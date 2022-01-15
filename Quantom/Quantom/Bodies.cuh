@@ -154,7 +154,7 @@ struct AngleBond {
 
 
 // ------------------------------------------------- COMPOUNDS ------------------------------------------------- //
-const int NEIGHBORLIST_MAX_COMPOUNDS = 32;
+const int NEIGHBORLIST_MAX_COMPOUNDS = 64;
 const int NEIGHBORLIST_MAX_SOLVENTS = 256;
 
 class NeighborList {
@@ -177,6 +177,7 @@ public:
 				neighborcompound_indexes[n_compound_neighbors++] = new_index;
 				return true;
 			}
+			printf("Too many compounds\n");
 			break;
 		case NeighborList::SOLVENT:
 			if (n_solvent_neighbors < NEIGHBORLIST_MAX_SOLVENTS) {
@@ -185,6 +186,7 @@ public:
 			}
 			break;
 		default:
+			exit(0);
 			break;
 		}
 		printf("Failed!\n");
@@ -270,8 +272,8 @@ struct Compound {
 		center_of_mass = getCOM();
 		//printf("")
 		radius = pairbonds[0].reference_dist * n_particles * 0.5f;
-		center_of_mass.print('C');
-		printf("Radius %f\n", radius);
+		//center_of_mass.print('C');
+		//printf("Radius %f\n", radius);
 	}
 
 	__host__ Float3 getCOM() {

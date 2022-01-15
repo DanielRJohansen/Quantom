@@ -5,7 +5,7 @@
 
 
 
-constexpr double BOX_LEN = 5.f;		// Must be > twice the len of largest compound
+constexpr double BOX_LEN = 7.f;		// Must be > twice the len of largest compound
 
 constexpr double BOX_LEN_HALF = BOX_LEN/2.f;
 constexpr double BOX_BASE = -BOX_LEN_HALF;
@@ -20,8 +20,8 @@ const int LOGBLOCK = 0;
 const int LOGTHREAD = 0;
 const int LOGTYPE = 1;	// 0 for solvent, 1 for compound
 //const int N_BODIES_START = 40;
-//const int N_SOLVATE_MOLECULES = 5*5*5;// 60;
-const int N_SOLVATE_MOLECULES = 64;
+
+const int N_SOLVATE_MOLECULES = 256;
 
 
 const int PARTICLES_PER_COMPOUND = 3;
@@ -36,18 +36,18 @@ const int LOG_P_ID = 17;
 
 const int MAX_COMPOUNDS = 0xFF;
 const int MAX_SOLVENTS = 0xFFFF;
-constexpr double CUTOFF = 5.0f;	//nm/
+constexpr double CUTOFF = 8.0f;	//nm/
 
 
 
 
-const int BLOCKS_PER_SOLVENTKERNEL = 2;
+const int BLOCKS_PER_SOLVENTKERNEL = 1;
 const int THREADS_PER_SOLVENTBLOCK = 256;	// Must be >= N_SOLVATE_MOLECULES
 
 
 const int THREADS_PER_COMPOUNDBLOCK = 64; // Must be >= max comp particles
 
-
+const int N_LIPID_COPIES = 64;
 
 
 
@@ -91,18 +91,12 @@ public:
 
 	void moveToDevice() {	// Loses pointer to RAM location!
 		compounds = genericMoveToDevice(compounds, n_compounds);
-
 		solvents = genericMoveToDevice(solvents, MAX_SOLVENTS);
-
 		compound_state_array = genericMoveToDevice(compound_state_array, MAX_COMPOUNDS);
 
 
-		//printf("Here\n");
 		compound_neighborlists = genericMoveToDevice(compound_neighborlists, MAX_COMPOUNDS);
 		solvent_neighborlists = genericMoveToDevice(solvent_neighborlists, MAX_SOLVENTS);
-
-
-		
 
 
 		cudaDeviceSynchronize();
@@ -123,8 +117,13 @@ public:
 		box = new Box;
 	}
 
-	void moveToDevice() {
+	__host__ void moveToDevice() {
 		box = genericMoveToDevice(box, 1);
+		cudaDeviceSynchronize();
+		if (cudaGetLastError() != cudaSuccess) {
+			fprintf(stderr, "Error during Simulation Host->Device transfer\n");
+			exit(1);
+		}
 		printf("Simulation ready for device\n");
 	}
 
@@ -135,9 +134,10 @@ public:
 	double box_size = BOX_LEN;	//nm
 	int blocks_per_dim;
 	int n_steps = 1000000;
+	int n_steps_to_log = 10000;
 	//int n_steps = 3000;
-	const double dt = 2 * 1e-6;		// ns, so first val corresponds to fs
-	int steps_per_render = 100;
+	const double dt = 5 * 1e-6;		// ns, so first val corresponds to fs
+	int steps_per_render = 50;
 	//int n_bodies = N_BODIES_START;
 	Box* box;
 

@@ -6,19 +6,13 @@
 Display::Display(Simulation* simulation) {
     sf::ContextSettings settings;
     settings.antialiasingLevel = 8;
-    window = new sf::RenderWindow(sf::VideoMode(WINDOW_SIZE, WINDOW_SIZE), "LIMA DYNAMICS");
-    //window = new sf::RenderWindow(sf::VideoMode(300, 300), "Quantom Simulation");
+    window = new sf::RenderWindow(sf::VideoMode(WINDOW_SIZE, WINDOW_SIZE), "LIMA DYNAMICS");    // Sometimes takes 30 sec to load, update Icue, restart pc.. I need to ditch windows... And SFML too..
 
     raytracer = new Raytracer(simulation, false);
 
     
     sf::Image blank_image;
-    //blank_image.create(WINDOW_SIZE, WINDOW_SIZE, sf::Color(0,100, 200));
-   // texture.create(300, 300);
     texture.create(WINDOW_SIZE, WINDOW_SIZE);
-    //texture.loadFromImage(blank_image);
-
-
 
 
 }
@@ -31,7 +25,6 @@ void Display::render(Simulation* simulation) {
     //texture.loadFromImage(image);
 
     draw(image);
-    //delete [] image;
     
 }
 
@@ -78,9 +71,7 @@ void Display::draw(uint8_t* image)
     //
 
     sprite.setTexture(texture, true);
-    //Flip vertically to move (0,0) from upper left corner to lower left corner.
     sprite.setScale(1.f, -1.f);
-    //sprite.setPosition(0, 300);
     sprite.setPosition(0, WINDOW_SIZE);
     window->draw(sprite);
     window->display();
@@ -143,7 +134,9 @@ uint8_t* Display::enhance(uint8_t* im, int from_size)   //doubles res
             uint8_t* x_mean = mean(&image[xyToIndex(x - 1, y, b)], &image[xyToIndex(x + 1, y, b)]);
             uint8_t* bi_mean = mean(y_mean, x_mean);
             set(&image[xyToIndex(x, y, b)], bi_mean);
-            delete[] y_mean, x_mean, bi_mean;
+            delete[] y_mean;
+            delete[] x_mean;
+            delete[] bi_mean;
         }
     }
      

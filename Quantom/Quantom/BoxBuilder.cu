@@ -37,10 +37,11 @@ void BoxBuilder::build(Simulation* simulation, Compound* main_molecule) {
 	else
 		placeMainMolecule(simulation, main_molecule);
 		*/
-	placeMultipleCompoundsRandomly(simulation, main_molecule, 5);
 
+	placeMultipleCompoundsRandomly(simulation, main_molecule, N_LIPID_COPIES);
+	printf("%d Compounds in box\n", simulation->box->n_compounds);
 	solvateBox(simulation);	// Always do after placing compounds
-	simulation->box->total_particles = simulation->box->n_compounds * PARTICLES_PER_COMPOUND + simulation->box->n_solvents;
+	simulation->box->total_particles = simulation->box->n_compounds * PARTICLES_PER_COMPOUND + simulation->box->n_solvents;											// BAD AMBIGUOUS AND WRONG CONSTANTS
 
 
 	cudaMemcpy(simulation->box->compound_state_array_next, simulation->box->compound_state_array, sizeof(CompoundState) * MAX_COMPOUNDS, cudaMemcpyHostToDevice);	// Just make sure they have the same n_particles info...
@@ -54,9 +55,6 @@ void BoxBuilder::build(Simulation* simulation, Compound* main_molecule) {
 	solvateLinker(simulation);
 	solvateCompoundCrosslinker(simulation);
 
-
-
-	
 
 
 
@@ -75,13 +73,10 @@ void BoxBuilder::build(Simulation* simulation, Compound* main_molecule) {
 
 
 
-
-
-
-	int n_points = simulation->box->total_particles * simulation->n_steps;
+	int n_points = simulation->box->total_particles * simulation->n_steps_to_log;
 	cudaMalloc(&simulation->box->potE_buffer, sizeof(double) * n_points);	// Can only log molecules of size 3 for now...
 	cudaMalloc(&simulation->box->trajectory, sizeof(Float3) * n_points);
-	//cudaMemset(&simulation->box->trajectory, 0, sizeof(double) * traj_points * 3);	// uhhhhhhhhhhhhhhhhahahaha dunno bout this
+	printf("Reserving %d MB for logging\n", (int) ((sizeof(double) + sizeof(Float3)) * n_points / 1e+6));
 	cudaMallocManaged(&simulation->box->outdata, sizeof(double) * 10 * simulation->n_steps);	// 10 data streams for 10k steps. 1 step at a time.
 	// 
 	// 
@@ -144,12 +139,19 @@ int BoxBuilder::solvateBox(Simulation* simulation)
 				Float3 solvent_center = Float3(base + dist_between_compounds * (double)x_index, base + dist_between_compounds * (double)y_index, base + dist_between_compounds * (double)z_index);
 				double solvent_radius = 0.2;
 
-				if (spaceAvailable(simulation->box, solvent_center, solvent_radius)) {
+				if (spaceAvailable(simulation->box, solvent_center)) {
 					simulation->box->solvents[simulation->box->n_solvents++] = createSolvent(
 						solvent_center,
 						simulation->dt
 					);
 				}
+				/*
+				if (spaceAvailable(simulation->box, solvent_center, solvent_radius)) {
+					simulation->box->solvents[simulation->box->n_solvents++] = createSolvent(
+						solvent_center,
+						simulation->dt
+					);
+				}*/
 			}
 		}
 	}
@@ -216,28 +218,15 @@ Solvent BoxBuilder::createSolvent(Float3 com, double dt)	// Nodes obv. points to
 	return Solvent(com, com - solvent_vel * dt);
 }
 
-bool BoxBuilder::spaceAvailable(Box* box, Float3 com, double radius) {	// Too lazy to implement yet..
-	for (int i = 0; i < box->n_compounds; i++) {
-		for (int j = 0; j < box->compounds[i].n_particles; j++) {
-			double dist = (box->compound_state_array[i].positions[j] - com).len();
-			if (dist < radius)
-				return false;
-		}
-	}
-	return true;
-}
-
 
 
 
 
 void BoxBuilder::compoundLinker(Simulation* simulation) {
 	for (int i = 0; i < simulation->box->n_compounds; i++) {
-		for (int j = 0; j < simulation->box->n_compounds; j++) {
-			if (i != j) {
-				simulation->box->compound_neighborlists[i].addIndex(j, NeighborList::NEIGHBOR_TYPE::COMPOUND);
-				simulation->box->compound_neighborlists[j].addIndex(i, NeighborList::NEIGHBOR_TYPE::COMPOUND);
-			}
+		for (int j = i+1; j < simulation->box->n_compounds; j++) {
+			simulation->box->compound_neighborlists[i].addIndex(j, NeighborList::NEIGHBOR_TYPE::COMPOUND);
+			simulation->box->compound_neighborlists[j].addIndex(i, NeighborList::NEIGHBOR_TYPE::COMPOUND);
 		}
 	}
 }
@@ -279,11 +268,24 @@ void BoxBuilder::placeMultipleCompoundsRandomly(Simulation* simulation, Compound
 	while (copies_placed < n_copies) {
 		Compound* c = randomizeCompound(template_compound);
 
-		if (spaceAvailable(simulation->box, calcCompoundBoundingBox(c))) {
+		if (spaceAvailable(simulation->box, c)) {
 			integrateCompound(c, simulation);
 			copies_placed++;
 		}
 		delete c;
+	}
+
+	for (int i = 0; i < simulation->box->n_compounds; i++) {
+		Compound* c = &simulation->box->compounds[i];
+		for (int ii = 0; ii < simulation->box->n_compounds; ii++) {
+			Compound* c2 = &simulation->box->compounds[ii];
+			if (ii != i) {
+				if (!verifyPairwiseParticleMindist(c, c2)) {
+					printf("Illegal compound positioning %d %d\n", i, ii);
+					exit(0);
+				}				
+			}
+		}
 	}
 }
 
@@ -293,9 +295,11 @@ Compound* BoxBuilder::randomizeCompound(Compound* original_compound)
 	*compound = *original_compound;
 
 	Float3 xyz_rot = get3Random() * (2.f*PI);
-	rotateCompound(compound, xyz_rot);
+	//rotateCompound(compound, xyz_rot);
 
-	Float3 xyz_mov = get3Random() * BOX_LEN;
+
+	Float3 xyz_target = (get3Random() * 0.6 + Float3(0.2))* BOX_LEN;
+	Float3 xyz_mov = xyz_target - calcCompoundCom(original_compound);
 	moveCompound(compound, xyz_mov);
 
 	return compound;
@@ -331,7 +335,6 @@ void BoxBuilder::rotateCompound(Compound* compound, Float3 xyz_rot)
 BoundingBox BoxBuilder::calcCompoundBoundingBox(Compound* compound)
 {
 	BoundingBox bb(Float3(9999, 9999, 9999), Float3(-9999, -9999, -9999));
-	//return bb;
 	for (int i = 0; i < compound->n_particles; i++) {
 		Float3 pos = compound->particles[i].pos_tsub1;
 		for (int dim = 0; dim < 3; dim++) {
@@ -339,17 +342,55 @@ BoundingBox BoxBuilder::calcCompoundBoundingBox(Compound* compound)
 			*bb.max.placeAt(dim) = max(bb.max.at(dim), pos.at(dim));
 		}
 	}
-	//exit(0);
 	return bb;
 }
 
-bool BoxBuilder::spaceAvailable(Box* box, BoundingBox compound_bb)
+bool BoxBuilder::spaceAvailable(Box* box, Compound* compound)
+{
+	BoundingBox bb_a = calcCompoundBoundingBox(compound);
+	bb_a.addPadding(MIN_NONBONDED_DIST);
+	for (int c_index = 0; c_index < box->n_compounds; c_index++) {
+		BoundingBox bb_b = calcCompoundBoundingBox(&box->compounds[c_index]);
+
+		/*if (box->n_compounds == 13) {
+			printf("\n c index %d\n", c_index);
+			bb_a.min.print('a');
+			bb_a.max.print('a');
+			bb_b.min.print('b');
+			bb_b.max.print('b');
+		}*/
+
+		if (bb_a.intersects(bb_b)) {
+			//printf("Verifying %d %d\n", box->n_compounds, c_index);
+			if (!verifyPairwiseParticleMindist(compound, &box->compounds[c_index]))
+				return false;			
+		}
+	}
+	return true;
+}
+
+bool BoxBuilder::spaceAvailable(Box* box, Float3 particle_center)
 {
 	for (int c_index = 0; c_index < box->n_compounds; c_index++) {
 		BoundingBox bb = calcCompoundBoundingBox(&box->compounds[c_index]);
-		if (compound_bb.intersects(bb)) {
+		bb.addPadding(MIN_NONBONDED_DIST);
+		if (bb.pointIsInBox(particle_center)) {
 			return false;
-			
+		}
+	}
+	return true;
+}
+
+bool BoxBuilder::verifyPairwiseParticleMindist(Compound* a, Compound* b)
+{
+	for (int ia = 0; ia < a->n_particles; ia++) {
+		for (int ib = 0; ib < b->n_particles; ib++) {
+			Float3 pos_a = a->particles[ia].pos_tsub1;
+			Float3 pos_b = b->particles[ib].pos_tsub1;
+
+			float dist = (pos_a - pos_b).len();
+			if (dist < MIN_NONBONDED_DIST)
+				return false;
 		}
 	}
 	return true;

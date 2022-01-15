@@ -32,6 +32,7 @@ struct Int3 {
 
 struct Float3 {
 	__host__ __device__ Float3() {}
+	__host__ __device__ Float3(double a) : x(a), y(a), z(a) {}
 	__host__ __device__ Float3(double x, double y, double z) : x(x), y(y), z(z) {}
 	__host__ __device__ Float3(double* a) { x = a[0]; y = a[1]; z = a[2]; }
 
@@ -165,12 +166,16 @@ struct BoundingBox {
 
 	bool intersects(BoundingBox b) {
 		return
-			min.x <= b.min.x && max.x >= b.min.x &&
+			min.x <= b.max.x && max.x >= b.min.x &&
 			min.y <= b.max.y && max.y >= b.min.y &&
 			min.z <= b.max.z && max.z >= b.min.z;
 	}
 	bool pointIsInBox(Float3 point) {
 		return (min < point) && (point < max);
+	}
+	void addPadding(double margin) {
+		min += Float3(-margin);
+		max += Float3(margin);
 	}
 };
 
@@ -213,11 +218,12 @@ T* genericMoveToDevice(T* data_ptr, int n_elements) {
 
 	cudaMallocManaged(&gpu_ptr, bytesize);
 	cudaMemcpy(gpu_ptr, data_ptr, bytesize, cudaMemcpyHostToDevice);
+	cudaDeviceSynchronize();
 	delete[] data_ptr;
 
 	data_ptr = gpu_ptr;
 
-	printf("Moved %d bytes to device\n", bytesize);
+	printf("Moved %.2f MB to device\n", bytesize*1e-6);
 	return gpu_ptr;
 }
 
