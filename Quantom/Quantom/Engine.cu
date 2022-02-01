@@ -174,6 +174,13 @@ __device__ Float3 calcLJForce(Float3* pos0, Float3* pos1, double* data_ptr) {	//
 	data_ptr[0] += LJ_pot *0.5 * 2;																	// WATCH OUT FOR 2 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	data_ptr[1] += force;
 	data_ptr[2] = cudaMin(data_ptr[2], dist);
+
+	Float3 force_vec = force_unit_vector * force;
+	if (force_vec.x != force_vec.x) {
+		printf("Force: %f\n", force);
+		force_unit_vector.print('u');
+	}
+
 	//|| (threadIdx.x == 0 && blockIdx.x == 1)
 	if (dist < 0.1f || abs(force) > 100e+6 ) {
 	//if (abs(LJ_pot) > 7000) {
@@ -235,6 +242,7 @@ __device__ void calcPairbondForces(Float3* pos_a, Float3* pos_b, double* referen
 
 
 constexpr double ktheta = 65 * 1e+3;	// J/mol
+/*
 __device__ Float3 calcAngleForce(CompoundState* statebuffer, AngleBond* anglebond, double* potE) {	// We fix the middle particle and move the other particles so they are closest as possible
 	// HOLY FUUUCK this shit is unsafe. Works if atoma are ordered left to right, with angles BELOW 180. Dont know which checks to implement yet
 	Float3 v1 = statebuffer->positions[anglebond->atom_indexes[0]] - statebuffer->positions[anglebond->atom_indexes[1]];
@@ -272,6 +280,7 @@ __device__ Float3 calcAngleForce(CompoundState* statebuffer, AngleBond* anglebon
 	
 	return force_direction * force_scalar;
 }
+*/
 __device__ void calcAnglebondForces(Float3* pos_left, Float3* pos_middle, Float3* pos_right, double* reference_angle, Float3* results, double* potE) {
 	Float3 v1 = *pos_left - *pos_middle;
 	Float3 v2 = *pos_right - *pos_middle;
@@ -494,10 +503,9 @@ __device__ void integratePosition(Float3* pos, Float3* pos_tsub1, Float3* force,
 	Float3 temp = *pos;
 	*pos = *pos * 2 - *pos_tsub1 + *force * (1.f / mass) * dt * dt;	// no *0.5?
 	*pos_tsub1 = temp;
-	if (force->len() > 100e+6) {
+	if (force->len() > 200e+6) {
 		printf("\nThread %d blockId %d\tForce %f \tFrom %f %f %f\tTo %f %f %f\n", threadIdx.x, blockIdx.x, force->len(), pos_tsub1->x, pos_tsub1->y, pos_tsub1->z, pos->x, pos->y, pos->z);
-		while(true)
-		{ }
+		
 	}
 	//printf("force: %f\n", force->len());
 }
@@ -531,18 +539,33 @@ __global__ void forceKernel(Box* box) {
 	neighborlist.loadData(&box->compound_neighborlists[blockIdx.x]);
 
 
+
+	//if (!blockIdx.x && !threadIdx.x)
+		//compound_state.positions[0].print('p');
+
 	double data_ptr[4];
 	for (int i = 0; i < 4; i++)
 		data_ptr[i] = 0;
 	data_ptr[2] = 9999;
 	data_ptr[3] = box->step + 1;
 
-	Float3 force(0, 0, 0);
+	Float3 force0(0.f);
+	Float3 force1(0.f);
+	Float3 force2(0.f);
 
 	// ------------------------------------------------------------ Intramolecular Operations ------------------------------------------------------------ //
 	applyHyperpos(&compound_state.positions[0], &compound_state.positions[threadIdx.x]);
-	force = force + computePairbondForces(&compound, &compound_state, utility_buffer, &data_ptr[2]);
-	force = force + computeAnglebondForces(&compound, &compound_state, utility_buffer, &data_ptr[2]);
+	force0 = force0 + computePairbondForces(&compound, &compound_state, utility_buffer, &data_ptr[2]);
+	if (force0.x != force0.x ) {
+		force0.print('p');
+		box->critical_error_encountered = 1;
+	}
+	force1 = force1 + computeAnglebondForces(&compound, &compound_state, utility_buffer, &data_ptr[2]);
+	if (force1.x != force1.x) {
+		force1.print('a');
+		box->critical_error_encountered = 1;
+	}
+	Float3 force = force0 + force1;
 	// ----------------------------------------------------------------------------------------------------------------------------------------------- //
 
 
@@ -557,7 +580,7 @@ __global__ void forceKernel(Box* box) {
 			applyHyperpos(&compound_state.positions[0], &utility_buffer[threadIdx.x]);
 		}
 		__syncthreads();
-		force += computeLJForces(&compound_state.positions[threadIdx.x], n_particles, utility_buffer, data_ptr);
+		force2 += computeLJForces(&compound_state.positions[threadIdx.x], n_particles, utility_buffer, data_ptr);
 	}
 	// ------------------------------------------------------------------------------------------------------------------------------------------------------ //
 
@@ -571,16 +594,25 @@ __global__ void forceKernel(Box* box) {
 	}
 	__syncthreads();
 	if (threadIdx.x < compound.n_particles) {
-		force += computeLJForces(&compound_state.positions[threadIdx.x], neighborlist.n_solvent_neighbors, utility_buffer, data_ptr);
+		force2 += computeLJForces(&compound_state.positions[threadIdx.x], neighborlist.n_solvent_neighbors, utility_buffer, data_ptr);
 	}		
 	// ------------------------------------------------------------------------------------------------------------------------------------------------ //
 
+	if (force2.x != force2.x) {
+		force.print('1');
+		force2.print('2');
+		box->critical_error_encountered = 1;
+	}
 
 
+	if (force2 > 50e+6) {
+		printf("Bond %f LJ %f total %f\n", force.len(), force2.len(), (force + force2).len());
+	}
+	force += force2;
 
-
-
-
+	if (force.x != force.x) {
+		compound_state.positions[threadIdx.x].print('p');
+	}
 
 
 

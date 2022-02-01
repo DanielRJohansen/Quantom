@@ -69,7 +69,16 @@ struct Float3 {
 	}
 	
 	__host__ __device__ inline static double getAngle(Float3 v1, Float3 v2) {
-		return acos((v1.dot(v2)) / (v1.len() * v2.len()));
+		double val = (v1.dot(v2)) / (v1.len() * v2.len());	// If i make this float, we get values over 1, even with the statements below! :(
+		if (val > 1.f || val < -1.f) {
+			printf("Val1 %f !!\n", val);
+		}
+		val = val > 1.f ? 1.f : val;
+		val = val < -1.f ? -1.f : val;
+		if (val > 1.f || val < -1.f) {
+			printf("Val2 %f !!\n", val);
+		}
+		return acos(val);
 	}
 	__host__ __device__ static double getAngle(Float3 a, Float3 middle, Float3 b) {
 		return getAngle(a - middle, b - middle);

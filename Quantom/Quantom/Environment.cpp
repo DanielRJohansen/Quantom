@@ -52,7 +52,7 @@ void Environment::run() {
 		for (int i = 0; i < simulation->steps_per_render; i++) {
 			engine->step();
 
-			if (simulation->finished)
+			if (simulation->finished || simulation->box->critical_error_encountered)
 				break;
 		}
 
@@ -82,6 +82,8 @@ void Environment::run() {
 		if (simulation->box->step >= simulation->n_steps)
 			break;
 
+		if (simulation->box->critical_error_encountered)
+			break;
 
 		
 		

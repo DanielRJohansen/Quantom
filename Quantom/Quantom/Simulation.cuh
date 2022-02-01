@@ -5,7 +5,7 @@
 
 
 
-constexpr double BOX_LEN = 7.f;		// Must be > twice the len of largest compound
+constexpr double BOX_LEN = 6.f;		// Must be > twice the len of largest compound
 
 constexpr double BOX_LEN_HALF = BOX_LEN/2.f;
 constexpr double BOX_BASE = -BOX_LEN_HALF;
@@ -47,7 +47,7 @@ const int THREADS_PER_SOLVENTBLOCK = 256;	// Must be >= N_SOLVATE_MOLECULES
 
 const int THREADS_PER_COMPOUNDBLOCK = 64; // Must be >= max comp particles
 
-const int N_LIPID_COPIES = 64;
+const int N_LIPID_COPIES = 32;
 
 
 
@@ -83,7 +83,7 @@ public:
 	double* outdata;			// Temp, for longging values to whatever
 	uint32_t step = 0;
 	double dt;
-
+	bool critical_error_encountered = 0;
 
 	double* potE_buffer;		// For total energy summation
 	Float3* trajectory;
@@ -136,7 +136,7 @@ public:
 	int n_steps = 1000000;
 	int n_steps_to_log = 10000;
 	//int n_steps = 3000;
-	const double dt = 5 * 1e-6;		// ns, so first val corresponds to fs
+	const double dt = 1 * 1e-6;		// ns, so first val corresponds to fs
 	int steps_per_render = 50;
 	//int n_bodies = N_BODIES_START;
 	Box* box;
