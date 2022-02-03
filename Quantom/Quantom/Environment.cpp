@@ -36,9 +36,6 @@ bool Environment::verifySimulationParameters() {	// Not yet implemented
 }
 
 void Environment::run() {
-
-
-	Molecule h2o;
 	printf("Simulation started\n\n");
 	int steps = 0;
 
