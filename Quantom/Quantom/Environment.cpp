@@ -4,6 +4,9 @@
 
 Environment::Environment() {
 	simulation = new Simulation();
+	if (!verifySimulationParameters()) {
+		exit(0);
+	}
 
 	engine = new Engine;
 
@@ -13,14 +16,8 @@ Environment::Environment() {
 
 	simulation = engine->prepSimulation(simulation, &main_molecule);
 	printf("Engine ready\n");
-	if (!verifySimulationParameters()) {
-		exit(0);
-	}
 
-	if (cudaGetLastError() != cudaSuccess) {
-		fprintf(stderr, "Error before Display Initiation\n");
-		exit(1);
-	}
+
 
 	display = new Display(simulation);
 	interface = new Interface(display->window);
@@ -35,71 +32,81 @@ bool Environment::verifySimulationParameters() {	// Not yet implemented
 	return true;
 }
 
+
+
+
+
+
 void Environment::run() {
 	printf("Simulation started\n\n");
-	int steps = 0;
-
+	time0 = std::chrono::high_resolution_clock::now();
 
 	
 
 	while (display->window->isOpen()) {
-		auto t0 = std::chrono::high_resolution_clock::now();
+
+		
+		engine->hostMaster();
+		engine->deviceMaster();
+		
+		
+		
 
 
-		for (int i = 0; i < simulation->steps_per_render; i++) {
-			engine->step();
+		handleStatus(simulation);
+		handleDisplay(simulation);
 
-			if (simulation->finished || simulation->box->critical_error_encountered)
-				break;
+
+
+		if (handleTermination(simulation)) {
+			break;
 		}
-
-
-
-		printf("\r\tStep #%06d", simulation->box->step);
-		double duration = (double) std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - t0).count();
-		int remaining_seconds = (int) (1.f/1000 * duration/simulation->steps_per_render * (simulation->n_steps - simulation->box->step));
-		printf("\tAvg. step time: %.1fms (%d/%d/%d) \tRemaining: %04ds",  duration/simulation->steps_per_render, engine->timings.x/simulation->steps_per_render, engine->timings.y / simulation->steps_per_render, engine->timings.z / simulation->steps_per_render, remaining_seconds);
-		engine->timings = Int3(0, 0, 0);
-
-		if (!(simulation->box->step % simulation->steps_per_render)) {
-			display->render(simulation);
-
-			interface->handleEvents();
-			if (interface->quit)
-				display->terminate();
-		}
-
-
-		if (steps++ == -1)
-			break;
-
-		if (simulation->finished)
-			break;
-		
-		if (simulation->box->step >= simulation->n_steps)
-			break;
-
-		if (simulation->box->critical_error_encountered)
-			break;
-
-		
-		
-		
-		
-
-
 	}
-
-	//exit(1);
-
-
 	printf("\n\n\n########################## SIMULATION FINISHED ##########################\n\n\n\n");
+	postRunEvents();
+}
+
+void Environment::postRunEvents() {
 	printTrajectory(simulation);
 	printWaterforce(simulation);
 	analyzer.analyzeEnergy(simulation);
 
 	printOut(simulation->box->outdata, simulation->n_steps);
 	//printDataBuffer(simulation->box);
+}
+
+void Environment::handleStatus(Simulation* simulation) {
+	if (!(simulation->getStep() % simulation->steps_per_render)) {
+		printf("\r\tStep #%06d", simulation->box->step);
+		double duration = (double)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - time0).count();
+		int remaining_seconds = (int)(1.f / 1000 * duration / simulation->steps_per_render * (simulation->n_steps - simulation->box->step));
+		printf("\tAvg. step time: %.1fms (%d/%d/%d) \tRemaining: %04ds", duration / simulation->steps_per_render, engine->timings.x / simulation->steps_per_render, engine->timings.y / simulation->steps_per_render, engine->timings.z / simulation->steps_per_render, remaining_seconds);
+		engine->timings = Int3(0, 0, 0);
+
+		time0 = std::chrono::high_resolution_clock::now();
+	}
+}
+
+void Environment::handleDisplay(Simulation* simulation) {
+	if (!(simulation->getStep() % simulation->steps_per_render)) {
+		display->render(simulation);
+
+		interface->handleEvents();
+		if (interface->quit)
+			display->terminate();
+	}
+}
+
+bool Environment::handleTermination(Simulation* simulation)
+{
+	if (simulation->finished)
+		return true;
+	if (simulation->getStep() >= simulation->n_steps)
+		return true;
+	if (simulation->box->critical_error_encountered)
+		return true;
+
+	return false;
 }
 
 void Environment::renderTrajectory(string trj_path)

@@ -56,7 +56,7 @@ void Engine::hostMaster() {
 
 
 void Engine::offLoadPositionData(Simulation* simulation) {
-	//cudaMemcpyAsync(compoundstatearray_host, simulation->box->compound_state_array, sizeof(CompoundState) * simulation->box->n_compounds, cudaMemcpyDeviceToHost);
+	//cudaMemcpy(compoundstatearray_host, simulation->box->compound_state_array, sizeof(CompoundState) * simulation->box->n_compounds, cudaMemcpyDeviceToHost);
 	cudaMemcpy(compoundstates_host, simulation->box->compound_state_array, sizeof(CompoundState) * simulation->n_compounds, cudaMemcpyDeviceToHost);
 	cudaMemcpy(solvents_host, simulation->box->solvents, sizeof(Solvent) * simulation->n_solvents, cudaMemcpyDeviceToHost);
 }

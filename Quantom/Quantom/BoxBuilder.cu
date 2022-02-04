@@ -82,6 +82,7 @@ void BoxBuilder::build(Simulation* simulation, Compound* main_molecule) {
 	// 
 	//cudaMalloc(&simulation->box->trajectory, sizeof(Float3) * simulation->box->n_compounds * 3 * simulation->n_steps);
 
+	simulation->copyBoxVariables();
 	simulation->box->moveToDevice();
 }
 

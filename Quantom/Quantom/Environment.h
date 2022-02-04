@@ -24,6 +24,12 @@ public:
 	Environment();
 
 	void run();
+	void postRunEvents();
+	void handleStatus(Simulation* simulation);
+	void handleDisplay(Simulation* simulation);
+	bool handleTermination(Simulation* simulation);
+
+
 	void renderTrajectory(string trj_path);
 	void makeVirtualTrajectory(string trj_path, string waterforce_path);
 
@@ -40,10 +46,21 @@ private:
 
 
 
+
 	// These should be in interface maybe?
 	void printOut(double* data, int n_steps);
 	//void printDataBuffer(Box* box);
 	void printTrajectory(Simulation* simulation);
 	void printWaterforce(Simulation* simulation);
+
+
+
+
+
+
+
+
+	std::chrono::steady_clock::time_point time0;
+
 };
 

@@ -16,6 +16,10 @@ constexpr double FOCUS_LEN_HALF = BLOCK_LEN / 4.f;
 
 
 
+const int STEPS_PER_NLIST_UPDATE = 200;
+
+
+
 const int LOGBLOCK = 0;
 const int LOGTHREAD = 0;
 const int LOGTYPE = 1;	// 0 for solvent, 1 for compound
@@ -56,6 +60,7 @@ const int N_LIPID_COPIES = 32;
 constexpr double SOLVENT_MASS = 12.0107 * 1e-3;	// kg/mol
 constexpr double COMPOUNDPARTICLE_MASS = 12.0107 * 1e-3;
 
+// This goes on Device
 class Box {
 public:
 
@@ -108,10 +113,8 @@ public:
 
 	
 
-
-__global__ class Simulation {
-
-
+// This stays on host
+class Simulation {
 public:
 	Simulation() {
 		box = new Box;
@@ -126,11 +129,24 @@ public:
 		}
 		printf("Simulation ready for device\n");
 	}
+	__host__ void copyBoxVariables() {
+		n_compounds = box->n_compounds;
+		n_solvents = box->n_solvents;
+	}
+	__host__ void incStep() {
+		step++;
+		box->step++;
+	}
+	__host__ inline int getStep() {
+		return step;
+	}
+	~Simulation() {}
 
 	bool finished = false;
 	//int step = 0;
 
 
+	
 	double box_size = BOX_LEN;	//nm
 	int blocks_per_dim;
 	int n_steps = 1000000;
@@ -141,17 +157,14 @@ public:
 	//int n_bodies = N_BODIES_START;
 	Box* box;
 
-	~Simulation() {
 
-	}
+	// Box variable copies, here for ease of access.
+	int n_compounds = 0;
+	int n_solvents = 0;
 
+private:
+	int step = 0;
 
 
 };
-
-
-
-
-
-
 

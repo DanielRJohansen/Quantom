@@ -14,6 +14,8 @@
 #include <cuda_runtime_api.h>
 
 	
+#include <thread>
+
 #include <fstream>	// TEMP
 
 
@@ -30,13 +32,23 @@ public:
 	Engine(){}
 
 	Simulation* prepSimulation(Simulation* simulation, Compound* main_molecule);
+
+
+	void deviceMaster();
+	void hostMaster();
+
 	//double* getDatabuffer();
 	bool testFunction();
-	void step();
 	double* analyzeEnergy();
 
 
 	Int3 timings = Int3(0, 0, 0);
+
+
+
+
+
+
 
 
 	// ----- Functions used by analyzer aswell ----- //
@@ -56,10 +68,29 @@ private:
 	Simulation* simulation;
 
 
-	// HOST FUNCTIONS //
-	void updateNeighborLists();
+	// -------------------------------------- GPU LOAD -------------------------------------- //
+	void step();
+
+	// -------------------------------------- CPU LOAD -------------------------------------- //
+	void offLoadPositionData(Simulation* simulation);
+	static void updateNeighborLists(Simulation* simulation, Engine* engine);	// thread worker, can't own engine object, thus pass ref
+	CompoundState* compoundstates_host;
+	Solvent* solvents_host;
+	NeighborList* compound_neighborlists_host;
+	NeighborList* solvent_neighborlists_host;
+
+	int prev_nlist_update_step = 0;
 
 
+	// -------------------------------------- HELPERS -------------------------------------- //
+
+	void genericErrorCheck(const char* text) {
+		cudaError_t cuda_status = cudaGetLastError();
+		if (cuda_status != cudaSuccess) {
+			fprintf(stderr, text);
+			exit(1);
+		}
+	}
 
 
 
@@ -82,6 +113,15 @@ private:
 	double box_base;				// Of box (left, back, down-most), is negative!
 	double block_center_base;	// Including that edge blocks focus area is halfway outside the box
 	cudaError_t cuda_status;
+
+
+
+
+
+
+
+
+
 
 };
 

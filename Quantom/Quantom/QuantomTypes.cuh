@@ -221,7 +221,7 @@ using namespace std;
 
 
 template<typename T>
-T* genericMoveToDevice(T* data_ptr, int n_elements) {
+T* genericMoveToDevice(T* data_ptr, int n_elements) {	// Currently uses MallocManaged, switch to unmanaged for safer operation
 	T* gpu_ptr;
 	int bytesize = n_elements * sizeof(T);
 
