@@ -310,3 +310,151 @@ struct Trajectory {
 	int n_steps;
 };
 
+
+
+
+class HashTable {
+	HashTable() {}
+	HashTable(int* keys, int n_keys, int ts) {
+		table_size = ts;
+		table = new int[ts]();
+		for (int i = 0; i < n_keys; i++)
+			insert(keys[i], 1);
+	}
+
+public:
+	bool insert(int key, int offset) {			// Returns true for sucessful insertion
+		int hash = (getHash(key) + offset) % table_size;
+		if (table[hash] == key) {		// Key already exists in table
+			return false;
+		}
+		else if (table[hash] == 0) {	// Key doesn't exist in table
+			table[hash] = key;
+			return true;
+		} 
+		else {							// Hash already taken, recurse
+			return insert(key, offset << 1);
+		}
+	}
+private:
+
+	int getHash(int key) {
+		return floor(table_size*(fmod((double) key * k, 1.f)));
+	}
+
+
+	int* table;
+	int table_size;
+	double k = 0.79026;
+};
+
+
+
+
+
+
+
+
+class AVLTree {
+public:
+	AVLTree(){}
+	AVLTree(int* ids, int n_elems) {
+		for (int i = 0; i < n_elems; i++) {		// Bad, these are sorted, start from the middle!!!!!!!!!!!!!!!!
+			insert(ids[i]);
+		}
+	}
+
+	bool insert(int id) {
+		if (root == NULL) {
+			root = new Node(id);
+			return true;
+		}
+		return root->insert(id, NULL);
+	}
+
+	struct Node;
+	Node* root = NULL;
+
+
+
+
+
+private:
+	struct Node {
+		struct Node(){}
+		struct Node(int id) : id(id){}
+
+		bool insert(int key, Node* parent) {
+			Node** child;
+			int* height;
+
+			if (key == id) {
+				return false;
+			}
+			else if (key < id) {
+				child = &left;
+				height = &h_left;
+			}
+			else {
+				child = &right;
+				height = &h_right;
+			}
+			
+
+			if (*child == NULL) {
+				*child = new Node(key);
+				*height = 1;
+				max_height = max(h_left, h_right);
+			}
+			else {
+				if ((*child)->insert(key, this)) {
+					*height = (*child)->max_height + 1;
+					
+				}
+				return false;
+			}
+			if (h_left - h_right > 1)
+				rotateRight(parent);
+			if (h_right - h_left > 1)
+				rotateLeft(parent);
+
+			return true;
+		}
+
+		void rotateRight(Node* parent) {
+			Node* prev_left = left;
+			left = left->right;
+			prev_left->right = this;
+			concedeGenerationPosition(prev_left);
+		}
+		void rotateLeft(Node* parent) {
+			Node* prev_right = right;
+			right = right->left;
+			prev_right->left = this;
+			concedeGenerationPosition(prev_right);
+		}
+
+		void concedeGenerationPosition(Node* sucessor) {
+			if (parent->left->id == id)	// Holy fuck, im gunna have a stroke!
+				parent->left = sucessor;
+			else
+				parent->right = sucessor;
+			updateHeights();
+			sucessor->updateHeights();
+		}
+
+		void updateHeights() {
+			h_left = left->max_height;
+			h_right = right->max_height;
+			max_height = max(h_left, h_right);
+		}
+
+		int max_height = 0;
+		int h_left = 0; //height
+		int h_right = 0;
+		int id;
+		Node* left = NULL;
+		Node* right = NULL;
+	};
+};
+

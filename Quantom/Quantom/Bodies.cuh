@@ -162,26 +162,26 @@ public:
 	enum NEIGHBOR_TYPE {COMPOUND, SOLVENT};
 	__host__ void init() {
 		for (int i = 0; i < NEIGHBORLIST_MAX_COMPOUNDS; i++) {
-			neighborcompound_indexes[i] = 0xFFFF;
+			neighborcompound_ids[i] = 0xFFFF;
 		}
 		for (int i = 0; i < NEIGHBORLIST_MAX_SOLVENTS; i++) {
-			neighborsolvent_indexes[i] = 0xFFFF;
+			neighborsolvent_ids[i] = 0xFFFF;
 		}
 	}
 
-	__host__ bool addIndex(int new_index, NEIGHBOR_TYPE nt) {
+	__host__ bool addId(int new_id, NEIGHBOR_TYPE nt) {
 		switch (nt)
 		{
 		case NeighborList::COMPOUND:
 			if (n_compound_neighbors < NEIGHBORLIST_MAX_COMPOUNDS) {
-				neighborcompound_indexes[n_compound_neighbors++] = new_index;
+				neighborcompound_ids[n_compound_neighbors++] = new_id;
 				return true;
 			}
 			printf("Too many compounds\n");
 			break;
 		case NeighborList::SOLVENT:
 			if (n_solvent_neighbors < NEIGHBORLIST_MAX_SOLVENTS) {
-				neighborsolvent_indexes[n_solvent_neighbors++] = new_index;
+				neighborsolvent_ids[n_solvent_neighbors++] = new_id;
 				return true;
 			}
 			break;
@@ -191,6 +191,9 @@ public:
 		}
 		printf("Failed!\n");
 		return false;
+	}
+	__host__ void removeId(int neighbor_id, NEIGHBOR_TYPE nt) {
+
 	}
 
 	__device__ void loadMeta(NeighborList* nl_ptr) {	// Called from thread 0
@@ -206,9 +209,11 @@ public:
 		}
 	}
 
-	uint16_t neighborcompound_indexes[NEIGHBORLIST_MAX_COMPOUNDS];
+
+
+	uint16_t neighborcompound_ids[NEIGHBORLIST_MAX_COMPOUNDS];
 	uint8_t n_compound_neighbors = 0;
-	uint16_t neighborsolvent_indexes[NEIGHBORLIST_MAX_SOLVENTS];
+	uint16_t neighborsolvent_ids[NEIGHBORLIST_MAX_SOLVENTS];
 	uint8_t n_solvent_neighbors = 0;
 };
 

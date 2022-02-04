@@ -25,6 +25,40 @@ __global__ void initKernel(Box* box);	// For now, just initializes previous pote
 
 
 
+struct NListDataCollection {
+	//NListDataCollection() {}
+	NListDataCollection(Simulation* simulation) {
+		n_compounds = simulation->n_compounds;
+		n_solvents = simulation->n_solvents;
+		compoundstates = new CompoundState[n_compounds];
+		solvents = new Solvent[simulation->n_solvents];
+		compound_neighborlists = new NeighborList[MAX_COMPOUNDS];
+		solvent_neighborlists = new NeighborList[MAX_SOLVENTS];
+		cudaMemcpy(compound_neighborlists, simulation->box->compound_neighborlists, sizeof(NeighborList) * n_compounds, cudaMemcpyDeviceToHost);
+		cudaMemcpy(solvent_neighborlists, simulation->box->solvent_neighborlists, sizeof(NeighborList) * n_solvents, cudaMemcpyDeviceToHost);
+	}
+	void compressPositionData() {
+		for (int i = 0; i < n_compounds; i++) {
+			compound_key_positions[i] = compoundstates[i].positions[0];
+		}
+		for (int i = 0; i < n_compounds; i++) {
+			solvent_positions[i] = solvents[i].pos;
+		}
+	}
+	int n_compounds;
+	int n_solvents;
+
+	// I guess this is not critical but temp, needed to load pos device->host
+	CompoundState* compoundstates;
+	Solvent* solvents;
+
+	Float3 compound_key_positions[MAX_COMPOUNDS];
+	Float3 solvent_positions[MAX_SOLVENTS];
+
+	NeighborList* compound_neighborlists;
+	NeighborList* solvent_neighborlists;
+};
+
 
 
 class Engine {
@@ -73,11 +107,9 @@ private:
 
 	// -------------------------------------- CPU LOAD -------------------------------------- //
 	void offLoadPositionData(Simulation* simulation);
-	static void updateNeighborLists(Simulation* simulation, Engine* engine);	// thread worker, can't own engine object, thus pass ref
-	CompoundState* compoundstates_host;
-	Solvent* solvents_host;
-	NeighborList* compound_neighborlists_host;
-	NeighborList* solvent_neighborlists_host;
+	static void updateNeighborLists(Simulation* simulation, NListDataCollection* nlist_data_collection);	// thread worker, can't own engine object, thus pass ref
+	static void cullDistantNeighbors(NListDataCollection* nlist_data_collection);	
+	NListDataCollection* nlist_data_collection;
 
 	int prev_nlist_update_step = 0;
 

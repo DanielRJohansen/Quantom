@@ -14,12 +14,7 @@ Simulation* Engine::prepSimulation(Simulation* simulation, Compound* main_molecu
 	simulation->moveToDevice();	// Only moves the Box to the device
 
 
-	compoundstates_host = new CompoundState[simulation->n_compounds];
-	solvents_host = new Solvent[simulation->n_solvents];
-	compound_neighborlists_host = new NeighborList[MAX_COMPOUNDS];
-	solvent_neighborlists_host = new NeighborList[MAX_SOLVENTS];
-	cudaMemcpy(compound_neighborlists_host, simulation->box->compound_neighborlists, sizeof(NeighborList) * simulation->n_compounds, cudaMemcpyDeviceToHost);
-	cudaMemcpy(solvent_neighborlists_host, simulation->box->solvent_neighborlists, sizeof(NeighborList) * simulation->n_solvents, cudaMemcpyDeviceToHost);
+	nlist_data_collection = new NListDataCollection(simulation);
 
 	return this->simulation;
 }
@@ -37,7 +32,7 @@ void Engine::hostMaster() {
 		// Lots of waiting time here...
 		cudaDeviceSynchronize();
 
-		std::thread nlist_worker(Engine::updateNeighborLists, simulation, this);
+		std::thread nlist_worker(Engine::updateNeighborLists, simulation, nlist_data_collection);
 		nlist_worker.detach();
 
 		prev_nlist_update_step = simulation->getStep();
@@ -57,15 +52,90 @@ void Engine::hostMaster() {
 
 void Engine::offLoadPositionData(Simulation* simulation) {
 	//cudaMemcpyAsync(compoundstatearray_host, simulation->box->compound_state_array, sizeof(CompoundState) * simulation->box->n_compounds, cudaMemcpyDeviceToHost);
-	cudaMemcpy(compoundstates_host, simulation->box->compound_state_array, sizeof(CompoundState) * simulation->n_compounds, cudaMemcpyDeviceToHost);
-	cudaMemcpy(solvents_host, simulation->box->solvents, sizeof(Solvent) * simulation->n_solvents, cudaMemcpyDeviceToHost);
+	cudaMemcpy(nlist_data_collection->compoundstates, simulation->box->compound_state_array, sizeof(CompoundState) * simulation->n_compounds, cudaMemcpyDeviceToHost);
+	cudaMemcpy(nlist_data_collection->solvents, simulation->box->solvents, sizeof(Solvent) * simulation->n_solvents, cudaMemcpyDeviceToHost);
 }
 
-void Engine::updateNeighborLists(Simulation* simulation, Engine* engine) {	// This is a thread worker-function, so it can't own the object, thus i pass a ref to the engine object..
+void Engine::cullDistantNeighbors(NListDataCollection* nlist_data_collection) {	// Calling with nlist avoids writing function for both solvent and compound
+	for (int i = 0; i < nlist_data_collection->n_compounds; i++) {
+		int id_self = i;
+		NeighborList* nlist_self = &nlist_data_collection->compound_neighborlists[i];
+		Float3 pos_self = nlist_data_collection->compound_key_positions[i];
+
+		for (int j = 0; j < nlist_self->n_compound_neighbors; j++) {		// Cull compound-compound
+			int id_neighbor = nlist_self->neighborcompound_ids[j];
+
+			if (id_self < id_neighbor) {
+				Float3 pos_neighbor = nlist_data_collection->compound_key_positions[id_neighbor];
+				NeighborList* nlist_neighbor = &nlist_data_collection->compound_neighborlists[id_neighbor];
+
+				double dist = (pos_neighbor - pos_self).len();
+				if (dist > CUTOFF) {
+					nlist_self->removeId(id_neighbor, NeighborList::NEIGHBOR_TYPE::COMPOUND);
+					nlist_neighbor->removeId(id_self, NeighborList::NEIGHBOR_TYPE::COMPOUND);
+					j--;	// Decrement, as the removeId puts the last element at the current and now vacant spot.
+				}
+			}
+		}
+
+
+		for (int j = 0; j < nlist_self->n_solvent_neighbors; j++) {			// Cull compound-solvent
+			int id_neighbor = nlist_self->neighborsolvent_ids[j];
+
+
+			Float3 pos_neighbor = nlist_data_collection->solvent_positions[id_neighbor];
+			NeighborList* nlist_neighbor = &nlist_data_collection->solvent_neighborlists[id_neighbor];
+
+			double dist = (pos_neighbor - pos_self).len();
+			if (dist > CUTOFF) {
+				nlist_self->removeId(id_neighbor, NeighborList::NEIGHBOR_TYPE::SOLVENT);
+				nlist_neighbor->removeId(id_self, NeighborList::NEIGHBOR_TYPE::COMPOUND);
+				j--;	// Decrement, as the removeId puts the last element at the current and now vacant spot.
+			}
+		}
+	}
+
+	for (int i = 0; i < nlist_data_collection->n_solvents; i++) {																// Cull solvent-solvent
+		int id_self = i;
+		NeighborList* nlist_self = &nlist_data_collection->solvent_neighborlists[i];
+		Float3 pos_self = nlist_data_collection->solvent_positions[i];
+
+
+		for (int j = 0; j < nlist_self->n_compound_neighbors; j++) {			/// NOT FINISHED HERE
+			int id_neighbor = nlist_self->neighborcompound_ids[j];
+
+			if (id_self < id_neighbor) {
+				Float3 pos_neighbor = nlist_data_collection->compound_key_positions[id_neighbor];
+				NeighborList* nlist_neighbor = &nlist_data_collection->compound_neighborlists[id_neighbor];
+
+				double dist = (pos_neighbor - pos_self).len();
+				if (dist > CUTOFF) {
+					nlist_self->removeId(id_neighbor, NeighborList::NEIGHBOR_TYPE::COMPOUND);
+					nlist_neighbor->removeId(id_self, NeighborList::NEIGHBOR_TYPE::COMPOUND);
+					j--;	// Decrement, as the removeId puts the last element at the current and now vacant spot.
+				}
+			}
+		}
+	}
+}
+
+void Engine::updateNeighborLists(Simulation* simulation, NListDataCollection* nlist_data_collection) {	// This is a thread worker-function, so it can't own the object, thus i pass a ref to the engine object..
+	nlist_data_collection->compressPositionData();
+
+
+
+
+	// FIrst do culling
+	// Then make hash table with current neighbors
+	// Then use hash table to add neighbors
+
+
 	int a = 1;
 	for (int compound_index = 0; compound_index < simulation->n_compounds; compound_index++) {
-		NeighborList* nlist_self = &engine->compound_neighborlists_host[compound_index];
+		NeighborList* nlist_self = &nlist_data_collection->compound_neighborlists[compound_index];
 		Float3 compound_key_pos = engine->compoundstates_host[compound_index].positions[0];
+
+
 		compound_key_pos.print('k');
 	}
 	/*
