@@ -16,7 +16,7 @@ constexpr double FOCUS_LEN_HALF = BLOCK_LEN / 4.f;
 
 
 
-const int STEPS_PER_NLIST_UPDATE = 200;
+const int STEPS_PER_NLIST_UPDATE = 50;
 
 
 
@@ -40,7 +40,7 @@ const int LOG_P_ID = 17;
 
 const int MAX_COMPOUNDS = 0xFF;
 const int MAX_SOLVENTS = 0xFFFF;
-constexpr double CUTOFF = 8.0f;	//nm/
+constexpr double CUTOFF = 3.0f;	//nm/
 
 
 

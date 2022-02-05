@@ -169,7 +169,7 @@ public:
 		}
 	}
 
-	__host__ bool addId(int new_id, NEIGHBOR_TYPE nt) {
+	__host__ bool addId(uint16_t new_id, NEIGHBOR_TYPE nt) {
 		switch (nt)
 		{
 		case NeighborList::COMPOUND:
@@ -192,8 +192,28 @@ public:
 		printf("Failed!\n");
 		return false;
 	}
-	__host__ void removeId(int neighbor_id, NEIGHBOR_TYPE nt) {
-
+	__host__ void removeId(uint16_t neighbor_id, NEIGHBOR_TYPE nt) {
+		uint16_t* ids;
+		uint8_t* n;
+		switch (nt)
+		{
+		case NeighborList::COMPOUND:
+			ids = neighborcompound_ids;
+			n = &n_compound_neighbors;
+			break;
+		case NeighborList::SOLVENT:
+			ids = neighborsolvent_ids;
+			n = &n_solvent_neighbors;
+			break;
+		}
+		for (int i = 0; i < *n; i++) {
+			if (ids[i] == neighbor_id) {
+				ids[i] = ids[*n - 1];
+				*n = *n - 1;
+				//printf("Remove id %d, nlist size: %d\n", (int)neighbor_id, (int)*n);
+				return;
+			}
+		}
 	}
 
 	__device__ void loadMeta(NeighborList* nl_ptr) {	// Called from thread 0
@@ -202,9 +222,9 @@ public:
 	}
 	__device__ void loadData(NeighborList* nl_ptr) {
 		if (threadIdx.x < n_compound_neighbors)
-			neighborcompound_indexes[threadIdx.x] = nl_ptr->neighborcompound_indexes[threadIdx.x];
+			neighborcompound_ids[threadIdx.x] = nl_ptr->neighborcompound_ids[threadIdx.x];
 		for (int i = threadIdx.x;  i < n_solvent_neighbors; i += blockDim.x) {// Same as THREADS_PER_COMPOUNDBLOCK
-			neighborsolvent_indexes[i] = nl_ptr->neighborsolvent_indexes[i];
+			neighborsolvent_ids[i] = nl_ptr->neighborsolvent_ids[i];
 			i += blockDim.x;	
 		}
 	}

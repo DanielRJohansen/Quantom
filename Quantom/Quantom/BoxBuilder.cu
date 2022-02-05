@@ -226,8 +226,8 @@ Solvent BoxBuilder::createSolvent(Float3 com, double dt)	// Nodes obv. points to
 void BoxBuilder::compoundLinker(Simulation* simulation) {
 	for (int i = 0; i < simulation->box->n_compounds; i++) {
 		for (int j = i+1; j < simulation->box->n_compounds; j++) {
-			simulation->box->compound_neighborlists[i].addIndex(j, NeighborList::NEIGHBOR_TYPE::COMPOUND);
-			simulation->box->compound_neighborlists[j].addIndex(i, NeighborList::NEIGHBOR_TYPE::COMPOUND);
+			simulation->box->compound_neighborlists[i].addId(j, NeighborList::NEIGHBOR_TYPE::COMPOUND);
+			simulation->box->compound_neighborlists[j].addId(i, NeighborList::NEIGHBOR_TYPE::COMPOUND);
 		}
 	}
 }
@@ -239,9 +239,9 @@ void BoxBuilder::solvateLinker(Simulation* simulation)
 		for (int j = i; j < simulation->box->n_solvents; j++) {
 			Solvent* other = &simulation->box->solvents[j];
 			if (i != j) {
-				if ((self->pos - other->pos).len() < CUTOFF) {
-					simulation->box->solvent_neighborlists[i].addIndex(j, NeighborList::NEIGHBOR_TYPE::SOLVENT);
-					simulation->box->solvent_neighborlists[j].addIndex(i, NeighborList::NEIGHBOR_TYPE::SOLVENT);
+				if ((self->pos - other->pos).len() < (CUTOFF*1.5)) {
+					simulation->box->solvent_neighborlists[i].addId(j, NeighborList::NEIGHBOR_TYPE::SOLVENT);
+					simulation->box->solvent_neighborlists[j].addId(i, NeighborList::NEIGHBOR_TYPE::SOLVENT);
 				}
 			}
 		}
@@ -255,8 +255,8 @@ void BoxBuilder::solvateCompoundCrosslinker(Simulation* simulation)
 		for (int j = 0; j < simulation->box->n_solvents; j++) {
 			Solvent* solvent= &simulation->box->solvents[j];
 			if ((compound->center_of_mass - solvent->pos).len() < CUTOFF) {
-				simulation->box->compound_neighborlists[i].addIndex(j, NeighborList::NEIGHBOR_TYPE::SOLVENT);
-				simulation->box->solvent_neighborlists[j].addIndex(i, NeighborList::NEIGHBOR_TYPE::COMPOUND);
+				simulation->box->compound_neighborlists[i].addId(j, NeighborList::NEIGHBOR_TYPE::SOLVENT);
+				simulation->box->solvent_neighborlists[j].addId(i, NeighborList::NEIGHBOR_TYPE::COMPOUND);
 			}
 		}
 	}

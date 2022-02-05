@@ -27,12 +27,19 @@ void Engine::deviceMaster() {
 }
 
 void Engine::hostMaster() {
+	if (updated_neighborlists_ready) {
+		cudaMemcpy(simulation->box->compound_neighborlists, nlist_data_collection->compound_neighborlists, sizeof(NeighborList) * simulation->n_compounds, cudaMemcpyHostToDevice);
+		cudaMemcpy(simulation->box->solvent_neighborlists, nlist_data_collection->solvent_neighborlists, sizeof(NeighborList) * simulation->n_solvents, cudaMemcpyHostToDevice);
+		updated_neighborlists_ready = 0;
+	}
+
+
 	if (simulation->getStep() - prev_nlist_update_step >= STEPS_PER_NLIST_UPDATE) {
 		offLoadPositionData(simulation);
 		// Lots of waiting time here...
 		cudaDeviceSynchronize();
 
-		std::thread nlist_worker(Engine::updateNeighborLists, simulation, nlist_data_collection);
+		std::thread nlist_worker(Engine::updateNeighborLists, simulation, nlist_data_collection, &updated_neighborlists_ready);
 		nlist_worker.detach();
 
 		prev_nlist_update_step = simulation->getStep();
@@ -56,6 +63,7 @@ void Engine::offLoadPositionData(Simulation* simulation) {
 	cudaMemcpy(nlist_data_collection->solvents, simulation->box->solvents, sizeof(Solvent) * simulation->n_solvents, cudaMemcpyDeviceToHost);
 }
 
+void __device__ __host__ applyHyperpos(Float3* static_particle, Float3* movable_particle);
 void Engine::cullDistantNeighbors(NListDataCollection* nlist_data_collection) {	// Calling with nlist avoids writing function for both solvent and compound
 	for (int i = 0; i < nlist_data_collection->n_compounds; i++) {
 		int id_self = i;
@@ -68,7 +76,7 @@ void Engine::cullDistantNeighbors(NListDataCollection* nlist_data_collection) {	
 			if (id_self < id_neighbor) {
 				Float3 pos_neighbor = nlist_data_collection->compound_key_positions[id_neighbor];
 				NeighborList* nlist_neighbor = &nlist_data_collection->compound_neighborlists[id_neighbor];
-
+				applyHyperpos(&pos_self, &pos_neighbor);
 				double dist = (pos_neighbor - pos_self).len();
 				if (dist > CUTOFF) {
 					nlist_self->removeId(id_neighbor, NeighborList::NEIGHBOR_TYPE::COMPOUND);
@@ -86,6 +94,7 @@ void Engine::cullDistantNeighbors(NListDataCollection* nlist_data_collection) {	
 			Float3 pos_neighbor = nlist_data_collection->solvent_positions[id_neighbor];
 			NeighborList* nlist_neighbor = &nlist_data_collection->solvent_neighborlists[id_neighbor];
 
+			applyHyperpos(&pos_self, &pos_neighbor);
 			double dist = (pos_neighbor - pos_self).len();
 			if (dist > CUTOFF) {
 				nlist_self->removeId(id_neighbor, NeighborList::NEIGHBOR_TYPE::SOLVENT);
@@ -102,16 +111,17 @@ void Engine::cullDistantNeighbors(NListDataCollection* nlist_data_collection) {	
 
 
 		for (int j = 0; j < nlist_self->n_compound_neighbors; j++) {			/// NOT FINISHED HERE
-			int id_neighbor = nlist_self->neighborcompound_ids[j];
+			int id_neighbor = nlist_self->neighborsolvent_ids[j];
 
 			if (id_self < id_neighbor) {
-				Float3 pos_neighbor = nlist_data_collection->compound_key_positions[id_neighbor];
-				NeighborList* nlist_neighbor = &nlist_data_collection->compound_neighborlists[id_neighbor];
+				Float3 pos_neighbor = nlist_data_collection->solvent_positions[id_neighbor];
+				NeighborList* nlist_neighbor = &nlist_data_collection->solvent_neighborlists[id_neighbor];
 
+				applyHyperpos(&pos_self, &pos_neighbor);
 				double dist = (pos_neighbor - pos_self).len();
 				if (dist > CUTOFF) {
-					nlist_self->removeId(id_neighbor, NeighborList::NEIGHBOR_TYPE::COMPOUND);
-					nlist_neighbor->removeId(id_self, NeighborList::NEIGHBOR_TYPE::COMPOUND);
+					nlist_self->removeId(id_neighbor, NeighborList::NEIGHBOR_TYPE::SOLVENT);
+					nlist_neighbor->removeId(id_self, NeighborList::NEIGHBOR_TYPE::SOLVENT);
 					j--;	// Decrement, as the removeId puts the last element at the current and now vacant spot.
 				}
 			}
@@ -119,9 +129,10 @@ void Engine::cullDistantNeighbors(NListDataCollection* nlist_data_collection) {	
 	}
 }
 
-void Engine::updateNeighborLists(Simulation* simulation, NListDataCollection* nlist_data_collection) {	// This is a thread worker-function, so it can't own the object, thus i pass a ref to the engine object..
+void Engine::updateNeighborLists(Simulation* simulation, NListDataCollection* nlist_data_collection, volatile bool* finished) {	// This is a thread worker-function, so it can't own the object, thus i pass a ref to the engine object..
 	nlist_data_collection->compressPositionData();
 
+	cullDistantNeighbors(nlist_data_collection);
 
 
 
@@ -129,34 +140,15 @@ void Engine::updateNeighborLists(Simulation* simulation, NListDataCollection* nl
 	// Then make hash table with current neighbors
 	// Then use hash table to add neighbors
 
-
 	int a = 1;
 	for (int compound_index = 0; compound_index < simulation->n_compounds; compound_index++) {
 		NeighborList* nlist_self = &nlist_data_collection->compound_neighborlists[compound_index];
-		Float3 compound_key_pos = engine->compoundstates_host[compound_index].positions[0];
 
-
-		compound_key_pos.print('k');
 	}
-	/*
-	int maxc = 1'000'000; // this is temporary!
-	CompoundState* statebuffer_host = new CompoundState[maxc];
-	CompoundNeighborList* neighborlists_host = new CompoundNeighborList[maxc];
-	cudaMemcpy(statebuffer_host, simulation->box->compound_state_array, sizeof(CompoundState) * maxc, cudaMemcpyDeviceToHost);
-	cudaDeviceSynchronize();
 
 
-	// This only needs to be done the first time... Or does it????
-	for (int i = 0; i < maxc; i++) {
-		//neighborlists_host[i].n_neighbors = 0;
-	}
-		
+	*finished = 1;
 
-
-
-	cudaMemcpy(simulation->box->compound_neighborlist_array, neighborlists_host, sizeof(CompoundNeighborList) * maxc, cudaMemcpyHostToDevice);
-	cudaDeviceSynchronize();
-	*/
 }
 
 
@@ -221,7 +213,7 @@ __device__ double cudaMin(double a, double b) {
 
 
 
-void __device__ applyHyperpos(Float3* static_particle, Float3* movable_particle) {
+void __device__ __host__ applyHyperpos(Float3* static_particle, Float3* movable_particle) {
 	//Float3 tmp = *movable_particle;
 	for (int i = 0; i < 3; i++) {
 		*movable_particle->placeAt(i) += BOX_LEN * ((static_particle->at(i) - movable_particle->at(i)) > BOX_LEN_HALF);
@@ -688,7 +680,7 @@ __global__ void forceKernel(Box* box) {
 
 	// --------------------------------------------------------------- Solvation forces --------------------------------------------------------------- //
 	for (int i = threadIdx.x; i < neighborlist.n_solvent_neighbors; i += blockDim.x) {
-		utility_buffer[i] = box->solvents[neighborlist.neighborsolvent_indexes[i]].pos;
+		utility_buffer[i] = box->solvents[neighborlist.neighborsolvent_ids[i]].pos;
 		applyHyperpos(&compound_state.positions[0], &utility_buffer[i]);
 	}
 	__syncthreads();
