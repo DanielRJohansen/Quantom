@@ -39,7 +39,8 @@ void Engine::hostMaster() {
 		// Lots of waiting time here...
 		cudaDeviceSynchronize();
 
-		std::thread nlist_worker(Engine::updateNeighborLists, simulation, nlist_data_collection, &updated_neighborlists_ready);
+		
+		std::thread nlist_worker(Engine::updateNeighborLists, simulation, nlist_data_collection, &updated_neighborlists_ready, &timings.z);
 		nlist_worker.detach();
 
 		prev_nlist_update_step = simulation->getStep();
@@ -129,26 +130,97 @@ void Engine::cullDistantNeighbors(NListDataCollection* nlist_data_collection) {	
 	}
 }
 
-void Engine::updateNeighborLists(Simulation* simulation, NListDataCollection* nlist_data_collection, volatile bool* finished) {	// This is a thread worker-function, so it can't own the object, thus i pass a ref to the engine object..
+void Engine::updateNeighborLists(Simulation* simulation, NListDataCollection* nlist_data_collection, volatile bool* finished, int* timing) {	// This is a thread worker-function, so it can't own the object, thus i pass a ref to the engine object..
+	auto t0 = std::chrono::high_resolution_clock::now();
+
 	nlist_data_collection->compressPositionData();
 
+	// First do culling of neighbors that has left CUTOFF
 	cullDistantNeighbors(nlist_data_collection);
 
 
 
-	// FIrst do culling
-	// Then make hash table with current neighbors
-	// Then use hash table to add neighbors
+	// First add compound->solvent, compound->compound
+	for (int id_self = 0; id_self < simulation->n_compounds; id_self++) {										
+		NeighborList* nlist_self = &nlist_data_collection->compound_neighborlists[id_self];
+		HashTable hashtable_compoundneighbors(nlist_self->neighborcompound_ids, (int)nlist_self->n_compound_neighbors, NEIGHBORLIST_MAX_COMPOUNDS * 2);
+		HashTable hashtable_solventneighbors(nlist_self->neighborsolvent_ids, (int)nlist_self->n_solvent_neighbors, NEIGHBORLIST_MAX_SOLVENTS * 2);
+		Float3 pos_self = nlist_data_collection->compound_key_positions[id_self];
 
-	int a = 1;
-	for (int compound_index = 0; compound_index < simulation->n_compounds; compound_index++) {
-		NeighborList* nlist_self = &nlist_data_collection->compound_neighborlists[compound_index];
 
+
+		for (int i = 0; i < nlist_self->n_compound_neighbors; i++) {											// Use neighbor compounds to find new solvents
+			NeighborList* nlist_neighbor = &nlist_data_collection->compound_neighborlists[nlist_self->neighborcompound_ids[i]];
+
+			for (int j = 0; j < nlist_neighbor->n_solvent_neighbors; j++) {
+				int id_candidate = nlist_neighbor->neighborsolvent_ids[j];
+				Float3 pos_candidate = nlist_data_collection->solvent_positions[id_candidate];
+				applyHyperpos(&pos_self, &pos_candidate);
+				double dist = (pos_self - pos_candidate).len();
+				if (dist < CUTOFF) {
+					NeighborList* nlist_candidate = &nlist_data_collection->solvent_neighborlists[id_candidate];
+
+					if (hashtable_solventneighbors.insert(id_candidate)) {
+						nlist_self->addId(id_candidate, NeighborList::NEIGHBOR_TYPE::SOLVENT);
+						nlist_candidate->addId(id_self, NeighborList::NEIGHBOR_TYPE::COMPOUND);
+					}
+				}
+			}
+		}
+
+
+		for (int id_candidate = id_self + 1; id_candidate < simulation->n_compounds; id_candidate++) {	// For finding new nearby compounds, it is faster and simpler to just check all compounds, since there is so few
+			Float3 pos_candidate = nlist_data_collection->compound_key_positions[id_candidate];
+			applyHyperpos(&pos_self, &pos_candidate);
+			double dist = (pos_self, pos_candidate).len();			
+			if (dist < CUTOFF) {
+				NeighborList* nlist_candidate = &nlist_data_collection->compound_neighborlists[id_candidate];
+				if (hashtable_compoundneighbors.insert(id_candidate)) {
+					nlist_self->addId(id_candidate, NeighborList::NEIGHBOR_TYPE::COMPOUND);
+					nlist_candidate->addId(id_self, NeighborList::NEIGHBOR_TYPE::COMPOUND);
+				}
+			}
+		}
+	}
+
+	// Finally add all solvent->solvent candidates
+	for (int id_self = 0; id_self < simulation->n_solvents; id_self++) {
+		NeighborList* nlist_self = &nlist_data_collection->solvent_neighborlists[id_self];
+		HashTable hashtable_solventneighbors(nlist_self->neighborsolvent_ids, (int)nlist_self->n_solvent_neighbors, NEIGHBORLIST_MAX_SOLVENTS * 2);
+		Float3 pos_self = nlist_data_collection->solvent_positions[id_self];
+
+		for (int i = 0; i < nlist_self->n_compound_neighbors; i++) {											// Use neighbor compounds to find new solvents
+			NeighborList* nlist_neighbor = &nlist_data_collection->compound_neighborlists[nlist_self->neighborcompound_ids[i]];
+
+			for (int j = 0; j < nlist_neighbor->n_solvent_neighbors; j++) {
+				int id_candidate = nlist_neighbor->neighborsolvent_ids[j];
+				if (id_candidate <= id_self) {
+					continue;
+				}
+
+
+				Float3 pos_candidate = nlist_data_collection->solvent_positions[id_candidate];
+				applyHyperpos(&pos_self, &pos_candidate);
+				double dist = (pos_self - pos_candidate).len();
+				if (dist < CUTOFF) {
+					NeighborList* nlist_candidate = &nlist_data_collection->solvent_neighborlists[id_candidate];
+
+					if (hashtable_solventneighbors.insert(id_candidate)) {
+						nlist_self->addId(id_candidate, NeighborList::NEIGHBOR_TYPE::SOLVENT);
+						nlist_candidate->addId(id_self, NeighborList::NEIGHBOR_TYPE::SOLVENT);
+					}
+				}
+			}
+		}
 	}
 
 
-	*finished = 1;
 
+
+	auto t1 = std::chrono::high_resolution_clock::now();
+	*timing = (int) std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
+
+	*finished = 1;
 }
 
 

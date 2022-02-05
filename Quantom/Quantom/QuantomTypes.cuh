@@ -70,9 +70,7 @@ struct Float3 {
 	
 	__host__ __device__ inline static double getAngle(Float3 v1, Float3 v2) {
 		double val = (v1.dot(v2)) / (v1.len() * v2.len());	// If i make this float, we get values over 1, even with the statements below! :(
-		if (val > 1.f || val < -1.f) {
-			printf("Val1 %f !!\n", val);
-		}
+		//if (val > 1.f || val < -1.f) { printf("Val1 %f !!\n", val);}
 		val = val > 1.f ? 1.f : val;
 		val = val < -1.f ? -1.f : val;
 		if (val > 1.f || val < -1.f) {
@@ -312,18 +310,17 @@ struct Trajectory {
 
 
 
-
 class HashTable {
+public:
 	HashTable() {}
-	HashTable(int* keys, int n_keys, int ts) {
+	HashTable(uint16_t* keys, int n_keys, int ts) {
 		table_size = ts;
 		table = new int[ts]();
 		for (int i = 0; i < n_keys; i++)
-			insert(keys[i], 1);
+			insert(keys[i]);
 	}
 
-public:
-	bool insert(int key, int offset) {			// Returns true for sucessful insertion
+	bool insert(uint16_t key, int offset=1) {			// Returns true for sucessful insertion
 		int hash = (getHash(key) + offset) % table_size;
 		if (table[hash] == key) {		// Key already exists in table
 			return false;
@@ -338,7 +335,7 @@ public:
 	}
 private:
 
-	int getHash(int key) {
+	int getHash(uint16_t key) {
 		return floor(table_size*(fmod((double) key * k, 1.f)));
 	}
 
