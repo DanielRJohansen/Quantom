@@ -2,7 +2,7 @@
 
 
 
-void BoxBuilder::build(Simulation* simulation, Compound* main_molecule) {
+void BoxBuilder::buildBox(Simulation* simulation, Compound* main_molecule) {
 
 	simulation->box->compounds = new Compound[MAX_COMPOUNDS];
 	simulation->box->solvents = new Solvent[MAX_SOLVENTS];
@@ -31,34 +31,6 @@ void BoxBuilder::build(Simulation* simulation, Compound* main_molecule) {
 	}
 
 
-	/*
-	if (main_molecule == nullptr)
-		placeMainMolecule(simulation);
-	else
-		placeMainMolecule(simulation, main_molecule);
-		*/
-
-	placeMultipleCompoundsRandomly(simulation, main_molecule, N_LIPID_COPIES);
-	printf("%d Compounds in box\n", simulation->box->n_compounds);
-	solvateBox(simulation);	// Always do after placing compounds
-	simulation->box->total_particles = simulation->box->n_compounds * PARTICLES_PER_COMPOUND + simulation->box->n_solvents;											// BAD AMBIGUOUS AND WRONG CONSTANTS
-
-
-	cudaMemcpy(simulation->box->compound_state_array_next, simulation->box->compound_state_array, sizeof(CompoundState) * MAX_COMPOUNDS, cudaMemcpyHostToDevice);	// Just make sure they have the same n_particles info...
-
-
-
-
-
-	
-	compoundLinker(simulation);
-	solvateLinker(simulation);
-	solvateCompoundCrosslinker(simulation);
-
-
-
-
-
 	Molecule water;
 	for (int i = 0; i < water.n_atoms; i++) {
 		simulation->box->rendermolecule.radii[i] = water.atoms[i].radius;
@@ -69,6 +41,35 @@ void BoxBuilder::build(Simulation* simulation, Compound* main_molecule) {
 	simulation->box->dt = simulation->dt;
 
 
+}
+
+void BoxBuilder::addSingleMolecule(Simulation* simulation, Compound* molecule)
+{
+}
+
+void BoxBuilder::addScatteredMolecules(Simulation* simulation, Compound* molecule, int n_copies)
+{
+	placeMultipleCompoundsRandomly(simulation, molecule, N_LIPID_COPIES);
+	printf("Scattered %d Compounds in box\n", simulation->box->n_compounds);
+}
+
+void BoxBuilder::finishBox(Simulation* simulation)
+{
+	printf("%d Compounds in box\n", simulation->box->n_compounds);
+	solvateBox(simulation);	// Always do after placing compounds
+
+
+	simulation->box->total_particles = simulation->box->n_compounds * PARTICLES_PER_COMPOUND + simulation->box->n_solvents;											// BAD AMBIGUOUS AND WRONG CONSTANTS
+
+
+	cudaMemcpy(simulation->box->compound_state_array_next, simulation->box->compound_state_array, sizeof(CompoundState) * MAX_COMPOUNDS, cudaMemcpyHostToDevice);	// Just make sure they have the same n_particles info...
+
+
+
+
+	compoundLinker(simulation);
+	solvateLinker(simulation);
+	solvateCompoundCrosslinker(simulation);
 
 
 
@@ -76,7 +77,7 @@ void BoxBuilder::build(Simulation* simulation, Compound* main_molecule) {
 	int n_points = simulation->box->total_particles * simulation->n_steps_to_log;
 	cudaMalloc(&simulation->box->potE_buffer, sizeof(double) * n_points);	// Can only log molecules of size 3 for now...
 	cudaMalloc(&simulation->box->trajectory, sizeof(Float3) * n_points);
-	printf("Reserving %d MB for logging\n", (int) ((sizeof(double) + sizeof(Float3)) * n_points / 1e+6));
+	printf("Reserving %d MB for logging\n", (int)((sizeof(double) + sizeof(Float3)) * n_points / 1e+6));
 	cudaMallocManaged(&simulation->box->outdata, sizeof(double) * 10 * simulation->n_steps);	// 10 data streams for 10k steps. 1 step at a time.
 	// 
 	// 
@@ -84,24 +85,12 @@ void BoxBuilder::build(Simulation* simulation, Compound* main_molecule) {
 
 	simulation->copyBoxVariables();
 	simulation->box->moveToDevice();
+	printf("Boxbuild complete!\n");
 }
 
 
-void BoxBuilder::placeMainMolecule(Simulation* simulation) {
-	Float3 compound_center = Float3(BOX_LEN_HALF, BOX_LEN_HALF, BOX_LEN_HALF);
-	double compound_radius = 0.2;
 
-	//simulation->box->compounds[simulation->box->n_compounds++] = 
-	integrateCompound(
-		compound_center,
-		simulation->box->n_compounds,
-		&simulation->box->compound_state_array[simulation->box->n_compounds],
-		simulation->dt,
-		simulation
-	);
-}
-
-void BoxBuilder::placeMainMolecule(Simulation* simulation, Compound* main_compound)
+void BoxBuilder::placeSingleMolecule(Simulation* simulation, Compound* main_compound)
 {
 	Float3 compound_center = Float3(BOX_LEN_HALF, BOX_LEN_HALF, BOX_LEN_HALF);
 
@@ -111,7 +100,6 @@ void BoxBuilder::placeMainMolecule(Simulation* simulation, Compound* main_compou
 	}
 
 	
-	//simulation->box->compounds[simulation->box->n_compounds++] = 
 	integrateCompound(
 		main_compound,
 		simulation
@@ -165,7 +153,7 @@ int BoxBuilder::solvateBox(Simulation* simulation)
 
 
 
-
+/*
 void BoxBuilder::integrateCompound(Float3 com, int compound_index, CompoundState* statebuffer_node, double dt, Simulation* simulation) {
 
 	int n_atoms = PARTICLES_PER_COMPOUND;
@@ -188,7 +176,7 @@ void BoxBuilder::integrateCompound(Float3 com, int compound_index, CompoundState
 
 	//return compound;
 }
-
+*/
 void BoxBuilder::integrateCompound(Compound* compound, Simulation* simulation)
 {
 	compound->init();
@@ -276,6 +264,8 @@ void BoxBuilder::placeMultipleCompoundsRandomly(Simulation* simulation, Compound
 		delete c;
 	}
 
+
+	// Temporary check that no to molecules placed are colliding.
 	for (int i = 0; i < simulation->box->n_compounds; i++) {
 		Compound* c = &simulation->box->compounds[i];
 		for (int ii = 0; ii < simulation->box->n_compounds; ii++) {

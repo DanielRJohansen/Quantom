@@ -43,6 +43,7 @@ private:
 	Engine* engine;
 	Analyzer analyzer;
 	CompoundBuilder compoundbuilder;
+	BoxBuilder boxbuilder;
 
 
 

@@ -1,23 +1,17 @@
 #include "Engine.cuh"
 
 
+Engine::Engine() {}
+Engine::Engine(Simulation* simulation) {
+	genericErrorCheck("Error before engine initialization.\n");
 
-Simulation* Engine::prepSimulation(Simulation* simulation, Compound* main_molecule) {
 	this->simulation = simulation;
-	srand(290128309);
-	boxbuilder.build(simulation, main_molecule);
-	printf("Boxbuild complete!\n");
-
-	genericErrorCheck("Error before Simulation Host->Device transfer\n");
-
-
-	simulation->moveToDevice();	// Only moves the Box to the device
-
 
 	nlist_data_collection = new NListDataCollection(simulation);
-
-	return this->simulation;
+	printf("Engine ready\n");
 }
+
+
 
 
 

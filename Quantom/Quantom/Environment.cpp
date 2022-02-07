@@ -8,14 +8,21 @@ Environment::Environment() {
 		exit(0);
 	}
 
-	engine = new Engine;
+	//engine = new Engine;
 
 	
-	Compound main_molecule = compoundbuilder.buildMolecule("D:\\Quantom\\m40.pdb", "D:\\Quantom\\dpc.itp");
+	Compound mol_dpc = compoundbuilder.buildMolecule("D:\\Quantom\\m40.pdb", "D:\\Quantom\\dpc.itp", 1);
+	//Compound mol_4pcw10 = compoundbuilder.buildMolecule("D:\\Quantom\\filaggrin\\4pcw_first10.pdb", "D:\\Quantom\\filaggrin\\topol.top");
+
+	boxbuilder.buildBox(simulation, &mol_dpc);
+	boxbuilder.addScatteredMolecules(simulation, &mol_dpc, N_LIPID_COPIES);
+	boxbuilder.finishBox(simulation);
 
 
-	simulation = engine->prepSimulation(simulation, &main_molecule);
-	printf("Engine ready\n");
+
+	simulation->moveToDevice();	// Only moves the Box to the device
+
+	engine = new Engine(simulation);
 
 
 

@@ -6,15 +6,17 @@ class BoxBuilder
 {
 public:
 	BoxBuilder() {
-
+		srand(290128309);
 	};
-	void build(Simulation* simulation, Compound* main_molecule=nullptr);
-
+	void buildBox(Simulation* simulation, Compound* main_molecule=nullptr);
+	void addSingleMolecule(Simulation* simulation, Compound* molecule);		// Can only use a single "add" function per Simulation for now!!!!!!!!!!!!!
+	void addScatteredMolecules(Simulation* simulation, Compound* molecule, int n_copies);
+	void addDoubleMembrane(Simulation* simulation, Compound* molecule);
+	void finishBox(Simulation* simulation);
 
 private:
 
-	void placeMainMolecule(Simulation* simulation);
-	void placeMainMolecule(Simulation* simulation, Compound* main_compound);
+	void placeSingleMolecule(Simulation* simulation, Compound* molecule);
 	int solvateBox(Simulation* simulation);					// Returns # of solvate compounds placed
 
 	void integrateCompound(Float3 com, int compound_index,

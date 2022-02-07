@@ -21,7 +21,7 @@ float mass_from_atom(char atom) {
 
 
 
-Compound CompoundBuilder::buildMolecule(string pdb_path, string itp_path)
+Compound CompoundBuilder::buildMolecule(string pdb_path, string itp_path, int max_residue_id)
 {
 	vector<vector<string>> pdb_data = readFile(pdb_path);
 	vector<vector<string>> itp_data = readFile(itp_path);
@@ -29,7 +29,7 @@ Compound CompoundBuilder::buildMolecule(string pdb_path, string itp_path)
 
 	Compound compound;
 
-	loadParticles(&compound, &pdb_data, 1);
+	loadParticles(&compound, &pdb_data, max_residue_id);
 	printf("%d particles added\n", compound.n_particles);
 	loadTopology(&compound, &itp_data, particle_id_map);
 	printf("%d pairbonds added\n", compound.n_pairbonds);
@@ -56,6 +56,8 @@ void CompoundBuilder::loadParticles(Compound* compound, vector<vector<string>>* 
 			int particle_id = stoi(record[1]);
 			string atom_name = record[2];
 			string monomer_name = record[3];
+			cout << record[3] <<endl;
+			cout << record[4] << endl;
 			int monomer_id = stoi(record[4]);
 			Float3 coord(stod(record[5]), stod(record[6]), stod(record[7]));
 			coord *= 0.1f;	// convert A to nm

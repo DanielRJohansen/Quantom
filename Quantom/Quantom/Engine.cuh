@@ -64,9 +64,8 @@ struct NListDataCollection {
 
 class Engine {
 public:
-	Engine(){}
-
-	Simulation* prepSimulation(Simulation* simulation, Compound* main_molecule);
+	Engine();
+	Engine(Simulation* simulation);
 
 
 	void deviceMaster();
@@ -99,7 +98,6 @@ public:
 			//cudaStreamDestroy(stream[i]);
 	}
 private:
-	BoxBuilder boxbuilder;
 	Simulation* simulation;
 
 

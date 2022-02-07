@@ -30,7 +30,7 @@ class CompoundBuilder
 {
 public:
 	CompoundBuilder() {}
-	Compound buildMolecule(string pdb_path, string itp_path);
+	Compound buildMolecule(string pdb_path, string itp_path, int max_residue_id=INT16_MAX);
 
 
 
