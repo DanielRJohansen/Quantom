@@ -1,7 +1,7 @@
 #include "Analyzer.cuh"
 
 
-
+const int PARTICLES_PER_COMPOUND = 64;	// TEMPORARY
 
 
 

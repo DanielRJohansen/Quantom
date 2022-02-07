@@ -4,12 +4,12 @@
 #include <SFML/Graphics.hpp>
 #include <iostream>
 
+
+
+
+
+
 const int MAX_COMPOUND_PARTICLES = 64;
-
-
-
-
-
 
 
 
@@ -252,7 +252,7 @@ const double HOH_refangle = 1.822996;	// radians
 const double max_LJ_dist = 1;			// nm
 
 const int MAX_PAIRBONDS = 64;
-const int MAX_ANGLEBONDS = 64;
+const int MAX_ANGLEBONDS = 128;
 const double CC_refdist = 0.153; // nm
 const double CCC_reftheta = 1.953; // nm
 

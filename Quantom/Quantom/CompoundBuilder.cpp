@@ -2,7 +2,7 @@
 
 
 
-float mass_from_atom(char atom) {
+float massFromAtom(char atom) {
 	switch (atom)
 	{
 	case 'C':
@@ -23,13 +23,14 @@ float mass_from_atom(char atom) {
 
 Compound CompoundBuilder::buildMolecule(string pdb_path, string itp_path, int max_residue_id)
 {
-	vector<vector<string>> pdb_data = readFile(pdb_path);
+	//vector<vector<string>> pdb_data = readFile(pdb_path);
+	vector<Record_ATOM> atom_data = parsePDB(pdb_path);
 	vector<vector<string>> itp_data = readFile(itp_path);
 
 
 	Compound compound;
 
-	loadParticles(&compound, &pdb_data, max_residue_id);
+	loadParticles(&compound, &atom_data, max_residue_id);
 	printf("%d particles added\n", compound.n_particles);
 	loadTopology(&compound, &itp_data, particle_id_map);
 	printf("%d pairbonds added\n", compound.n_pairbonds);
@@ -41,18 +42,17 @@ Compound CompoundBuilder::buildMolecule(string pdb_path, string itp_path, int ma
 	return compound;
 }
 
-void CompoundBuilder::loadParticles(Compound* compound, vector<vector<string>>* pdb_data, int max_monomer_id)
+void CompoundBuilder::loadParticles(Compound* compound, vector<CompoundBuilder::Record_ATOM>* pdb_data, int max_residue_id)
 {
-	int size = 1 << 24;
-	particle_id_map = new int[size];
-	for (int i = 0; i < size; i++)
+	int max_atom_cnt = 1 << 24;
+	particle_id_map = new int[max_atom_cnt];
+	for (int i = 0; i < max_atom_cnt; i++)
 		particle_id_map[i] = -1;
 
 
-	for (vector<string> record : *pdb_data) {
-		if (record[0] == "ATOM") {
+	for (Record_ATOM record : *pdb_data) {
 
-			
+			/*
 			int particle_id = stoi(record[1]);
 			string atom_name = record[2];
 			string monomer_name = record[3];
@@ -61,27 +61,26 @@ void CompoundBuilder::loadParticles(Compound* compound, vector<vector<string>>* 
 			int monomer_id = stoi(record[4]);
 			Float3 coord(stod(record[5]), stod(record[6]), stod(record[7]));
 			coord *= 0.1f;	// convert A to nm
-
-			if (stoi(record[4]) > max_monomer_id)
+			*/
+			printf("res %d   max res %d\n", record.residue_seq_number, max_residue_id);
+			if (record.residue_seq_number > max_residue_id)
 				break;
 
-
-			particle_id_map[particle_id] = compound->n_particles;
-			float mass = mass_from_atom(atom_name[0]) / 1000.f;							// kg/mol;
-
-			compound->particles[compound->n_particles++] = CompactParticle(mass, coord);
+			particle_id_map[record.atom_serial_number] = compound->n_particles;
 
 
-
-
-
-
-
-
-
-			//if (compound->n_particles == 5)
+			//if (stoi(record[4]) > max_monomer_id)
 				//break;
-		}
+
+
+			//particle_id_map[particle_id] = compound->n_particles;
+			float mass = massFromAtom(record.atom_name[0]) / 1000.f;							// kg/mol;
+
+			compound->particles[compound->n_particles++] = CompactParticle(mass, record.coordinate);
+
+
+
+
 	}
 }
 
@@ -168,7 +167,7 @@ void CompoundBuilder::addDihedral(Compound* compound, vector<string>* record)
 {
 }
 
-vector<vector<string>> CompoundBuilder::readFile(string path)
+vector<vector<string>> CompoundBuilder::readFile(string path)		// Naive file segmentation, DANGEROUS!
 {
 	fstream file;
 	file.open(path);
@@ -202,6 +201,67 @@ vector<vector<string>> CompoundBuilder::readFile(string path)
 			//cout << w << " ";
 		}
 		//printf("\n");
+	}
+	return records;
+}
+
+vector<CompoundBuilder::Record_ATOM> CompoundBuilder::parsePDB(string path)
+{
+	fstream file;
+	file.open(path);
+	int line_cnt = 0;
+
+	int endpoints[] = { 4, 11, 16 , 17, 20, 22, 26, 27, 38, 46, 54 };
+
+
+	vector<Record_ATOM> records;
+
+	string line;
+	while (getline(file, line)) {
+		stringstream ss(line);
+		string row_type;
+		getline(ss, row_type, ' ');
+		if (row_type != "ATOM")
+			continue;
+
+
+
+
+		vector<string> data_buffer;
+		//cout << line << endl;
+
+
+
+
+
+
+
+		int ptr = 0;
+		for (int stop : endpoints) {
+			string word = "";
+			
+			while (ptr < stop) {
+				if (line[ptr] != ' ')
+					word = word + line[ptr];
+				ptr++;
+			}
+			//cout << "Word:" << word << endl;
+			data_buffer.push_back(word);
+		}
+
+		cout << data_buffer[6] << endl;
+		//printf("%d\n", stoi(data_buffer[6]));
+		records.push_back(Record_ATOM(
+			stoi(data_buffer[1]),
+			data_buffer[2],
+			data_buffer[3][0],			// alt loc
+			data_buffer[4],
+			data_buffer[5][0],		// chain id
+			stoi(data_buffer[6]),
+			data_buffer[7][0],
+			Float3(stod(data_buffer[8]), stod(data_buffer[9]), stod(data_buffer[10])) * 0.1	// Convert A to nm right off the bat!
+		));
+
 	}
 	return records;
 }

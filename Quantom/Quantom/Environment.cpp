@@ -11,11 +11,12 @@ Environment::Environment() {
 	//engine = new Engine;
 
 	
-	Compound mol_dpc = compoundbuilder.buildMolecule("D:\\Quantom\\m40.pdb", "D:\\Quantom\\dpc.itp", 1);
-	//Compound mol_4pcw10 = compoundbuilder.buildMolecule("D:\\Quantom\\filaggrin\\4pcw_first10.pdb", "D:\\Quantom\\filaggrin\\topol.top");
+	//Compound mol_dpc = compoundbuilder.buildMolecule("D:\\Quantom\\m40.pdb", "D:\\Quantom\\dpc.itp", 1);
+	Compound mol_4pcw10 = compoundbuilder.buildMolecule("D:\\Quantom\\filaggrin\\4pcw_first10.pdb", "D:\\Quantom\\filaggrin\\topol.top", 7);
 
-	boxbuilder.buildBox(simulation, &mol_dpc);
-	boxbuilder.addScatteredMolecules(simulation, &mol_dpc, N_LIPID_COPIES);
+	boxbuilder.buildBox(simulation);
+	boxbuilder.addSingleMolecule(simulation, &mol_4pcw10);
+	//boxbuilder.addScatteredMolecules(simulation, &mol_dpc, N_LIPID_COPIES);
 	boxbuilder.finishBox(simulation);
 
 

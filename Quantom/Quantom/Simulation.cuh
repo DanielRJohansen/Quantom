@@ -28,7 +28,7 @@ const int LOGTYPE = 1;	// 0 for solvent, 1 for compound
 const int N_SOLVATE_MOLECULES = 256;
 
 
-const int PARTICLES_PER_COMPOUND = 3;
+//const int PARTICLES_PER_COMPOUND = 3;
 const int BLOCKS_PER_SM = 512;
 //const int GRIDBLOCKS_PER_BODY = 16;
 //const int THREADS_PER_GRIDBLOCK = MAX_BLOCK_BODIES / GRIDBLOCKS_PER_BODY;

@@ -36,7 +36,10 @@ public:
 
 
 private:
-	void loadParticles(Compound* compound, vector<vector<string>>* pdb_data, int max_monomer_id = INT32_MAX);
+	struct Record_ATOM;
+
+
+	void loadParticles(Compound* compound, vector<Record_ATOM>* pdb_data, int max_monomer_id = INT32_MAX);
 	void loadTopology(Compound* compound, vector<vector<string>>* itp_data, int* particle_id_map);
 
 
@@ -55,5 +58,47 @@ private:
 	ParsedLine parseAtom(string line);
 	ParsedLine parseConnection(string line);
 	vector<vector<string>> readFile(string path);
+
+	vector<Record_ATOM> parsePDB(string path);
+
+
+
+
+
+
+
+
+
+
+
+	struct Record_ATOM {	//	https://www.cgl.ucsf.edu/chimera/docs/UsersGuide/tutorials/pdbintro.html
+		Record_ATOM(int a, string b, char c, string d, char e, int f, char g, Float3 h) {
+			atom_serial_number = a;
+			atom_name = b;
+			alternate_location_indicator = c;
+			residue_name = d;
+			chain_identifier = e;
+			residue_seq_number = f;
+			code_for_insertions_of_residues = g;
+			coordinate = h;
+		}
+
+		int atom_serial_number;
+		string atom_name;
+		char alternate_location_indicator;
+		string residue_name;
+		char chain_identifier;
+		int residue_seq_number;
+		char code_for_insertions_of_residues;
+		Float3 coordinate;						// [nm]
+	};
+
+
+
+
 };
+
+
+
+
 

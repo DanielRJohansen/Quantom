@@ -8,6 +8,15 @@ Engine::Engine(Simulation* simulation) {
 	this->simulation = simulation;
 
 	nlist_data_collection = new NListDataCollection(simulation);
+
+
+
+
+
+	int kernel_shared_mem = sizeof(Compound) + sizeof(CompoundState) + sizeof(NeighborList) + sizeof(Float3) * NEIGHBORLIST_MAX_SOLVENTS;
+	printf("Forcekernel shared mem. size: %d B\n", kernel_shared_mem);
+
+
 	printf("Engine ready\n");
 }
 

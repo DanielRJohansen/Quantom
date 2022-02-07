@@ -2,7 +2,7 @@
 
 
 
-void BoxBuilder::buildBox(Simulation* simulation, Compound* main_molecule) {
+void BoxBuilder::buildBox(Simulation* simulation) {
 
 	simulation->box->compounds = new Compound[MAX_COMPOUNDS];
 	simulation->box->solvents = new Solvent[MAX_SOLVENTS];
@@ -45,6 +45,18 @@ void BoxBuilder::buildBox(Simulation* simulation, Compound* main_molecule) {
 
 void BoxBuilder::addSingleMolecule(Simulation* simulation, Compound* molecule)
 {
+	Float3 compound_center = Float3(BOX_LEN_HALF, BOX_LEN_HALF, BOX_LEN_HALF);
+
+	Float3 offset = compound_center - molecule->getCOM();
+	for (int i = 0; i < molecule->n_particles; i++) {
+		molecule->particles[i].pos_tsub1 += offset;
+	}
+
+
+	integrateCompound(
+		molecule,
+		simulation
+	);
 }
 
 void BoxBuilder::addScatteredMolecules(Simulation* simulation, Compound* molecule, int n_copies)
@@ -59,7 +71,7 @@ void BoxBuilder::finishBox(Simulation* simulation)
 	solvateBox(simulation);	// Always do after placing compounds
 
 
-	simulation->box->total_particles = simulation->box->n_compounds * PARTICLES_PER_COMPOUND + simulation->box->n_solvents;											// BAD AMBIGUOUS AND WRONG CONSTANTS
+	//simulation->box->total_particles = simulation->box->n_compounds * PARTICLES_PER_COMPOUND + simulation->box->n_solvents;											// BAD AMBIGUOUS AND WRONG CONSTANTS
 
 
 	cudaMemcpy(simulation->box->compound_state_array_next, simulation->box->compound_state_array, sizeof(CompoundState) * MAX_COMPOUNDS, cudaMemcpyHostToDevice);	// Just make sure they have the same n_particles info...
@@ -92,18 +104,7 @@ void BoxBuilder::finishBox(Simulation* simulation)
 
 void BoxBuilder::placeSingleMolecule(Simulation* simulation, Compound* main_compound)
 {
-	Float3 compound_center = Float3(BOX_LEN_HALF, BOX_LEN_HALF, BOX_LEN_HALF);
 
-	Float3 offset = compound_center - main_compound->getCOM();
-	for (int i = 0; i < main_compound->n_particles; i++) {
-		main_compound->particles[i].pos_tsub1 += offset;
-	}
-
-	
-	integrateCompound(
-		main_compound,
-		simulation
-	);
 }
 
 int BoxBuilder::solvateBox(Simulation* simulation)
