@@ -13,6 +13,8 @@ float massFromAtom(char atom) {
 		return 30.9738;
 	case 'N':
 		return 14.0067;
+	case 'H':
+		return 1.f;
 	default:
 		printf("Element %c not found", atom);
 		exit(1);
@@ -24,15 +26,16 @@ float massFromAtom(char atom) {
 Compound CompoundBuilder::buildMolecule(string pdb_path, string itp_path, int max_residue_id)
 {
 	//vector<vector<string>> pdb_data = readFile(pdb_path);
-	vector<Record_ATOM> atom_data = parsePDB(pdb_path);
-	vector<vector<string>> itp_data = readFile(itp_path);
+	//vector<Record_ATOM> atom_data = parsePDB(pdb_path);
+	vector<Record_ATOM> atom_data = parseGRO(pdb_path);
+	vector<vector<string>> top_data = parseTOP(itp_path);
 
 
 	Compound compound;
 
-	loadParticles(&compound, &atom_data, max_residue_id);
+	loadParticles(&compound, &atom_data, max_residue_id, true);
 	printf("%d particles added\n", compound.n_particles);
-	loadTopology(&compound, &itp_data, particle_id_map);
+	loadTopology(&compound, &top_data, particle_id_map);
 	printf("%d pairbonds added\n", compound.n_pairbonds);
 	printf("%d anglebonds added\n", compound.n_anglebonds);
 
@@ -42,7 +45,7 @@ Compound CompoundBuilder::buildMolecule(string pdb_path, string itp_path, int ma
 	return compound;
 }
 
-void CompoundBuilder::loadParticles(Compound* compound, vector<CompoundBuilder::Record_ATOM>* pdb_data, int max_residue_id)
+void CompoundBuilder::loadParticles(Compound* compound, vector<CompoundBuilder::Record_ATOM>* pdb_data, int max_residue_id, bool ignore_protons)
 {
 	int max_atom_cnt = 1 << 24;
 	particle_id_map = new int[max_atom_cnt];
@@ -62,9 +65,13 @@ void CompoundBuilder::loadParticles(Compound* compound, vector<CompoundBuilder::
 			Float3 coord(stod(record[5]), stod(record[6]), stod(record[7]));
 			coord *= 0.1f;	// convert A to nm
 			*/
-			printf("res %d   max res %d\n", record.residue_seq_number, max_residue_id);
+			//printf("res %d   max res %d\n", record.residue_seq_number, max_residue_id);
 			if (record.residue_seq_number > max_residue_id)
 				break;
+
+			if (ignore_protons && record.atom_name[0] == 'H')
+				continue;
+
 
 			particle_id_map[record.atom_serial_number] = compound->n_particles;
 
@@ -76,18 +83,15 @@ void CompoundBuilder::loadParticles(Compound* compound, vector<CompoundBuilder::
 			//particle_id_map[particle_id] = compound->n_particles;
 			float mass = massFromAtom(record.atom_name[0]) / 1000.f;							// kg/mol;
 
-			compound->particles[compound->n_particles++] = CompactParticle(mass, record.coordinate);
-
-
-
-
+			compound->particles[compound->n_particles] = CompactParticle(mass, record.coordinate);
+			compound->n_particles++;
 	}
 }
 
-void CompoundBuilder::loadTopology(Compound* compound, vector<vector<string>>* itp_data, int* particle_id_map)
+void CompoundBuilder::loadTopology(Compound* compound, vector<vector<string>>* top_data, int* particle_id_map)
 {
 	TopologyMode mode = INACTIVE;
-	for (vector<string> record : *itp_data) {
+	for (vector<string> record : *top_data) {
 		if (record.size() == 0) {
 			mode = INACTIVE;
 			continue;
@@ -167,7 +171,7 @@ void CompoundBuilder::addDihedral(Compound* compound, vector<string>* record)
 {
 }
 
-vector<vector<string>> CompoundBuilder::readFile(string path)		// Naive file segmentation, DANGEROUS!
+vector<vector<string>> CompoundBuilder::parseTOP(string path)		// Naive file segmentation, DANGEROUS!
 {
 	fstream file;
 	file.open(path);
@@ -251,6 +255,7 @@ vector<CompoundBuilder::Record_ATOM> CompoundBuilder::parsePDB(string path)
 
 		cout << data_buffer[6] << endl;
 		//printf("%d\n", stoi(data_buffer[6]));
+		
 		records.push_back(Record_ATOM(
 			stoi(data_buffer[1]),
 			data_buffer[2],
@@ -261,7 +266,73 @@ vector<CompoundBuilder::Record_ATOM> CompoundBuilder::parsePDB(string path)
 			data_buffer[7][0],
 			Float3(stod(data_buffer[8]), stod(data_buffer[9]), stod(data_buffer[10])) * 0.1	// Convert A to nm right off the bat!
 		));
-
+		
 	}
 	return records;
+}
+
+vector<CompoundBuilder::Record_ATOM> CompoundBuilder::parseGRO(string path)
+{
+	fstream file;
+	file.open(path);
+	int line_cnt = 0;
+	string line;
+	string space_delimiter = " ";
+
+	vector<Record_ATOM> records;
+
+	while (getline(file, line)) {
+		vector<string> words;
+		stringstream ss(line);
+		string word;
+		while (getline(ss, word, ' ')) {
+			if (word == "" || word == "[" || word == "]") {
+				continue;
+			}
+			words.push_back(word);
+		}
+
+
+		ResidueComboId res = parseResidueID(words.at(0));
+
+		if (!res.valid || words.size() != 6)
+			continue;
+
+		Record_ATOM record(
+			stoi(words.at(2)),
+			words.at(1),
+			' ',
+			res.name,
+			' ',
+			res.id,
+			' ',
+			Float3(stod(words.at(3)), stod(words.at(4)), stod(words.at(5)))
+		);
+		records.push_back(record);
+	}
+
+	
+
+	return records;
+}
+
+CompoundBuilder::ResidueComboId CompoundBuilder::parseResidueID(string s)
+{
+	string id = "";
+	string name = "";
+	for (char c : s) {
+		if (isAsciiNumber(c))
+			id = id + c;
+		else
+			name = name + c;
+	}
+	
+	if (id == "" || name == "")
+		return ResidueComboId();
+	return ResidueComboId(stoi(id), name);
+}
+
+bool CompoundBuilder::isAsciiNumber(char c)
+{
+	return (c > 47 && c < 58);
 }

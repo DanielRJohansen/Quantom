@@ -15,7 +15,7 @@
 
 constexpr double PI = 3.14159;
 
-enum ATOM_TYPE { NONE, O, C, P, N, H };
+enum ATOM_TYPE { NONE, O, C, P, N, H, SOL };
 
 
 struct Int3 {

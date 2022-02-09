@@ -12,7 +12,7 @@
 // For logging
 #include <fstream>
 #include <string>
-
+#include <assert.h>  
 
 
 

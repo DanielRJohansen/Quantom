@@ -12,10 +12,12 @@ Environment::Environment() {
 
 	
 	//Compound mol_dpc = compoundbuilder.buildMolecule("D:\\Quantom\\m40.pdb", "D:\\Quantom\\dpc.itp", 1);
-	Compound mol_4pcw10 = compoundbuilder.buildMolecule("D:\\Quantom\\filaggrin\\4pcw_first10.pdb", "D:\\Quantom\\filaggrin\\topol.top", 7);
+	//Compound mol_4pcw10 = compoundbuilder.buildMolecule("D:\\Quantom\\filaggrin\\4pcw_first10.pdb", "D:\\Quantom\\filaggrin\\topol.top", 7);
+	//Compound mol_4pcw10 = compoundbuilder.buildMolecule("D:\\Quantom\\filaggrin\\conf.gro", "D:\\Quantom\\filaggrin\\topol.top", 4);
+	Compound mol_6lzm_10 = compoundbuilder.buildMolecule("D:\\Quantom\\t4lys\\conf.gro", "D:\\Quantom\\t4lys\\topol.top", 10);
 
 	boxbuilder.buildBox(simulation);
-	boxbuilder.addSingleMolecule(simulation, &mol_4pcw10);
+	boxbuilder.addSingleMolecule(simulation, &mol_6lzm_10);
 	//boxbuilder.addScatteredMolecules(simulation, &mol_dpc, N_LIPID_COPIES);
 	boxbuilder.finishBox(simulation);
 
@@ -37,6 +39,11 @@ Environment::Environment() {
 }
 
 bool Environment::verifySimulationParameters() {	// Not yet implemented
+	assert(THREADS_PER_COMPOUNDBLOCK >= MAX_COMPOUND_PARTICLES);
+	assert(THREADS_PER_SOLVENTBLOCK >= N_SOLVATE_MOLECULES);
+	assert(BOX_LEN > 3.f);
+	assert(BOX_LEN >= CUTOFF + 0.5f);
+	assert(simulation->n_compounds <= 1);	// Otherwise data_GAN goes haywire
 	return true;
 }
 

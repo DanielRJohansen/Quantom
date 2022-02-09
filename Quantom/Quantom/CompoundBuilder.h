@@ -39,7 +39,7 @@ private:
 	struct Record_ATOM;
 
 
-	void loadParticles(Compound* compound, vector<Record_ATOM>* pdb_data, int max_monomer_id = INT32_MAX);
+	void loadParticles(Compound* compound, vector<Record_ATOM>* pdb_data, int max_monomer_id = INT32_MAX, bool ignore_protons =false);
 	void loadTopology(Compound* compound, vector<vector<string>>* itp_data, int* particle_id_map);
 
 
@@ -57,15 +57,27 @@ private:
 	ParsedLine parseLine(int line_index);
 	ParsedLine parseAtom(string line);
 	ParsedLine parseConnection(string line);
-	vector<vector<string>> readFile(string path);
 
+	vector<vector<string>> parseTOP(string path);
 	vector<Record_ATOM> parsePDB(string path);
+	vector<Record_ATOM> parseGRO(string path);
+
+
+	struct ResidueComboId;
+
+	ResidueComboId parseResidueID(string s);
+	bool isAsciiNumber(char c);
 
 
 
 
-
-
+	struct ResidueComboId {
+		ResidueComboId(){}
+		ResidueComboId(int id, string name) : id(id), name(name) { valid = true; }
+		bool valid = false;
+		int id;
+		string name;
+	};
 
 
 

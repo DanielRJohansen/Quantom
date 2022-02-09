@@ -9,7 +9,7 @@
 
 
 
-const int MAX_COMPOUND_PARTICLES = 64;
+const int MAX_COMPOUND_PARTICLES = 128;
 
 
 
@@ -251,8 +251,8 @@ const double OH_refdist = 0.095;			// nm
 const double HOH_refangle = 1.822996;	// radians
 const double max_LJ_dist = 1;			// nm
 
-const int MAX_PAIRBONDS = 64;
-const int MAX_ANGLEBONDS = 128;
+const int MAX_PAIRBONDS = 128;
+const int MAX_ANGLEBONDS = 256;
 const double CC_refdist = 0.153; // nm
 const double CCC_reftheta = 1.953; // nm
 

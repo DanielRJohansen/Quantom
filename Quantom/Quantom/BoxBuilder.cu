@@ -91,6 +91,7 @@ void BoxBuilder::finishBox(Simulation* simulation)
 	cudaMalloc(&simulation->box->trajectory, sizeof(Float3) * n_points);
 	printf("Reserving %d MB for logging\n", (int)((sizeof(double) + sizeof(Float3)) * n_points / 1e+6));
 	cudaMallocManaged(&simulation->box->outdata, sizeof(double) * 10 * simulation->n_steps);	// 10 data streams for 10k steps. 1 step at a time.
+	cudaMallocManaged(&simulation->box->data_GAN, sizeof(Float3) * 6 * MAX_COMPOUND_PARTICLES * 50'000);
 	// 
 	// 
 	//cudaMalloc(&simulation->box->trajectory, sizeof(Float3) * simulation->box->n_compounds * 3 * simulation->n_steps);

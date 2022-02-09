@@ -5,7 +5,7 @@
 
 
 
-constexpr double BOX_LEN = 6.f;		// Must be > twice the len of largest compound
+constexpr double BOX_LEN = 4.f;		// Must be > twice the len of largest compound
 
 constexpr double BOX_LEN_HALF = BOX_LEN/2.f;
 constexpr double BOX_BASE = -BOX_LEN_HALF;
@@ -25,7 +25,7 @@ const int LOGTHREAD = 0;
 const int LOGTYPE = 1;	// 0 for solvent, 1 for compound
 //const int N_BODIES_START = 40;
 
-const int N_SOLVATE_MOLECULES = 256;
+const int N_SOLVATE_MOLECULES = 180;
 
 
 //const int PARTICLES_PER_COMPOUND = 3;
@@ -49,7 +49,7 @@ const int BLOCKS_PER_SOLVENTKERNEL = 1;
 const int THREADS_PER_SOLVENTBLOCK = 256;	// Must be >= N_SOLVATE_MOLECULES
 
 
-const int THREADS_PER_COMPOUNDBLOCK = 64; // Must be >= max comp particles
+const int THREADS_PER_COMPOUNDBLOCK = 128; // Must be >= max comp particles
 
 const int N_LIPID_COPIES = 32;
 
@@ -92,7 +92,7 @@ public:
 
 	double* potE_buffer;		// For total energy summation
 	Float3* trajectory;
-
+	Float3* data_GAN;			// Only works if theres 1 compounds right now.
 
 	void moveToDevice() {	// Loses pointer to RAM location!
 		compounds = genericMoveToDevice(compounds, n_compounds);
@@ -153,7 +153,7 @@ public:
 	int n_steps_to_log = 10000;
 	//int n_steps = 3000;
 	const double dt = 1 * 1e-6;		// ns, so first val corresponds to fs
-	int steps_per_render = 50;
+	int steps_per_render = 20;
 	//int n_bodies = N_BODIES_START;
 	Box* box;
 

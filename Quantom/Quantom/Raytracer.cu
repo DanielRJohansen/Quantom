@@ -86,6 +86,18 @@ __device__ bool Ray::searchParticle(Float3* pos, int index, bool is_virtual)
 __device__ void paintImage(uint8_t* image, Ray* ray) {
     switch (ray->atom_type)
     {
+    case ATOM_TYPE::SOL:
+        image[0] = 0x03;
+        image[1] = 0xa9;
+        image[2] = 0xf4;
+        image[3] = 255;
+        break;
+    case ATOM_TYPE::H:
+        image[0] = 250;
+        image[1] = 250;
+        image[2] = 250;
+        image[3] = 255;
+        break;
     case ATOM_TYPE::O:
         image[0] = 240;
         image[1] = 20;
@@ -111,10 +123,10 @@ __device__ void paintImage(uint8_t* image, Ray* ray) {
         image[3] = 0xFF;
         break;
     case ATOM_TYPE::NONE:
-        image[0] = 0xFE;
-        image[1] = 0xFE;
-        image[2] = 0xFA;
-        image[3] = 0x42;
+        image[0] = 0xF2;
+        image[1] = 0xE5;
+        image[2] = 0xD9;
+        image[3] = 0xFF;
         break;
     default:
         image[3] = 0x00;
@@ -192,7 +204,7 @@ __global__ void renderKernel(Ray* rayptr, uint8_t* image, Box* box) {
 
     for (int i = 0; i < box->n_solvents; i++) {
         if (ray.searchParticle(&box->solvents[i].pos, i)) {
-            ray.atom_type = ATOM_TYPE::O;
+            ray.atom_type = ATOM_TYPE::SOL;
         }
     }
     

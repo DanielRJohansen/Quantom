@@ -715,23 +715,23 @@ __global__ void forceKernel(Box* box) {
 	data_ptr[2] = 9999;
 	data_ptr[3] = box->step + 1;
 
-	Float3 force0(0.f);
-	Float3 force1(0.f);
-	Float3 force2(0.f);
+	Float3 force_bond(0.f);
+	Float3 force_angle(0.f);
+	Float3 force_LJ_com(0.f);
+	Float3 force_LJ_sol(0.f);
 
 	// ------------------------------------------------------------ Intramolecular Operations ------------------------------------------------------------ //
 	applyHyperpos(&compound_state.positions[0], &compound_state.positions[threadIdx.x]);
-	force0 = force0 + computePairbondForces(&compound, &compound_state, utility_buffer, &data_ptr[2]);
-	if (force0.x != force0.x ) {
-		force0.print('p');
+	force_bond =  computePairbondForces(&compound, &compound_state, utility_buffer, &data_ptr[2]);
+	if (force_bond.x != force_bond.x ) {
+		force_bond.print('p');
 		box->critical_error_encountered = 1;
 	}
-	force1 = force1 + computeAnglebondForces(&compound, &compound_state, utility_buffer, &data_ptr[2]);
-	if (force1.x != force1.x) {
-		force1.print('a');
+	force_angle = computeAnglebondForces(&compound, &compound_state, utility_buffer, &data_ptr[2]);
+	if (force_angle.x != force_angle.x) {
+		force_angle.print('a');
 		box->critical_error_encountered = 1;
 	}
-	Float3 force = force0 + force1;
 	// ----------------------------------------------------------------------------------------------------------------------------------------------- //
 
 
@@ -746,7 +746,7 @@ __global__ void forceKernel(Box* box) {
 			applyHyperpos(&compound_state.positions[0], &utility_buffer[threadIdx.x]);
 		}
 		__syncthreads();
-		force2 += computeLJForces(&compound_state.positions[threadIdx.x], n_particles, utility_buffer, data_ptr);
+		force_LJ_com += computeLJForces(&compound_state.positions[threadIdx.x], n_particles, utility_buffer, data_ptr);
 	}
 	// ------------------------------------------------------------------------------------------------------------------------------------------------------ //
 
@@ -760,21 +760,22 @@ __global__ void forceKernel(Box* box) {
 	}
 	__syncthreads();
 	if (threadIdx.x < compound.n_particles) {
-		force2 += computeLJForces(&compound_state.positions[threadIdx.x], neighborlist.n_solvent_neighbors, utility_buffer, data_ptr);
+		force_LJ_sol += computeLJForces(&compound_state.positions[threadIdx.x], neighborlist.n_solvent_neighbors, utility_buffer, data_ptr);
 	}		
 	// ------------------------------------------------------------------------------------------------------------------------------------------------ //
 
-	if (force2.x != force2.x) {
-		force.print('1');
-		force2.print('2');
+	if (force_LJ_sol.x != force_LJ_sol.x) {
+		force_LJ_com.print('1');
+		force_LJ_sol.print('2');
 		box->critical_error_encountered = 1;
 	}
 
 
-	if (force2 > 50e+6) {
+	/*if (force2 > 50e+6) {
 		printf("Bond %f LJ %f total %f\n", force.len(), force2.len(), (force + force2).len());
 	}
-	force += force2;
+	force += force2;*/
+	Float3 force = force_bond + force_angle + force_LJ_com + force_LJ_sol;
 
 	if (force.x != force.x) {
 		compound_state.positions[threadIdx.x].print('p');
@@ -828,6 +829,10 @@ __global__ void forceKernel(Box* box) {
 			box->outdata[6 + box->step * 10] = data_ptr[1];// force.len();
 		}
 		*/
+		box->data_GAN[0 + threadIdx.x * 6 + box->step * compound.n_particles * 6] = compound_state.positions[threadIdx.x];
+		box->data_GAN[1 + threadIdx.x * 6 + box->step * compound.n_particles * 6] = force_bond + force_angle;
+		box->data_GAN[2 + threadIdx.x * 6 + box->step * compound.n_particles * 6] = force_LJ_com;
+		box->data_GAN[3 + threadIdx.x * 6 + box->step * compound.n_particles * 6] = force_LJ_sol;
 	}
 	
 	// ----------------------------------------------------------------------------- //
