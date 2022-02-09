@@ -829,10 +829,10 @@ __global__ void forceKernel(Box* box) {
 			box->outdata[6 + box->step * 10] = data_ptr[1];// force.len();
 		}
 		*/
-		box->data_GAN[0 + threadIdx.x * 6 + box->step * compound.n_particles * 6] = compound_state.positions[threadIdx.x];
-		box->data_GAN[1 + threadIdx.x * 6 + box->step * compound.n_particles * 6] = force_bond + force_angle;
-		box->data_GAN[2 + threadIdx.x * 6 + box->step * compound.n_particles * 6] = force_LJ_com;
-		box->data_GAN[3 + threadIdx.x * 6 + box->step * compound.n_particles * 6] = force_LJ_sol;
+		box->data_GAN[0 + threadIdx.x * 6 + box->step * MAX_COMPOUND_PARTICLES * 6] = compound_state.positions[threadIdx.x];
+		box->data_GAN[1 + threadIdx.x * 6 + box->step * MAX_COMPOUND_PARTICLES * 6] = force_bond + force_angle;
+		box->data_GAN[2 + threadIdx.x * 6 + box->step * MAX_COMPOUND_PARTICLES * 6] = force_LJ_com;
+		box->data_GAN[3 + threadIdx.x * 6 + box->step * MAX_COMPOUND_PARTICLES * 6] = force_LJ_sol;
 	}
 	
 	// ----------------------------------------------------------------------------- //

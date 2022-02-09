@@ -54,7 +54,7 @@ private:
 	void printTrajectory(Simulation* simulation);
 	void printWaterforce(Simulation* simulation);
 
-
+	void printFloat3Matrix(Float3* data_matrix, Int3 dim, string filename);
 
 
 

@@ -82,11 +82,12 @@ void Environment::run() {
 }
 
 void Environment::postRunEvents() {
-	printTrajectory(simulation);
-	printWaterforce(simulation);
-	analyzer.analyzeEnergy(simulation);
+	printFloat3Matrix(simulation->box->data_GAN, Int3(simulation->getStep(), MAX_COMPOUND_PARTICLES, 6), "D:\\Quantom\\Training\\sim_out.csv");
+	//printTrajectory(simulation);
+	//printWaterforce(simulation);
+	//analyzer.analyzeEnergy(simulation);
 
-	printOut(simulation->box->outdata, simulation->n_steps);
+	//printOut(simulation->box->outdata, simulation->n_steps);
 	//printDataBuffer(simulation->box);
 }
 
@@ -176,15 +177,6 @@ void Environment::makeVirtualTrajectory(string trj_path, string waterforce_path)
 
 
 
-
-
-
-
-
-
-
-
-
 void Environment::printOut(double* data, int n_steps) {
 	std::ofstream myfile("D:\\Quantom\\log.csv");
 	for (int i = 0; i < 10; i++) {
@@ -232,6 +224,29 @@ void Environment::printWaterforce(Simulation* simulation)
 		myfile << "\n";
 	}
 
+	myfile.close();
+}
+
+void Environment::printFloat3Matrix(Float3* data_matrix, Int3 dim, string filename)
+{
+	std::ofstream myfile(filename);
+
+	int n_points = simulation->box->total_particles * simulation->n_steps;
+	Float3* traj_host = new Float3[n_points];
+	cudaMemcpy(traj_host, simulation->box->trajectory, sizeof(Float3) * n_points, cudaMemcpyDeviceToHost);
+
+
+	for (int i = 0; i < dim.x; i++) {
+		for (int ii = 0; ii < dim.y; ii++) {
+			for (int iii = 0; iii < dim.z; iii++) {
+				int index = i * dim.y * dim.z + ii * dim.z + iii;
+				Float3 data = data_matrix[index];
+				for (int iiii = 0; iiii < 3; iiii++)
+					myfile << data.at(iiii) << ';';
+			}
+		}
+		myfile << "\n";
+	}
 	myfile.close();
 }
 
