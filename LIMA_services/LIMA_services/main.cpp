@@ -251,8 +251,8 @@ Row* readData() {
 			//while (getline(ss, word, ';')) {
 			while (getline(ss, raw_input[column_index++], ';')) {}
 
-			if (!(row_cnt % 100))
-				printf("Reading row: %d\r", row_cnt);
+			if (!((row_cnt+1) % 100))
+				printf("Reading row: %d\r", row_cnt+1);
 
 			//rows[row_cnt++] = parseRow(row_raw, row_raw.size() / entries_per_atom);
 			rows[dataline_cnt++] = parseRow(raw_input);
@@ -274,18 +274,19 @@ void exportData(selfcenteredDatapoint* data, Int3 dim, string filename) {
 
 	for (int i = 0; i < dim.x; i++) {								// Step
 
-		if (!(i % 100))
-			printf("Writing row: %d\r", i);
+		if (!((i+1) % 100))
+			printf("Writing row: %d\r", i+1);
 
 		selfcenteredDatapoint scdp = data[i];
-		for (int ii = 0; ii < dim.y; ii++) {						// atoms
-			//scdp.atoms_relative[ii].pos.print('p');
-			scdp.atoms_relative[ii].pos.printToFile(&myfile);
-		//	exit(1);
-			scdp.atoms_relative[ii].LJ_force.printToFile(&myfile);
-			scdp.atoms_relative_prev[ii].pos.printToFile(&myfile);
-			scdp.atoms_relative_prev[ii].LJ_force.printToFile(&myfile);
-			myfile << '\n';
+
+		scdp.atoms_relative[0].LJ_force.printToFile(&myfile);				// First print label				3xfloat
+		scdp.atoms_relative_prev[0].LJ_force.printToFile(&myfile);			// Then print prev self force		3xfloat
+			
+		for (int ii = 1; ii < dim.y; ii++) {						
+			scdp.atoms_relative[ii].pos.printToFile(&myfile);				// Print other atoms pos			69x3xfloat
+			//scdp.atoms_relative[ii].LJ_force.printToFile(&myfile);
+			//scdp.atoms_relative_prev[ii].pos.printToFile(&myfile);
+			scdp.atoms_relative_prev[ii].LJ_force.printToFile(&myfile);		// Print other atoms prev force		69x3xfloat
 		}
 		myfile << "\n";
 	}
