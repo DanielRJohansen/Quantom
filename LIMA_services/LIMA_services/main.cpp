@@ -288,9 +288,9 @@ void exportData(selfcenteredDatapoint* data, Int3 dim, string filename) {
 			//scdp.atoms_relative_prev[ii].pos.printToFile(&myfile);
 			scdp.atoms_relative_prev[ii].LJ_force.printToFile(&myfile);		// Print other atoms prev force		69x3xfloat
 		}
-		myfile << "\n";
+		if (! (i+1 == dim.x))	// Otherwise it adds an empty line at the bottom, breaking in python loading shit
+			myfile << "\n";
 	}
-	printf("\n");
 	myfile.close();
 }
 
