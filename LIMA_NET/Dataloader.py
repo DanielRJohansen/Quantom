@@ -40,7 +40,7 @@ class WaterforceDataloader():
        # n_val = int(datapoints_total * 0.3)
         trainset = LIMADataset(data[0:self.n_train, :], labels[0:self.n_train, :])
         valset = LIMADataset(data[self.n_train:, :], labels[self.n_train:, :])
-
+        self.batch_size = batch_size
         self.trainloader = DataLoader(dataset=trainset, batch_size=batch_size, shuffle=True, num_workers=2)
         self.valloader = DataLoader(dataset=valset, batch_size=batch_size, shuffle=False, num_workers=2)
 

@@ -229,6 +229,9 @@ void Environment::printWaterforce(Simulation* simulation)
 
 void Environment::printFloat3Matrix(Float3* data_matrix, Int3 dim, string filename)
 {
+	printf("Printing data to file \n");
+	cout << filename << endl;
+
 	std::ofstream myfile(filename);
 
 	int n_points = simulation->box->total_particles * simulation->n_steps;
@@ -237,6 +240,10 @@ void Environment::printFloat3Matrix(Float3* data_matrix, Int3 dim, string filena
 
 
 	for (int i = 0; i < dim.x; i++) {
+		if (i % 1000 == 999)
+			printf("Exporting line %d\r", i);
+
+
 		for (int ii = 0; ii < dim.y; ii++) {
 			for (int iii = 0; iii < dim.z; iii++) {
 				int index = i * dim.y * dim.z + ii * dim.z + iii;
@@ -247,6 +254,7 @@ void Environment::printFloat3Matrix(Float3* data_matrix, Int3 dim, string filena
 		}
 		myfile << "\n";
 	}
+	printf("\n");
 	myfile.close();
 }
 

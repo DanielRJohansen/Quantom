@@ -10,7 +10,7 @@ using namespace std;
 const int ATOMS_PER_ROW = 70;
 
 const int ROW_START = 100;
-const int ROW_END = 10000;
+const int ROW_END = 100000;
 
 
 struct Int3 {
@@ -235,7 +235,7 @@ Row* readData() {
 
 
 
-	Row* rows = new Row[10000+1];
+	Row* rows = new Row[ROW_END+1];
 
 
 
@@ -301,7 +301,7 @@ int main(void) {
 
 	Row* rows = readData();
 
-	selfcenteredDatapoint* data = new selfcenteredDatapoint[10000+1];
+	selfcenteredDatapoint* data = new selfcenteredDatapoint[ROW_END+1];
 	int cnt = 0;
 	int query_atom = 0;
 	printf("Processing data in bulk\n");

@@ -86,12 +86,12 @@ void BoxBuilder::finishBox(Simulation* simulation)
 
 
 
-	int n_points = simulation->box->total_particles * simulation->n_steps_to_log;
+	int n_points = simulation->box->total_particles * simulation->n_steps;
 	cudaMalloc(&simulation->box->potE_buffer, sizeof(double) * n_points);	// Can only log molecules of size 3 for now...
 	cudaMalloc(&simulation->box->trajectory, sizeof(Float3) * n_points);
 	printf("Reserving %d MB for logging\n", (int)((sizeof(double) + sizeof(Float3)) * n_points / 1e+6));
 	cudaMallocManaged(&simulation->box->outdata, sizeof(double) * 10 * simulation->n_steps);	// 10 data streams for 10k steps. 1 step at a time.
-	cudaMallocManaged(&simulation->box->data_GAN, sizeof(Float3) * 6 * MAX_COMPOUND_PARTICLES * 50'000);
+	cudaMallocManaged(&simulation->box->data_GAN, sizeof(Float3) * 6 * MAX_COMPOUND_PARTICLES * simulation->n_steps);
 	// 
 	// 
 	//cudaMalloc(&simulation->box->trajectory, sizeof(Float3) * simulation->box->n_compounds * 3 * simulation->n_steps);
