@@ -7,10 +7,10 @@
 using namespace std;
 
 
-const int ATOMS_PER_ROW = 70;
-
+const int ATOMS_PER_ROW = 70;	// How many we are interested in loading. This loading is BEFORE we sort by distance
+const int FLOAT3_PER_ATOM = 6;
 const int ROW_START = 100;
-const int ROW_END = 100000;
+const int MAX_ROW = 1e+5;
 
 
 struct Int3 {
@@ -89,7 +89,7 @@ struct Atom {
 };
 
 struct Row {
-	Atom atoms[70];
+	Atom atoms[ATOMS_PER_ROW];
 };
 
 struct selfcenteredDatapoint {
@@ -192,7 +192,7 @@ selfcenteredDatapoint makeDatapoint(Row* rows, int atom_id, int row) {	// Row in
 
 	for (int i = 0; i < ATOMS_PER_ROW; i++) {
 		//scdp.atoms_relative[i].pos.print('p');
-		//scdp.atoms_relative[i].LJ_force.print('f');
+		//scdp.atoms_relative[i].LJ_force.print('F');
 	}
 	
 
@@ -208,9 +208,10 @@ Row parseRow(string* raw_data) {
 	Float3 data[6];
 	//return Row();
 	for (int i = 0; i < ATOMS_PER_ROW; i++) {
-		for (int ii = 0; ii < 4; ii++) {
+		for (int ii = 0; ii < FLOAT3_PER_ATOM; ii++) {
 			for (int iii = 0; iii < 3; iii++) {
-				*data[ii].placeAt(iii) = stod(raw_data[iii + ii * 3 + i * 6 * 3]);
+				//cout << raw_data[iii + ii * 3 + i * FLOAT3_PER_ATOM * 3] << endl;
+				*data[ii].placeAt(iii) = stod(raw_data[iii + ii * 3 + i * FLOAT3_PER_ATOM * 3]);
 			}
 		}
 
@@ -218,29 +219,31 @@ Row parseRow(string* raw_data) {
 		row.atoms[i].pos = data[0];
 		row.atoms[i].LJ_force = data[3];
 		//row.atoms[i].pos.print('p');
+		//row.atoms[i].LJ_force.print('F');
 	}
-
+	
 	return row;
 }
 
-Row* readData() {
+int readData(Row* rows) {
 	string path = "D:\\Quantom\\Training\\sim_out.csv";
 	fstream file;
 	file.open(path);
 
 	int row_cnt = 0;
-	int dataline_cnt = 0; 
+	int lines_read = 0; 
 	string line;
-	int entries_per_atom = 3 * 6;	// 6 Float3
-
-
-
-	Row* rows = new Row[ROW_END+1];
+	int entries_per_atom = 3 * FLOAT3_PER_ATOM;	// 6 Float3
 
 
 
 
-	string raw_input[ATOMS_PER_ROW * 3 * 6 * 10];	// dunno about that *10
+
+
+
+	int end_column = ATOMS_PER_ROW * 3 * FLOAT3_PER_ATOM + 10;
+	string* raw_input = new string[end_column]();	// dunno about that *10
+	for (int i = 0; i < end_column; i++) raw_input[i] = "";
 	while (getline(file, line)) {
 		int column_index = 0;
 		
@@ -249,24 +252,29 @@ Row* readData() {
 			stringstream ss(line);
 			string word;
 			//while (getline(ss, word, ';')) {
-			while (getline(ss, raw_input[column_index++], ';')) {}
-
+			//continue;
+			while (getline(ss, word, ';')) {
+				raw_input[column_index++] = word;
+				if (column_index == end_column)
+					break;
+			}
 			if (!((row_cnt+1) % 100))
 				printf("Reading row: %d\r", row_cnt+1);
-
+			//cout<< raw_input
 			//rows[row_cnt++] = parseRow(row_raw, row_raw.size() / entries_per_atom);
-			rows[dataline_cnt++] = parseRow(raw_input);
+			rows[lines_read++] = parseRow(raw_input);
+			//printf("%d %f\n", dataline_cnt-1, rows[dataline_cnt - 1].atoms[0].LJ_force.len());
 		}
 
 		row_cnt++;
 
-		if (row_cnt == ROW_END)
+		if (row_cnt == MAX_ROW)
 			break;
 	}
 	printf("\n");
 	file.close();
 
-	return rows;
+	return lines_read;
 }
 
 void exportData(selfcenteredDatapoint* data, Int3 dim, string filename) {	
@@ -278,7 +286,7 @@ void exportData(selfcenteredDatapoint* data, Int3 dim, string filename) {
 			printf("Writing row: %d\r", i+1);
 
 		selfcenteredDatapoint scdp = data[i];
-
+		//scdp.atoms_relative[0].LJ_force.print('f');
 		scdp.atoms_relative[0].LJ_force.printToFile(&myfile);				// First print label				3xfloat
 		scdp.atoms_relative_prev[0].LJ_force.printToFile(&myfile);			// Then print prev self force		3xfloat
 			
@@ -298,14 +306,14 @@ void exportData(selfcenteredDatapoint* data, Int3 dim, string filename) {
 
 
 int main(void) {
+	Row* rows = new Row[MAX_ROW + 1];
+	int lines_read = readData(rows);
 
-	Row* rows = readData();
-
-	selfcenteredDatapoint* data = new selfcenteredDatapoint[ROW_END+1];
+	selfcenteredDatapoint* data = new selfcenteredDatapoint[MAX_ROW+1];
 	int cnt = 0;
 	int query_atom = 0;
-	printf("Processing data in bulk\n");
-	for (int row = 1; row < ROW_END - ROW_START; row += 5) {
+	printf("Processing data\n");
+	for (int row = 1; row < lines_read; row += 5) {
 		data[cnt++] = makeDatapoint(rows, query_atom, row);
 	}
 
@@ -316,7 +324,6 @@ int main(void) {
 
 	delete[] rows;
 	delete[] data;
-	printf("Hello world!");
 
 
 

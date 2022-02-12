@@ -2,7 +2,7 @@ from Dataloader import WaterforceDataloader
 from LIMA_DNN import LIMADNN
 from LIMA_NET import LIMANET
 from torch.utils.data import DataLoader
-
+import torch
 
 
 
@@ -14,12 +14,12 @@ from torch.utils.data import DataLoader
 
 
 if __name__ == '__main__':
-    print("Hello world!")
-    dataloader = WaterforceDataloader(batch_size=64)
-    #dataloader = DataLoader(dataset=dataset, batch_size=4, shuffle=True, num_workers=0)
+    dataloader = WaterforceDataloader(batch_size=32, nearest_n_atoms=16)
 
-    model = LIMADNN(inputsize = dataloader.inputsize, dataloader=dataloader)
+    model = LIMADNN(n_neighbors=4)
     print(model)
+    pytorch_total_params = sum(p.numel() for p in model.parameters())
+    print("Total parameters: ", pytorch_total_params)
     #model.train()
     net = LIMANET(model, dataloader.inputsize, dataloader)
-    net.train()
+    net.train(500)

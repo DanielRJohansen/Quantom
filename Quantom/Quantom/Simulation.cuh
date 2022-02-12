@@ -40,7 +40,7 @@ const int LOG_P_ID = 17;
 
 const int MAX_COMPOUNDS = 0xFF;
 const int MAX_SOLVENTS = 0xFFFF;
-constexpr double CUTOFF = 3.0f;	//nm/
+constexpr double CUTOFF = 5.0f;	//nm/
 
 
 
@@ -54,7 +54,7 @@ const int THREADS_PER_COMPOUNDBLOCK = 128; // Must be >= max comp particles
 const int N_LIPID_COPIES = 32;
 
 
-
+const int SIMULATION_STEPS = 60'000;
 
 //constexpr double SOLVENT_MASS = 18.01528f * 1e-3;	// kg/mol
 constexpr double SOLVENT_MASS = 12.0107 * 1e-3;	// kg/mol
@@ -149,7 +149,7 @@ public:
 	
 	double box_size = BOX_LEN;	//nm
 	int blocks_per_dim;
-	int n_steps = 100000;
+	int n_steps = SIMULATION_STEPS;
 	//int n_steps_to_log = 10000;
 	//int n_steps = 3000;
 	const double dt = 1 * 1e-6;		// ns, so first val corresponds to fs

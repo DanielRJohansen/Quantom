@@ -833,6 +833,11 @@ __global__ void forceKernel(Box* box) {
 		box->data_GAN[1 + threadIdx.x * 6 + box->step * MAX_COMPOUND_PARTICLES * 6] = force_bond + force_angle;
 		box->data_GAN[2 + threadIdx.x * 6 + box->step * MAX_COMPOUND_PARTICLES * 6] = force_LJ_com;
 		box->data_GAN[3 + threadIdx.x * 6 + box->step * MAX_COMPOUND_PARTICLES * 6] = force_LJ_sol;
+		if (threadIdx.x == 0) {
+			//printf("Neighbors: %d\n", neighborlist.n_solvent_neighbors);
+			//force_LJ_sol.print('s');
+		}
+			
 	}
 	
 	// ----------------------------------------------------------------------------- //

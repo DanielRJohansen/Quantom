@@ -42,7 +42,7 @@ bool Environment::verifySimulationParameters() {	// Not yet implemented
 	assert(THREADS_PER_COMPOUNDBLOCK >= MAX_COMPOUND_PARTICLES);
 	assert(THREADS_PER_SOLVENTBLOCK >= N_SOLVATE_MOLECULES);
 	assert(BOX_LEN > 3.f);
-	assert(BOX_LEN >= CUTOFF + 0.5f);
+	//assert(BOX_LEN >= CUTOFF + 0.5f);
 	assert(simulation->n_compounds <= 1);	// Otherwise data_GAN goes haywire
 	return true;
 }
@@ -61,7 +61,7 @@ void Environment::run() {
 	while (display->window->isOpen()) {
 
 		
-		engine->hostMaster();
+		//engine->hostMaster();
 		engine->deviceMaster();
 		
 		
@@ -227,29 +227,25 @@ void Environment::printWaterforce(Simulation* simulation)
 	myfile.close();
 }
 
-void Environment::printFloat3Matrix(Float3* data_matrix, Int3 dim, string filename)
+void Environment::printFloat3Matrix(Float3* data_matrix, Int3 dim, string filename)		// dim: steps, n_particles, f3 per particle
 {
 	printf("Printing data to file \n");
 	cout << filename << endl;
 
 	std::ofstream myfile(filename);
 
-	int n_points = simulation->box->total_particles * simulation->n_steps;
-	Float3* traj_host = new Float3[n_points];
-	cudaMemcpy(traj_host, simulation->box->trajectory, sizeof(Float3) * n_points, cudaMemcpyDeviceToHost);
+
+	for (int step = 0; step < dim.x; step++) {
+		if (step % 1000 == 999)
+			printf("Exporting line %d\r", step);
 
 
-	for (int i = 0; i < dim.x; i++) {
-		if (i % 1000 == 999)
-			printf("Exporting line %d\r", i);
-
-
-		for (int ii = 0; ii < dim.y; ii++) {
-			for (int iii = 0; iii < dim.z; iii++) {
-				int index = i * dim.y * dim.z + ii * dim.z + iii;
+		for (int particle = 0; particle < dim.y; particle++) {
+			for (int datapoint = 0; datapoint < dim.z; datapoint++) {
+				int index = step * dim.y * dim.z +particle* dim.z + datapoint;
 				Float3 data = data_matrix[index];
-				for (int iiii = 0; iiii < 3; iiii++)
-					myfile << data.at(iiii) << ';';
+				for (int i = 0; i < 3; i++)
+					myfile << data.at(i) << ';';
 			}
 		}
 		myfile << "\n";
