@@ -14,9 +14,13 @@ import torch
 
 
 if __name__ == '__main__':
-    dataloader = WaterforceDataloader(batch_size=32, nearest_n_atoms=16)
+    n_neighbors = 1
+    data_filepath = "D:\\Quantom\\LIMANET\\sim_out\\atom0_lines29556.csv"
 
-    model = LIMADNN(n_neighbors=2)
+
+    dataloader = WaterforceDataloader(data_filepath, batch_size=32, nearest_n_atoms=n_neighbors)
+
+    model = LIMADNN(n_neighbors=n_neighbors)
     print(model)
     pytorch_total_params = sum(p.numel() for p in model.parameters())
     print("Total parameters: ", pytorch_total_params)

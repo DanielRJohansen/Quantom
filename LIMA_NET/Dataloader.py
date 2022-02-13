@@ -20,9 +20,9 @@ class LIMADataset(Dataset):
 
 
 class WaterforceDataloader():
-    def __init__(self, nearest_n_atoms=69, batch_size=64):
+    def __init__(self, data_filepath, nearest_n_atoms=69, batch_size=64):
         final_index = 6 + 3 * nearest_n_atoms * 2
-        raw_data = np.genfromtxt("D:\\Quantom\\Training\\prepro_atom1.csv", delimiter=';', dtype=np.float32)
+        raw_data = np.genfromtxt(data_filepath, delimiter=';', dtype=np.float32)
 
         labels = torch.from_numpy(raw_data[:, 0:3])
         data = torch.from_numpy(raw_data[:, 3:final_index])  # -1 removes the na that numpy adds for some odd reason..

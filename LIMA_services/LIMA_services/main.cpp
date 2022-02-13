@@ -10,7 +10,7 @@ using namespace std;
 const int ATOMS_PER_ROW = 70;	// How many we are interested in loading. This loading is BEFORE we sort by distance
 const int FLOAT3_PER_ATOM = 6;
 const int ROW_START = 100;
-const int MAX_ROW = 1e+5;
+const int MAX_ROW = 2e+6;
 //const int MAX_ROW = 1e+3;
 
 
@@ -104,7 +104,6 @@ struct selfcenteredDatapoint {
 	Atom atoms_relative[128];	// Sorted with closest neighbor first
 	Atom atoms_relative_prev[128];	// Sorted with closest neighbor first
 };
-
 
 
 Atom* merge(const Atom* left, int n_left, const Atom* right, int n_right) {
@@ -228,8 +227,7 @@ Row parseRow(string* raw_data) {
 	return row;
 }
 
-int readData(Row* rows) {
-	string path = "D:\\Quantom\\Training\\sim_out.csv";
+int readData(Row* rows, string path) {
 	fstream file;
 	file.open(path);
 
@@ -240,15 +238,11 @@ int readData(Row* rows) {
 
 
 
-
-
-
 	int end_column = ATOMS_PER_ROW * 3 * FLOAT3_PER_ATOM + 10;
 	string* raw_input = new string[end_column]();	// dunno about that *10
 	for (int i = 0; i < end_column; i++) raw_input[i] = "";
 	while (getline(file, line)) {
 		int column_index = 0;
-		
 		if (row_cnt >= ROW_START) {
 			stringstream ss(line);
 			string word;
@@ -311,55 +305,68 @@ void makeForceChangePlot(selfcenteredDatapoint* data, int n_datapoints) {
 		
 		if (force_change < 1.f) {
 			bin = 0;
-			zeroes++;
+			if (force_change == 0.f)
+				zeroes++;
 		}
 		else 
 			bin = (int)log2(force_change);
 			
 		//printf("BIN: %d. Force %f\n", bin, force_change);
-		printf("bin: %d\n", bin);
 		bins[bin]++;
-		if (bin < 0 || bin > 30)
+		if (bin < 0 || bin > 31) {
+			printf("Bin: %d\n");
 			exit(0);
+		}
+			
 	}
 	printf("%d zeroes in dataset\n", zeroes);
 
-	printf("x=[");
+	printf("x=categorical([");
 	for (int i = 0; i < 32; i++) printf("%u ", (int) pow(2, i));
-	printf("];\ny=[");
+	printf("]);\ny=[");
 	for (int i = 0; i < 32; i++) printf("%d ", bins[i]);
 	printf("];\n");
 }
 
-void discardVolatileDatapoints(selfcenteredDatapoint* data, int n_datapoints, double cuttoff_value) {	// Removes datapoints where the change in force is too large for the NN to handle..
+int discardVolatileDatapoints(selfcenteredDatapoint* data, int n_datapoints, double cuttoff_value) {	// Removes datapoints where the change in force is too large for the NN to handle..
+	int n_ignored = 0;
 	for (int i = 0; i < n_datapoints; i++) {
 		double force_change = (data[i].atoms_relative[0].LJ_force - data[i].atoms_relative_prev[0].LJ_force).len();
-		if (force_change > cuttoff_value)
+		if (force_change > cuttoff_value) {
 			data[i].ignore = true;
+			n_ignored++;
+		}
 	}
+	return n_ignored;
 }
 
 int main(void) {
+	printf("Allocating %.01f GB of RAM\n", ((double)sizeof(Row) * MAX_ROW + (double) sizeof(selfcenteredDatapoint) * MAX_ROW)/ 1000000000.f);
 	Row* rows = new Row[MAX_ROW + 1];
-	int lines_read = readData(rows);
+	selfcenteredDatapoint* data = new selfcenteredDatapoint[MAX_ROW + 1];
 
-	selfcenteredDatapoint* data = new selfcenteredDatapoint[MAX_ROW+1];
+	string path_in = "D:\\Quantom\\LIMANET\\sim_out\\sim_out.csv";
+
+	int lines_read = readData(rows, path_in);
+	
 	int cnt = 0;
 	int query_atom = 0;
 	printf("Processing data\n");
-	for (int row = 1; row < lines_read; row += 5) {
+	for (int row = 1; row < lines_read; row += 2) {
 		data[cnt++] = makeDatapoint(rows, query_atom, row);
 	}
 	makeForceChangePlot(data, lines_read);
-	discardVolatileDatapoints(data, lines_read, 5000.f);
+	int n_ignored_datapoints = discardVolatileDatapoints(data, lines_read, 5000.f);
 
-	exportData(data, Int3(cnt, ATOMS_PER_ROW, 1), "D:\\Quantom\\Training\\prepro_atom1.csv");
+
+	string path_out = "D:\\Quantom\\LIMANET\\sim_out\\atom" + to_string(query_atom) + "_lines" + to_string(cnt-n_ignored_datapoints) + ".csv";
+	exportData(data, Int3(cnt, ATOMS_PER_ROW, 1), path_out);
 
 
 
 	delete[] rows;
 	delete[] data;
-
+	
 
 
 	return 0;

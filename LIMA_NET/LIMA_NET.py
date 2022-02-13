@@ -15,7 +15,7 @@ class LIMANET():
         #self.loss = self.calcLoss()
         #self.loss = torch.nn.MSELoss()
         #self.loss = torch.nn.L1Loss()
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.00001)
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.0001)
 
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
