@@ -15,7 +15,7 @@ class LIMANET():
         #self.loss = self.calcLoss()
         #self.loss = torch.nn.MSELoss()
         #self.loss = torch.nn.L1Loss()
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.0001)
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.00001)
 
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -40,9 +40,9 @@ class LIMANET():
 
             self.optimizer.zero_grad()
 
-            outputs = self.model(inputs)
+            preds, bases = self.model(inputs)
             #loss = self.loss(outputs, labels)
-            loss = self.calcLoss(outputs, labels)
+            loss = self.calcLoss(preds, bases, labels)
             loss.backward()
 
             self.optimizer.step()
@@ -61,39 +61,77 @@ class LIMANET():
         for i, vdata in enumerate(self.valloader):
             vinputs, vlabels = vdata
             vinputs = vinputs.to(self.device)
-            vlabels = vlabels.to(self.device)
+            labels = vlabels.to(self.device)
 
-            preds = self.model(vinputs)
+            pred, base = self.model(vinputs)
             #vloss = self.loss(preds, vlabels)
-            vloss = self.calcLoss(preds, vlabels)
+            vloss = self.calcLoss(pred, base, labels)
             vloss_total += vloss.item()
 
-            self.calcAccuracy(preds, vlabels)
-        print(vloss_total)
-        vloss_avg = vloss_total / (len(self.valloader) * 32)
+            self.calcAccuracy(pred, base, labels)
+        vloss_avg = vloss_total / (len(self.valloader))
         self.model.train(True)
 
         return vloss_avg
 
-    def calcLoss(self, predictions, labels):
-        error = predictions.sub(labels)
-        error = torch.square(error)
-        error = torch.sum(error, 1)
+    def calcLoss(self, predictions, base, labels):
+        true_dF = labels.sub(base)
+
+        # error = predictions.sub(labels)
+        error = predictions.sub(true_dF)
+        sq_e = torch.square(error)
+        sum_sq_e = torch.sum(sq_e, 1)
+        sum_e = torch.sqrt(sum_sq_e)
+
+        scalar = torch.sqrt(torch.sum(torch.square(true_dF)))  # Dunno which scalar to use, try both i guess
+        # scalar = torch.sqrt(torch.sum(torch.square(base)))
+        scalar = torch.max(scalar, torch.tensor(0.001))
+        sum_e = sum_e.div(scalar)
+        mean_err = torch.mean(sum_e)
+
+        #print(labels)
+        #print(base)
+
+        #print(true_dF)
+        #print(predictions)
+        #print("scalar ", scalar)
+        #print(sum_e)
+        #print(mean_err)
+        #exit(0)
+
+        #error = predictions.sub(labels)
+        #error = torch.square(error)
+        #error = torch.sum(error, 1)
         #error = torch.sqrt(error)
-        mean_err = torch.mean(error)
+        #mean_err = torch.mean(error)
         return mean_err
 
 
-    def calcAccuracy(self, predictions, labels):
-        error = predictions.sub(labels)
-        error = torch.square(error)
-        MSE = torch.sum(error, 1)
-        ME = torch.sqrt(error)
+    def calcAccuracy(self, predictions, base, labels):
+        true_dF = labels.sub(base)
 
-        min_err = torch.min(ME)
-        max_err = torch.max(ME)
-        mean_err = torch.mean(MSE)
+        #error = predictions.sub(labels)
+        error = predictions.sub(true_dF)
+        sq_e = torch.square(error)
+        sum_sq_e = torch.sum(sq_e, 1)
+        sum_e = torch.sqrt(sum_sq_e)
+
+        scalar = torch.sqrt(torch.sum(torch.square(true_dF)))   # Dunno which scalar to use, try both i guess
+        #scalar = torch.sqrt(torch.sum(torch.square(base)))
+        scalar = torch.min(scalar, torch.tensor(0.000001))
+        sum_e = sum_e.div(scalar)
+
+
+        min_err = torch.min(sum_e)
+        max_err = torch.max(sum_e)
+        mean_err = torch.mean(sum_e)
         #print("Min ", min_err.item())
-        print("Mean ", mean_err.item())
+        if (mean_err > 10000):
+            pass
+            #print("Mean ", mean_err.item())
+            #print("E ", error)
+            #print(predictions)
+            #print(labels)
+
         #print("Max ", max_err.item())
         return min_err, max_err, mean_err

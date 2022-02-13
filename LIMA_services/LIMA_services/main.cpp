@@ -11,6 +11,7 @@ const int ATOMS_PER_ROW = 70;	// How many we are interested in loading. This loa
 const int FLOAT3_PER_ATOM = 6;
 const int ROW_START = 100;
 const int MAX_ROW = 1e+5;
+//const int MAX_ROW = 1e+3;
 
 
 struct Int3 {
@@ -97,6 +98,8 @@ struct selfcenteredDatapoint {
 	selfcenteredDatapoint(int id, float mass) :id(id), mass(mass){}
 	int id;
 	float mass;
+
+	bool ignore = false;
 
 	Atom atoms_relative[128];	// Sorted with closest neighbor first
 	Atom atoms_relative_prev[128];	// Sorted with closest neighbor first
@@ -240,7 +243,6 @@ int readData(Row* rows) {
 
 
 
-
 	int end_column = ATOMS_PER_ROW * 3 * FLOAT3_PER_ATOM + 10;
 	string* raw_input = new string[end_column]();	// dunno about that *10
 	for (int i = 0; i < end_column; i++) raw_input[i] = "";
@@ -248,11 +250,8 @@ int readData(Row* rows) {
 		int column_index = 0;
 		
 		if (row_cnt >= ROW_START) {
-
 			stringstream ss(line);
 			string word;
-			//while (getline(ss, word, ';')) {
-			//continue;
 			while (getline(ss, word, ';')) {
 				raw_input[column_index++] = word;
 				if (column_index == end_column)
@@ -281,11 +280,12 @@ void exportData(selfcenteredDatapoint* data, Int3 dim, string filename) {
 	std::ofstream myfile(filename);
 
 	for (int i = 0; i < dim.x; i++) {								// Step
-
 		if (!((i+1) % 100))
-			printf("Writing row: %d\r", i+1);
+			printf("\rWriting row: %d", i+1);
 
 		selfcenteredDatapoint scdp = data[i];
+		if (scdp.ignore)
+			continue;
 		//scdp.atoms_relative[0].LJ_force.print('f');
 		scdp.atoms_relative[0].LJ_force.printToFile(&myfile);				// First print label				3xfloat
 		scdp.atoms_relative_prev[0].LJ_force.printToFile(&myfile);			// Then print prev self force		3xfloat
@@ -302,8 +302,42 @@ void exportData(selfcenteredDatapoint* data, Int3 dim, string filename) {
 	myfile.close();
 }
 
+void makeForceChangePlot(selfcenteredDatapoint* data, int n_datapoints) {
+	int bins[32] = { 0 };
+	int zeroes = 0;
+	int bin;
+	for (int i = 0; i < n_datapoints; i++) {
+		double force_change = (data[i].atoms_relative[0].LJ_force - data[i].atoms_relative_prev[0].LJ_force).len();
+		
+		if (force_change < 1.f) {
+			bin = 0;
+			zeroes++;
+		}
+		else 
+			bin = (int)log2(force_change);
+			
+		//printf("BIN: %d. Force %f\n", bin, force_change);
+		printf("bin: %d\n", bin);
+		bins[bin]++;
+		if (bin < 0 || bin > 30)
+			exit(0);
+	}
+	printf("%d zeroes in dataset\n", zeroes);
 
+	printf("x=[");
+	for (int i = 0; i < 32; i++) printf("%u ", (int) pow(2, i));
+	printf("];\ny=[");
+	for (int i = 0; i < 32; i++) printf("%d ", bins[i]);
+	printf("];\n");
+}
 
+void discardVolatileDatapoints(selfcenteredDatapoint* data, int n_datapoints, double cuttoff_value) {	// Removes datapoints where the change in force is too large for the NN to handle..
+	for (int i = 0; i < n_datapoints; i++) {
+		double force_change = (data[i].atoms_relative[0].LJ_force - data[i].atoms_relative_prev[0].LJ_force).len();
+		if (force_change > cuttoff_value)
+			data[i].ignore = true;
+	}
+}
 
 int main(void) {
 	Row* rows = new Row[MAX_ROW + 1];
@@ -316,8 +350,9 @@ int main(void) {
 	for (int row = 1; row < lines_read; row += 5) {
 		data[cnt++] = makeDatapoint(rows, query_atom, row);
 	}
+	makeForceChangePlot(data, lines_read);
+	discardVolatileDatapoints(data, lines_read, 5000.f);
 
-	
 	exportData(data, Int3(cnt, ATOMS_PER_ROW, 1), "D:\\Quantom\\Training\\prepro_atom1.csv");
 
 

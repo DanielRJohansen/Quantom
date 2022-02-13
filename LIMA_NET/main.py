@@ -16,10 +16,10 @@ import torch
 if __name__ == '__main__':
     dataloader = WaterforceDataloader(batch_size=32, nearest_n_atoms=16)
 
-    model = LIMADNN(n_neighbors=4)
+    model = LIMADNN(n_neighbors=2)
     print(model)
     pytorch_total_params = sum(p.numel() for p in model.parameters())
     print("Total parameters: ", pytorch_total_params)
     #model.train()
     net = LIMANET(model, dataloader.inputsize, dataloader)
-    net.train(500)
+    net.train(5000)
