@@ -16,14 +16,14 @@ class LIMADNN(nn.Module):
         self.fc_nforce2 = nn.Linear(n_neighbors * 3, neighbors_out)
 
         self.fc_forcepos_stack_1 = nn.Linear(neighbors_out*2, neighbors_out*2)
-        self.fc_forcepos_stack_2 = nn.Linear(neighbors_out*2, 32-3)
+        self.fc_forcepos_stack_2 = nn.Linear(neighbors_out*2, 16-3)
 
         self.fc_sforce1 = nn.Linear(3, 3)
 
         #self.fc_fullstack1 = nn.Linear(64, 64)
-        self.fc_fullstack2 = nn.Linear(32, 16)
+        self.fc_fullstack2 = nn.Linear(16, 8)
 
-        self.fc_out = nn.Linear(16, 3)
+        self.fc_out = nn.Linear(8, 3)
 
 
     def forward(self, x):

@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import math
-
+import numpy as nn
 
 class LIMANET():
     def __init__(self, model, inputsize, dataloader):
@@ -20,15 +20,12 @@ class LIMANET():
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         print(self.device)
+
+
         self.model = self.model.to(self.device)
-
-
-    def train(self, n_epochs):
-        print("Initial val loss: ", self.validate())
-        for e in range(n_epochs):
-            train_loss = self.train_one_epoch()
-            val_loss = self.validate()
-            print("Epoch ", e, " train-loss: ", train_loss, " val-loss: ", val_loss)
+        print(model)
+        self.total_params = sum(p.numel() for p in model.parameters())
+        print("Total parameters: ", self.total_params)
 
 
     def train_one_epoch(self):
@@ -56,72 +53,68 @@ class LIMANET():
 
     def validate(self):
         self.model.train(False)
-        vloss_total = 0
+        loss_total = 0
+        acc_total = 0
+
+        for i, data in enumerate(self.valloader):
+            inputs, labels = data
+            inputs = inputs.to(self.device)
+            labels = labels.to(self.device)
+
+            pred, base = self.model(inputs)
+
+            loss = self.calcLoss(pred, base, labels)
+            loss_total += loss.item()
+            acc = self.calcAccuracy(pred, base, labels)
+            acc_total += acc.item()
 
 
-        for i, vdata in enumerate(self.valloader):
-            vinputs, vlabels = vdata
-            vinputs = vinputs.to(self.device)
-            labels = vlabels.to(self.device)
 
-            pred, base = self.model(vinputs)
-            #vloss = self.loss(preds, vlabels)
-            vloss = self.calcLoss(pred, base, labels)
-            vloss_total += vloss.item()
-
-            self.calcAccuracy(pred, base, labels)
-
-        #print("pred: ", pred[0])
-        #print("label ", labels[0])
-
-        vloss_avg = (vloss_total-vloss.item()) / (len(self.valloader)-1)  # Remove the last batch, as it might not be full size
+        loss_avg = (loss_total-loss.item()) / (len(self.valloader)-1)  # Remove the last batch, as it might not be full size
+        acc_avg = (acc_total - acc.item()) / (len(self.valloader) - 1)  # Remove the last batch, as it might not be full size
         self.model.train(True)
 
-        return vloss_avg
+        return loss_avg, acc_avg
 
-    def calcLoss(self, predictions, base, labels):
-        true_dF = labels.sub(base)
-
+    def calcEuclideanError(self, predictions, labels):
         error = predictions.sub(labels)
-        #error = predictions.sub(true_dF)
+        # error = predictions.sub(true_dF)
         sq_e = torch.square(error)
         sum_sq_e = torch.sum(sq_e, 1)
         sum_e = torch.sqrt(sum_sq_e)
+        return sum_e
 
+    def calcLossScalar(self, base, labels):
+        # Two ways of putting error in context of force
+        true_dF = labels.sub(base)
         scalar = torch.sqrt(torch.sum(torch.square(true_dF)))  # Dunno which scalar to use, try both i guess
+
         # scalar = torch.sqrt(torch.sum(torch.square(base)))
-        scalar = torch.max(scalar, torch.tensor(0.001))
-        sum_e = sum_e.div(scalar)
-        mean_err = torch.mean(sum_e)
+
+
+        scalar = torch.max(scalar, torch.tensor(0.0001))  # Dont let scalar become too small, avoid exploding loss
+        return scalar
+
+    def calcLoss(self, predictions, base, labels):
+        euclidean_errors = self.calcEuclideanError(predictions, labels)
+        scalar = self.calcLossScalar(base, labels)
+        sum_of_errors = euclidean_errors.div(scalar)
+
+        mean_err = torch.mean(sum_of_errors)
 
         return mean_err
 
 
     def calcAccuracy(self, predictions, base, labels):
-        true_dF = labels.sub(base)
+        euclidean_errors = self.calcEuclideanError(predictions, labels)
+        scalar = self.calcLossScalar(base, labels)
+        sum_of_errors = euclidean_errors.div(scalar)
 
-        #error = predictions.sub(labels)
-        error = predictions.sub(true_dF)
-        sq_e = torch.square(error)
-        sum_sq_e = torch.sum(sq_e, 1)
-        sum_e = torch.sqrt(sum_sq_e)
+        ones = torch.ones(sum_of_errors.shape, dtype=torch.float32).to(self.device)
+        zeroes = torch.zeros(sum_of_errors.shape, dtype=torch.float32).to(self.device)
+        unbound_acc = ones.sub(sum_of_errors)
+        stack = torch.stack((unbound_acc, zeroes))
+        bounded_acc = torch.max(stack, dim=0)[0]
 
-        scalar = torch.sqrt(torch.sum(torch.square(true_dF)))   # Dunno which scalar to use, try both i guess
-        #scalar = torch.sqrt(torch.sum(torch.square(base)))
-        scalar = torch.min(scalar, torch.tensor(0.000001))
-        sum_e = sum_e.div(scalar)
-
-
-        min_err = torch.min(sum_e)
-        max_err = torch.max(sum_e)
-        mean_err = torch.mean(sum_e)
-        #print("Min ", min_err.item())
-        if (mean_err > 10000):
-            pass
-            #print("Mean ", mean_err.item())
-            #print("E ", error)
-            #print(predictions)
-            #print(labels)
-
-        #print("Max ", max_err.item())
-        return min_err, max_err, mean_err
+        mean_acc = torch.mean(bounded_acc)
+        return mean_acc
