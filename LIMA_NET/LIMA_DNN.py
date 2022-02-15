@@ -7,7 +7,7 @@ class LIMADNN(nn.Module):
     def __init__(self, n_neighbors):
         super(LIMADNN, self).__init__()
         self.n_neighbors = n_neighbors
-        neighbors_out = min(n_neighbors*4, 64)
+        neighbors_out = min(n_neighbors*2, 32)
 
         self.fc_npos1 = nn.Linear(n_neighbors*3, n_neighbors*3)
         self.fc_npos2 = nn.Linear(n_neighbors * 3, neighbors_out)
@@ -54,4 +54,5 @@ class LIMADNN(nn.Module):
         out = torch.sigmoid(out)
         
         out = out.mul(force_prev)
+        out = out.add(force_prev)
         return out, force_prev

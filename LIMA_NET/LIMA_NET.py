@@ -48,7 +48,8 @@ class LIMANET():
             self.optimizer.step()
 
             epoch_loss += loss.item()
-        avg_loss = epoch_loss / (len(self.trainloader))
+
+        avg_loss = (epoch_loss-loss.item()) / (len(self.trainloader)-1) # Remove the last batch, as it might not be full size
 
         return avg_loss
 
@@ -69,7 +70,11 @@ class LIMANET():
             vloss_total += vloss.item()
 
             self.calcAccuracy(pred, base, labels)
-        vloss_avg = vloss_total / (len(self.valloader))
+
+        #print("pred: ", pred[0])
+        #print("label ", labels[0])
+
+        vloss_avg = (vloss_total-vloss.item()) / (len(self.valloader)-1)  # Remove the last batch, as it might not be full size
         self.model.train(True)
 
         return vloss_avg
@@ -77,8 +82,8 @@ class LIMANET():
     def calcLoss(self, predictions, base, labels):
         true_dF = labels.sub(base)
 
-        # error = predictions.sub(labels)
-        error = predictions.sub(true_dF)
+        error = predictions.sub(labels)
+        #error = predictions.sub(true_dF)
         sq_e = torch.square(error)
         sum_sq_e = torch.sum(sq_e, 1)
         sum_e = torch.sqrt(sum_sq_e)
@@ -89,21 +94,6 @@ class LIMANET():
         sum_e = sum_e.div(scalar)
         mean_err = torch.mean(sum_e)
 
-        #print(labels)
-        #print(base)
-
-        #print(true_dF)
-        #print(predictions)
-        #print("scalar ", scalar)
-        #print(sum_e)
-        #print(mean_err)
-        #exit(0)
-
-        #error = predictions.sub(labels)
-        #error = torch.square(error)
-        #error = torch.sum(error, 1)
-        #error = torch.sqrt(error)
-        #mean_err = torch.mean(error)
         return mean_err
 
 

@@ -15,8 +15,8 @@ import torch
 
 if __name__ == '__main__':
     n_neighbors = 1
-    data_filepath = "D:\\Quantom\\LIMANET\\sim_out\\atom0_lines29556.csv"
-
+    #data_filepath = "D:\\Quantom\\LIMANET\\sim_out\\atom0_lines4865.csv"
+    data_filepath = "D:\\Quantom\\LIMANET\\sim_out\\atom0_lines29556_shuffled.csv"
 
     dataloader = WaterforceDataloader(data_filepath, batch_size=32, nearest_n_atoms=n_neighbors)
 

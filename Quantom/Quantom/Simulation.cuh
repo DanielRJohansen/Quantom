@@ -54,7 +54,7 @@ const int THREADS_PER_COMPOUNDBLOCK = 128; // Must be >= max comp particles
 const int N_LIPID_COPIES = 32;
 
 
-const int SIMULATION_STEPS = 60'000;
+const int SIMULATION_STEPS = 100000;
 
 //constexpr double SOLVENT_MASS = 18.01528f * 1e-3;	// kg/mol
 constexpr double SOLVENT_MASS = 12.0107 * 1e-3;	// kg/mol
@@ -161,6 +161,8 @@ public:
 	// Box variable copies, here for ease of access.
 	int n_compounds = 0;
 	int n_solvents = 0;
+
+	string out_dir = "D:\\Quantom\\LIMANET\\sim_out";
 
 private:
 	int step = 0;

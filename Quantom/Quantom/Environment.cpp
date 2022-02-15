@@ -82,7 +82,11 @@ void Environment::run() {
 }
 
 void Environment::postRunEvents() {
-	printFloat3Matrix(simulation->box->data_GAN, Int3(simulation->getStep(), MAX_COMPOUND_PARTICLES, 6), "D:\\Quantom\\Training\\sim_out.csv");
+	printFloat3Matrix(
+		simulation->box->data_GAN,
+		Int3(simulation->getStep(), MAX_COMPOUND_PARTICLES, 6),
+		simulation->out_dir + "\\particles_" + to_string(70) + "_steps_" + to_string(simulation->getStep()) + ".csv");
+		//"D:\\Quantom\\Training\\sim_out.csv");
 	//printTrajectory(simulation);
 	//printWaterforce(simulation);
 	//analyzer.analyzeEnergy(simulation);
@@ -237,18 +241,23 @@ void Environment::printFloat3Matrix(Float3* data_matrix, Int3 dim, string filena
 
 	for (int step = 0; step < dim.x; step++) {
 		if (step % 1000 == 999)
-			printf("Exporting line %d\r", step);
+			printf("\rExporting line %d", step+1);
 
-
+		string line = "";
 		for (int particle = 0; particle < dim.y; particle++) {
 			for (int datapoint = 0; datapoint < dim.z; datapoint++) {
 				int index = step * dim.y * dim.z +particle* dim.z + datapoint;
 				Float3 data = data_matrix[index];
-				for (int i = 0; i < 3; i++)
-					myfile << data.at(i) << ';';
+				for (int i = 0; i < 3; i++) {
+					line = line + to_string(data.at(i)) + ';';
+					//myfile << data.at(i) << ';';
+				}
+
 			}
 		}
-		myfile << "\n";
+		line = line + '\n';
+		myfile << line;
+		//myfile << "\n";
 	}
 	printf("\n");
 	myfile.close();

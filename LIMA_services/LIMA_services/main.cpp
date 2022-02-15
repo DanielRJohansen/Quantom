@@ -10,7 +10,7 @@ using namespace std;
 const int ATOMS_PER_ROW = 70;	// How many we are interested in loading. This loading is BEFORE we sort by distance
 const int FLOAT3_PER_ATOM = 6;
 const int ROW_START = 100;
-const int MAX_ROW = 2e+6;
+const int MAX_ROW = 1e+5;
 //const int MAX_ROW = 1e+3;
 
 
@@ -84,6 +84,7 @@ struct Float3 {
 };
 
 struct Atom {
+	int id;
 	Float3 pos;
 	Float3 LJ_force;
 	double euclidean_dist;
@@ -95,8 +96,8 @@ struct Row {
 
 struct selfcenteredDatapoint {
 	selfcenteredDatapoint() {}
-	selfcenteredDatapoint(int id, float mass) :id(id), mass(mass){}
-	int id;
+	selfcenteredDatapoint(int id, float mass) :queryatom_id(id), mass(mass){}
+	int queryatom_id;
 	float mass;
 
 	bool ignore = false;
@@ -156,14 +157,29 @@ Atom* mergeSort(const Atom* atoms, const int l, const int r) {	// l and r are in
 	}
 }
 
-void mergeSortAPI(Atom* atoms, int n_atoms) {
+int* mergeSortAPI(Atom* atoms, int n_atoms) {					// Returns a mapping where mapping[0] is the closest id, mapping [1] seconds closest, so on
 	Atom* sorted_atoms = mergeSort(atoms, 0, n_atoms-1);
 	for (int i = 0; i < n_atoms; i++) {
 		atoms[i] = sorted_atoms[i];
 	}
+	
+	int* mapping = new int[n_atoms];
+	for (int i = 0; i < n_atoms; i++) mapping[i] = sorted_atoms[i].id;
+
 	delete[] sorted_atoms;
+	return mapping;
 }
 
+void sortAtoms(Atom* atoms, int n_atoms, int* mapping) {
+	Atom* temp = new Atom[n_atoms];
+	for (int i = 0; i < n_atoms; i++) {
+		temp[i] = atoms[i];
+	}
+	for (int i = 0; i < n_atoms; i++) {
+		temp[i] = atoms[mapping[i]];
+	}
+	delete[] temp;
+}
 
 
 void makePositionsRelative(Atom* atoms, int atom_id) {
@@ -177,28 +193,24 @@ void makePositionsRelative(Atom* atoms, int atom_id) {
 	atoms[atom_id].pos = Float3(0.f);
 }
 
-selfcenteredDatapoint makeDatapoint(Row* rows, int atom_id, int row) {	// Row indicates row to predict, implicitly using the row before..
+selfcenteredDatapoint makeDatapoint(Row* rows, int query_atom_id, int row) {	// Row indicates row to predict, implicitly using the row before..
 	Row* row_cur = &rows[row];
 	Row* row_prev = &rows[row - 1];
 
-	selfcenteredDatapoint scdp(atom_id, 0);
-	for (int i = 0; i < ATOMS_PER_ROW; i++) {
+	selfcenteredDatapoint scdp(query_atom_id, 0);
+	for (int i = 0; i < ATOMS_PER_ROW; i++) {			// Load positions. They are NOT yet relative to query atom
 		scdp.atoms_relative[i] = row_cur->atoms[i];
 		scdp.atoms_relative_prev[i] = row_prev->atoms[i];
 	}
-	makePositionsRelative(scdp.atoms_relative, atom_id);
-	makePositionsRelative(scdp.atoms_relative_prev, atom_id);
+	makePositionsRelative(scdp.atoms_relative, query_atom_id);
+	makePositionsRelative(scdp.atoms_relative_prev, query_atom_id);
 
-	mergeSortAPI(scdp.atoms_relative, ATOMS_PER_ROW);
-	mergeSortAPI(scdp.atoms_relative_prev, ATOMS_PER_ROW);
+	int* mapping = mergeSortAPI(scdp.atoms_relative, ATOMS_PER_ROW);
+	sortAtoms(scdp.atoms_relative, ATOMS_PER_ROW, mapping);
+	sortAtoms(scdp.atoms_relative_prev, ATOMS_PER_ROW, mapping);
+	delete[] mapping;
 
-	for (int i = 0; i < ATOMS_PER_ROW; i++) {
-		//scdp.atoms_relative[i].pos.print('p');
-		//scdp.atoms_relative[i].LJ_force.print('F');
-	}
 	
-
-	//exit(0);
 	return scdp;
 }
 
@@ -217,7 +229,7 @@ Row parseRow(string* raw_data) {
 			}
 		}
 
-
+		row.atoms[i].id = i;
 		row.atoms[i].pos = data[0];
 		row.atoms[i].LJ_force = data[3];
 		//row.atoms[i].pos.print('p');
@@ -231,50 +243,63 @@ int readData(Row* rows, string path) {
 	fstream file;
 	file.open(path);
 
-	int row_cnt = 0;
-	int lines_read = 0; 
-	string line;
+	int inputline_cnt = 0;	// Refers to the current line count in the file
+	int dataline_cnt = 0;	// Refers to the current row in the "rows" array
+
+	
 	int entries_per_atom = 3 * FLOAT3_PER_ATOM;	// 6 Float3
 
 
 
 	int end_column = ATOMS_PER_ROW * 3 * FLOAT3_PER_ATOM + 10;
-	string* raw_input = new string[end_column]();	// dunno about that *10
+	string* raw_input = new string[end_column]();	
 	for (int i = 0; i < end_column; i++) raw_input[i] = "";
+
+	string line;
 	while (getline(file, line)) {
 		int column_index = 0;
-		if (row_cnt >= ROW_START) {
-			stringstream ss(line);
-			string word;
-			while (getline(ss, word, ';')) {
-				raw_input[column_index++] = word;
-				if (column_index == end_column)
-					break;
-			}
-			if (!((row_cnt+1) % 100))
-				printf("Reading row: %d\r", row_cnt+1);
-			//cout<< raw_input
-			//rows[row_cnt++] = parseRow(row_raw, row_raw.size() / entries_per_atom);
-			rows[lines_read++] = parseRow(raw_input);
-			//printf("%d %f\n", dataline_cnt-1, rows[dataline_cnt - 1].atoms[0].LJ_force.len());
+		if (inputline_cnt < ROW_START) {
+			inputline_cnt++;
+			continue;
 		}
-
-		row_cnt++;
-
-		if (row_cnt == MAX_ROW)
+		if (inputline_cnt == MAX_ROW)
 			break;
+
+
+
+
+		stringstream ss(line);
+		string word;
+		while (getline(ss, word, ';')) {
+			raw_input[column_index++] = word;
+			if (column_index == end_column)
+				break;
+		}
+		if ((inputline_cnt % 100) == 99)
+			printf("Reading row: %d\r", inputline_cnt +1);
+
+		rows[dataline_cnt++] = parseRow(raw_input);
+		inputline_cnt++;
+		//printf("%d %f\n", dataline_cnt-1, rows[dataline_cnt - 1].atoms[0].LJ_force.len());
+		
+
+
 	}
 	printf("\n");
 	file.close();
-
-	return lines_read;
+	printf("%d datalines read \n", dataline_cnt);
+	return dataline_cnt;
 }
 
 void exportData(selfcenteredDatapoint* data, Int3 dim, string filename) {	
 	std::ofstream myfile(filename);
+	printf("Exporting to file \n");
+	cout << filename << endl;
+
+	
 
 	for (int i = 0; i < dim.x; i++) {								// Step
-		if (!((i+1) % 100))
+		if ((i % 100) == 99)
 			printf("\rWriting row: %d", i+1);
 
 		selfcenteredDatapoint scdp = data[i];
@@ -305,8 +330,13 @@ void makeForceChangePlot(selfcenteredDatapoint* data, int n_datapoints) {
 		
 		if (force_change < 1.f) {
 			bin = 0;
-			if (force_change == 0.f)
+			if (force_change == 0.f) {
 				zeroes++;
+				data[i].atoms_relative[1].pos.x = 40404;
+				data[i].atoms_relative[0].LJ_force = Float3(40404.f);
+				printf("What");
+			}
+				
 		}
 		else 
 			bin = (int)log2(force_change);
@@ -337,30 +367,85 @@ int discardVolatileDatapoints(selfcenteredDatapoint* data, int n_datapoints, dou
 			n_ignored++;
 		}
 	}
+	printf("%d datapoints cuttoff due to force change magnitude\n", n_ignored);
 	return n_ignored;
 }
 
+
+#include <algorithm>
+
+void shuffle(selfcenteredDatapoint* data, int n_datapoints) {
+	int* order = new int[n_datapoints];
+	for (int i = 0; i < n_datapoints; i++) order[i] = i;
+	random_shuffle(order, order + n_datapoints);
+	
+
+	selfcenteredDatapoint* temp = new selfcenteredDatapoint[n_datapoints];
+	for (int i = 0; i < n_datapoints; i++) temp[i] = data[i];
+	for (int i = 0; i < n_datapoints; i++) data[i] = temp[order[i]];
+	delete[] order;
+}
+
+
+
+
 int main(void) {
+/*
+	int y = 100000;
+	int x = 70 * 6 * 3;
+
+	float* ddata = new float[x * y];
+	for (int i = 0; i < x * y; i++) ddata[i] = 3.14f;
+
+
+
+
+	printf("Writing\n");
+	 //std::fstream("file.binary", std::ios::out | std::ios::binary);
+	int bytes = sizeof(float) * x * y;
+	auto myfile = fstream("D:\\Quantom\\LIMANET\\sim_out\\test.bin", ios::out, ios::binary);
+	myfile.write((char*)&ddata[0], bytes);
+	myfile.close();
+	printf("Done\n");
+
+	
+	
+	exit(1);
+
+*/
+
+	bool shuffle_time_dim = true;
+
 	printf("Allocating %.01f GB of RAM\n", ((double)sizeof(Row) * MAX_ROW + (double) sizeof(selfcenteredDatapoint) * MAX_ROW)/ 1000000000.f);
 	Row* rows = new Row[MAX_ROW + 1];
 	selfcenteredDatapoint* data = new selfcenteredDatapoint[MAX_ROW + 1];
 
-	string path_in = "D:\\Quantom\\LIMANET\\sim_out\\sim_out.csv";
+	
+	string path_in = "D:\\Quantom\\LIMANET\\sim_out\\particles_70_steps_60000.csv";
+	//string path_in = "D:\\Quantom\\LIMANET\\sim_out\\particles_70_steps_300.csv";
 
 	int lines_read = readData(rows, path_in);
 	
-	int cnt = 0;
+	int n_datapoints = 0;
 	int query_atom = 0;
 	printf("Processing data\n");
 	for (int row = 1; row < lines_read; row += 2) {
-		data[cnt++] = makeDatapoint(rows, query_atom, row);
+		data[n_datapoints++] = makeDatapoint(rows, query_atom, row);
 	}
-	makeForceChangePlot(data, lines_read);
-	int n_ignored_datapoints = discardVolatileDatapoints(data, lines_read, 5000.f);
+	makeForceChangePlot(data, n_datapoints);
+	int n_ignored_datapoints = discardVolatileDatapoints(data, n_datapoints, 5000.f);
 
 
-	string path_out = "D:\\Quantom\\LIMANET\\sim_out\\atom" + to_string(query_atom) + "_lines" + to_string(cnt-n_ignored_datapoints) + ".csv";
-	exportData(data, Int3(cnt, ATOMS_PER_ROW, 1), path_out);
+	string path_out = "D:\\Quantom\\LIMANET\\sim_out\\atom" + to_string(query_atom) + "_lines" + to_string(n_datapoints - n_ignored_datapoints);
+	if (shuffle_time_dim) {
+		//random_shuffle(data, data + sizeof(selfcenteredDatapoint) * n_datapoints);
+		shuffle(data, n_datapoints);
+		path_out = path_out + "_shuffled";
+	}
+	path_out = path_out + ".csv";
+	
+	
+	exportData(data, Int3(n_datapoints, ATOMS_PER_ROW, 1), path_out);
 
 
 
