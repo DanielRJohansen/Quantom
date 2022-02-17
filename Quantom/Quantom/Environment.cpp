@@ -61,7 +61,7 @@ void Environment::run() {
 	while (display->window->isOpen()) {
 
 		
-		//engine->hostMaster();
+		engine->hostMaster();
 		engine->deviceMaster();
 		
 		
@@ -202,14 +202,14 @@ void Environment::printOut(double* data, int n_steps) {
 void Environment::printTrajectory(Simulation* simulation) {
 	std::ofstream myfile("D:\\Quantom\\trajectory.csv");
 
-	int n_points = simulation->box->total_particles * simulation->n_steps;
+	int n_points = simulation->box->total_particles_upperbound * simulation->n_steps;
 	Float3* traj_host = new Float3[n_points];
 	cudaMemcpy(traj_host, simulation->box->trajectory, sizeof(Float3) * n_points, cudaMemcpyDeviceToHost);
 
 	for (int i = 0; i < simulation->box->step; i++) {
-		for (int j = 0; j < simulation->box->total_particles; j++) {
+		for (int j = 0; j < simulation->box->total_particles_upperbound; j++) {
 			for (int k = 0; k < 3; k++) {
-				myfile << traj_host[j + i * simulation->box->total_particles].at(k) << ";";
+				myfile << traj_host[j + i * simulation->box->total_particles_upperbound].at(k) << ";";
 			}			
 		}
 		myfile << "\n";

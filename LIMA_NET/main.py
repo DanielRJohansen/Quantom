@@ -15,7 +15,7 @@ import torch
 
 
 if __name__ == '__main__':
-    n_neighbors = 1
+    n_neighbors = 0
     #data_filepath = "D:\\Quantom\\LIMANET\\sim_out\\atom0_lines4865.csv"
     data_filepath = "D:\\Quantom\\LIMANET\\sim_out\\atom0_lines29556_shuffled.csv"
 

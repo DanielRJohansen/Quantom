@@ -105,11 +105,16 @@ private:
 	void step();
 
 	// -------------------------------------- CPU LOAD -------------------------------------- //
-	void offLoadPositionData(Simulation* simulation);
+	void offloadPositionData(Simulation* simulation);
+	void onloadNeighborlists();
 	static void updateNeighborLists(Simulation* simulation, NListDataCollection* nlist_data_collection, 
 		volatile bool* finished, int* timing);	// thread worker, can't own engine object, thus pass ref
 	static void cullDistantNeighbors(NListDataCollection* nlist_data_collection);
 	NListDataCollection* nlist_data_collection;
+
+	void offloadLoggingData();
+
+
 
 	int prev_nlist_update_step = 0;
 	volatile bool updated_neighborlists_ready = 0;

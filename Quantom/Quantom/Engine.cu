@@ -30,6 +30,13 @@ void Engine::deviceMaster() {
 }
 
 void Engine::hostMaster() {
+	if ((simulation->getStep() % STEPS_PER_LOGTRANSFER) == STEPS_PER_LOGTRANSFER - 1) {
+		offloadLoggingData();
+	}
+
+	
+
+	/*
 	if (updated_neighborlists_ready) {
 		cudaMemcpy(simulation->box->compound_neighborlists, nlist_data_collection->compound_neighborlists, sizeof(NeighborList) * simulation->n_compounds, cudaMemcpyHostToDevice);
 		cudaMemcpy(simulation->box->solvent_neighborlists, nlist_data_collection->solvent_neighborlists, sizeof(NeighborList) * simulation->n_solvents, cudaMemcpyHostToDevice);
@@ -48,6 +55,7 @@ void Engine::hostMaster() {
 
 		prev_nlist_update_step = simulation->getStep();
 	}
+	*/
 }
 
 
@@ -61,7 +69,7 @@ void Engine::hostMaster() {
 //--------------------------------------------------------------------------	CPU workload --------------------------------------------------------------//
 
 
-void Engine::offLoadPositionData(Simulation* simulation) {
+void Engine::offloadPositionData(Simulation* simulation) {
 	//cudaMemcpyAsync(compoundstatearray_host, simulation->box->compound_state_array, sizeof(CompoundState) * simulation->box->n_compounds, cudaMemcpyDeviceToHost);
 	cudaMemcpy(nlist_data_collection->compoundstates, simulation->box->compound_state_array, sizeof(CompoundState) * simulation->n_compounds, cudaMemcpyDeviceToHost);
 	cudaMemcpy(nlist_data_collection->solvents, simulation->box->solvents, sizeof(Solvent) * simulation->n_solvents, cudaMemcpyDeviceToHost);
@@ -227,6 +235,9 @@ void Engine::updateNeighborLists(Simulation* simulation, NListDataCollection* nl
 }
 
 
+void Engine::offloadLoggingData() {
+
+}
 
 
 

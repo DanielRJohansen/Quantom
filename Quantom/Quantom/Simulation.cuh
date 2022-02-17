@@ -17,7 +17,7 @@ constexpr double FOCUS_LEN_HALF = BLOCK_LEN / 4.f;
 
 
 const int STEPS_PER_NLIST_UPDATE = 50;
-
+const int STEPS_PER_LOGTRANSFER = 1000;
 
 
 const int LOGBLOCK = 0;
@@ -68,7 +68,7 @@ public:
 
 	uint32_t n_compounds = 0;
 	uint16_t n_solvents = 0;
-	uint32_t total_particles = 0;
+	uint32_t total_particles_upperbound = 0;
 
 	RenderMolecule rendermolecule;	// Not proud, TEMP
 

@@ -38,10 +38,10 @@ void __global__ monitorCompoundEnergyKernel(Box* box, Float3* data_out) {		// ev
 	__syncthreads();
 
 
-	double potE = box->potE_buffer[threadIdx.x + compound_index * PARTICLES_PER_COMPOUND + step * box->total_particles];	
+	double potE = box->potE_buffer[threadIdx.x + compound_index * PARTICLES_PER_COMPOUND + step * box->total_particles_upperbound];	
 
-	Float3 pos_tsub1 = box->trajectory[threadIdx.x + compound_index * PARTICLES_PER_COMPOUND + (step - 1) * box->total_particles];
-	Float3 pos_tadd1 = box->trajectory[threadIdx.x + compound_index * PARTICLES_PER_COMPOUND + (step + 1) * box->total_particles];
+	Float3 pos_tsub1 = box->trajectory[threadIdx.x + compound_index * PARTICLES_PER_COMPOUND + (step - 1) * box->total_particles_upperbound];
+	Float3 pos_tadd1 = box->trajectory[threadIdx.x + compound_index * PARTICLES_PER_COMPOUND + (step + 1) * box->total_particles_upperbound];
 	applyHyperposA(&pos_tadd1, &pos_tsub1);
 	
 
@@ -85,19 +85,19 @@ void __global__ monitorSolventEnergyKernel(Box* box, Float3* data_out) {
 		data_out[blockIdx.y + (step - 1) * N_MONITORBLOCKS_PER_STEP] = Float3(0, 0, 0);
 	}
 
-	Float3 pos_tsub1 = box->trajectory[compounds_offset + solvent_index + (step - 1) * box->total_particles];
-	Float3 pos_tadd1 = box->trajectory[compounds_offset + solvent_index + (step + 1) * box->total_particles];
+	Float3 pos_tsub1 = box->trajectory[compounds_offset + solvent_index + (step - 1) * box->total_particles_upperbound];
+	Float3 pos_tadd1 = box->trajectory[compounds_offset + solvent_index + (step + 1) * box->total_particles_upperbound];
 	applyHyperposA(&pos_tadd1, &pos_tsub1);
 
 
-	double potE = box->potE_buffer[compounds_offset + solvent_index + step * box->total_particles];
+	double potE = box->potE_buffer[compounds_offset + solvent_index + step * box->total_particles_upperbound];
 
 	
 	double vel = (pos_tadd1 - pos_tsub1).len() * 0.5f / box->dt;
 	if (vel > 10'000) {
 		printf("step %04d solvate %04dvel:  %f\n", step, solvent_index, vel);
 		//pos_tadd1.print('a');
-		//printf("analyzer index %d\n", compounds_offset + solvent_index + (step - 1) * box->total_particles);
+		//printf("analyzer index %d\n", compounds_offset + solvent_index + (step - 1) * box->total_particles_upperbound);
 		//pos_tsub1.print('s');
 	}
 	if (potE > 200'000) {
@@ -143,7 +143,7 @@ void Analyzer::analyzeEnergy(Simulation* simulation) {	// Calculates the avg J/m
 	Float3* average_compound_energy = analyzeCompoundEnergy(simulation, analysable_steps);	//avg energy PER PARTICLE in compound
 
 	for (int i = 0; i < analysable_steps; i++) {
-		average_energy[i] = (average_solvent_energy[i] * simulation->box->n_solvents * 1 + average_compound_energy[i] * simulation->box->n_compounds * PARTICLES_PER_COMPOUND) * (1.f/ simulation->box->total_particles);
+		average_energy[i] = (average_solvent_energy[i] * simulation->box->n_solvents * 1 + average_compound_energy[i] * simulation->box->n_compounds * PARTICLES_PER_COMPOUND) * (1.f/ simulation->box->total_particles_upperbound);
 	}
 
 
