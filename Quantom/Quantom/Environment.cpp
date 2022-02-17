@@ -44,6 +44,7 @@ bool Environment::verifySimulationParameters() {	// Not yet implemented
 	assert(BOX_LEN > 3.f);
 	//assert(BOX_LEN >= CUTOFF + 0.5f);
 	assert(simulation->n_compounds <= 1);	// Otherwise data_GAN goes haywire
+	assert(simulation->n_steps % STEPS_PER_LOGTRANSFER == 0);
 	return true;
 }
 
@@ -82,14 +83,18 @@ void Environment::run() {
 }
 
 void Environment::postRunEvents() {
+	analyzer.analyzeEnergy(simulation);
+
+	return;
+
 	printFloat3Matrix(
 		simulation->box->data_GAN,
 		Int3(simulation->getStep(), MAX_COMPOUND_PARTICLES, 6),
 		simulation->out_dir + "\\particles_" + to_string(70) + "_steps_" + to_string(simulation->getStep()) + ".csv");
-		//"D:\\Quantom\\Training\\sim_out.csv");
+
 	//printTrajectory(simulation);
 	//printWaterforce(simulation);
-	//analyzer.analyzeEnergy(simulation);
+	
 
 	//printOut(simulation->box->outdata, simulation->n_steps);
 	//printDataBuffer(simulation->box);
@@ -202,14 +207,14 @@ void Environment::printOut(double* data, int n_steps) {
 void Environment::printTrajectory(Simulation* simulation) {
 	std::ofstream myfile("D:\\Quantom\\trajectory.csv");
 
-	int n_points = simulation->box->total_particles_upperbound * simulation->n_steps;
+	int n_points = simulation->total_particles_upperbound * simulation->n_steps;
 	Float3* traj_host = new Float3[n_points];
 	cudaMemcpy(traj_host, simulation->box->trajectory, sizeof(Float3) * n_points, cudaMemcpyDeviceToHost);
 
 	for (int i = 0; i < simulation->box->step; i++) {
-		for (int j = 0; j < simulation->box->total_particles_upperbound; j++) {
+		for (int j = 0; j < simulation->total_particles_upperbound; j++) {
 			for (int k = 0; k < 3; k++) {
-				myfile << traj_host[j + i * simulation->box->total_particles_upperbound].at(k) << ";";
+				myfile << traj_host[j + i * simulation->total_particles_upperbound].at(k) << ";";
 			}			
 		}
 		myfile << "\n";

@@ -70,8 +70,10 @@ void BoxBuilder::finishBox(Simulation* simulation)
 	printf("%d Compounds in box\n", simulation->box->n_compounds);
 	solvateBox(simulation);	// Always do after placing compounds
 
-	simulation->box->total_particles_upperbound = simulation->box->n_compounds * MAX_COMPOUND_PARTICLES + simulation->box->n_solvents;											// BAD AMBIGUOUS AND WRONG CONSTANTS
-	//simulation->box->total_particles = simulation->box->n_compounds * PARTICLES_PER_COMPOUND + simulation->box->n_solvents;											// BAD AMBIGUOUS AND WRONG CONSTANTS
+
+	// Need this variable both on host and device
+	simulation->total_particles_upperbound = simulation->box->n_compounds * MAX_COMPOUND_PARTICLES + simulation->box->n_solvents;											// BAD AMBIGUOUS AND WRONG CONSTANTS
+	simulation->box->total_particles_upperbound = simulation->total_particles_upperbound;											// BAD AMBIGUOUS AND WRONG CONSTANTS
 
 
 	cudaMemcpy(simulation->box->compound_state_array_next, simulation->box->compound_state_array, sizeof(CompoundState) * MAX_COMPOUNDS, cudaMemcpyHostToDevice);	// Just make sure they have the same n_particles info...
@@ -86,9 +88,15 @@ void BoxBuilder::finishBox(Simulation* simulation)
 
 
 
-	int n_points = simulation->box->total_particles_upperbound * STEPS_PER_LOGTRANSFER;
-	cudaMalloc(&simulation->box->potE_buffer, sizeof(double) * n_points);	// Can only log molecules of size 3 for now...
-	cudaMalloc(&simulation->box->trajectory, sizeof(Float3) * n_points);
+	int n_points = simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER;
+	cudaMalloc(&simulation->box->potE_buffer, sizeof(double) * simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER);	// Can only log molecules of size 3 for now...
+	simulation->potE_buffer = new double[simulation->total_particles_upperbound * simulation->n_steps];
+
+
+
+	cudaMalloc(&simulation->box->trajectory, sizeof(Float3) * simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER);
+	simulation->traj_buffer = new Float3[simulation->total_particles_upperbound * simulation->n_steps];
+
 	printf("Reserving %d MB for logging\n", (int)((sizeof(double) + sizeof(Float3)) * n_points / 1e+6));
 	cudaMallocManaged(&simulation->box->outdata, sizeof(double) * 10 * simulation->n_steps);	// 10 data streams for 10k steps. 1 step at a time.
 

@@ -17,8 +17,8 @@
 
 
 
-const int THREADS_PER_MONITORBLOCK = 256;
-const int N_MONITORBLOCKS_PER_STEP = 256;
+//const int THREADS_PER_MONITORBLOCK = 256;
+//const int N_MONITORBLOCKS_PER_STEP = 256;
 
 class Analyzer {
 public:

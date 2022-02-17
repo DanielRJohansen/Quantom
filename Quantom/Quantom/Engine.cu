@@ -236,7 +236,9 @@ void Engine::updateNeighborLists(Simulation* simulation, NListDataCollection* nl
 
 
 void Engine::offloadLoggingData() {
-
+	int step_offset = (simulation->getStep() / STEPS_PER_LOGTRANSFER) * simulation->total_particles_upperbound;	// Tongue in cheek here, no we do not need to subtract 1 from the fraction
+	cudaMemcpy(&simulation->potE_buffer[step_offset], simulation->box->potE_buffer, sizeof(double) * simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER, cudaMemcpyDeviceToHost);
+	cudaMemcpy(&simulation->traj_buffer[step_offset], simulation->box->trajectory, sizeof(Float3) * simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER, cudaMemcpyDeviceToHost);
 }
 
 
@@ -821,13 +823,11 @@ __global__ void forceKernel(Box* box) {
 	
 	// ------------------------------------ DATA LOG ------------------------------- //
 	{
-		/*
-		if (threadIdx.x < 3) {	// TODO: UPDATE 3 TO PARTICLES_PER_COMPOUND
-			box->potE_buffer[threadIdx.x + blockIdx.x * PARTICLES_PER_COMPOUND + box->step * box->total_particles] = data_ptr[0] + data_ptr[2];
-			box->trajectory[threadIdx.x + blockIdx.x * PARTICLES_PER_COMPOUND + (box->step) * box->total_particles] = compound_state.positions[threadIdx.x];
-		}
+		int step_offset = (box->step % STEPS_PER_LOGTRANSFER) * box->total_particles_upperbound;
+		box->potE_buffer[threadIdx.x + blockIdx.x * MAX_COMPOUND_PARTICLES + step_offset] = data_ptr[0] + data_ptr[2];
+		box->trajectory[threadIdx.x + blockIdx.x * MAX_COMPOUND_PARTICLES + step_offset] = compound_state.positions[threadIdx.x];
 		__syncthreads();
-
+/*
 		if (blockIdx.x == LOGBLOCK && threadIdx.x == LOGTHREAD && LOGTYPE == 1) {
 			box->outdata[3 + box->step * 10] = data_ptr[0];	// LJ pot
 
