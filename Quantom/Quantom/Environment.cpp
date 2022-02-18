@@ -62,9 +62,9 @@ void Environment::run() {
 	while (display->window->isOpen()) {
 
 		
+		engine->deviceMaster();		// Device first, otherwise offloading data always needs the last datapoint!
 		engine->hostMaster();
-		engine->deviceMaster();
-		
+
 		
 		
 

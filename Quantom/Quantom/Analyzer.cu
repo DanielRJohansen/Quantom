@@ -25,6 +25,13 @@ void __device__ distributedSummation(T* arrayptr, int array_len) {				// Places 
 	}
 }
 
+double __device__ calcKineticEnergy(Float3* pos1, Float3* pos2, double mass, double dt) {
+	applyHyperposA(pos1, pos2);
+
+	double vel = (*pos1 - *pos2).len() * 0.5f / dt;
+	double kinE = 0.5 * mass * vel * vel;
+	return kinE;
+}
 
 void __global__ monitorCompoundEnergyKernel(Box* box, Float3* traj_buffer, double* potE_buffer, Float3* data_out) {		// everything here breaks if not all compounds are identical in particle count and particle mass!!!!!!!
 	__shared__ Float3 energy[MAX_COMPOUND_PARTICLES];
@@ -54,11 +61,13 @@ void __global__ monitorCompoundEnergyKernel(Box* box, Float3* traj_buffer, doubl
 
 	Float3 pos_tsub1 = traj_buffer[threadIdx.x + compound_index * MAX_COMPOUND_PARTICLES + (step - 1) * box->total_particles_upperbound];
 	Float3 pos_tadd1 = traj_buffer[threadIdx.x + compound_index * MAX_COMPOUND_PARTICLES + (step + 1) * box->total_particles_upperbound];
+	double kinE = calcKineticEnergy(&pos_tadd1, &pos_tsub1, compound.particles[threadIdx.x].mass, box->dt);
+	/*
 	applyHyperposA(&pos_tadd1, &pos_tsub1);
-	
-
 	double vel = (pos_tadd1 - pos_tsub1).len() * 0.5f / box->dt;
 	double kinE = 0.5 * compound.particles[threadIdx.x].mass * vel * vel;
+	*/
+
 
 	double totalE = potE + kinE;
 
@@ -113,41 +122,31 @@ void __global__ monitorSolventEnergyKernel(Box* box, Float3* traj_buffer, double
 
 	Float3 pos_tsub1 = traj_buffer[compounds_offset + solvent_index + (step - 1) * box->total_particles_upperbound];
 	Float3 pos_tadd1 = traj_buffer[compounds_offset + solvent_index + (step + 1) * box->total_particles_upperbound];
-	applyHyperposA(&pos_tadd1, &pos_tsub1);
+	double kinE = calcKineticEnergy(&pos_tadd1, &pos_tsub1, SOLVENT_MASS, box->dt);
 
+	/*
+	applyHyperposA(&pos_tadd1, &pos_tsub1);
+	double vel = (pos_tadd1 - pos_tsub1).len() * 0.5f / box->dt;
+	double kinE = 0.5 * SOLVENT_MASS * vel * vel;
+	*/
 
 	double potE = potE_buffer[compounds_offset + solvent_index + step * box->total_particles_upperbound];
 
-	
-	double vel = (pos_tadd1 - pos_tsub1).len() * 0.5f / box->dt;
-
-	if (vel > 10'000) {
-		printf("step %04d solvate %04dvel:  %f\n", step, solvent_index, vel);
-		//pos_tadd1.print('a');
-		//printf("analyzer index %d\n", compounds_offset + solvent_index + (step - 1) * box->total_particles_upperbound);
-		//pos_tsub1.print('s');
-	}
 	if (potE > 200'000) {
 		printf("step %04d solvate %04d pot %f\n", step, solvent_index, potE);
 	}
-	
-		
-	double kinE = 0.5 * SOLVENT_MASS * vel * vel;
-
 
 	double totalE = potE + kinE;
 
 	energy[threadIdx.x] = Float3(potE, kinE, totalE);
 	__syncthreads();
 
-	/*
-	for (int i = 1; i < THREADS_PER_MONITORBLOCK; i *= 2) {	// Distributed averaging
-		if ((threadIdx.x + i) < THREADS_PER_MONITORBLOCK) {
-			energy[threadIdx.x] = (energy[threadIdx.x] + energy[threadIdx.x + i]);// *0.5f;	// easier to just divide by sum of solvents at host
-		}
-		__syncthreads();
+
+	if (threadIdx.x == 0 && energy[0].x < 400) {
+		printf("Step %d\n", step);
+		energy[0].print('0');
 	}
-	*/
+		
 
 	distributedSummation(energy, 256);
 	if (threadIdx.x == 0) {
@@ -162,12 +161,18 @@ void __global__ monitorSolventEnergyKernel(Box* box, Float3* traj_buffer, double
 
 
 void Analyzer::analyzeEnergy(Simulation* simulation) {	// Calculates the avg J/mol // calculate energies separately for compounds and solvents. weigh averages based on amount of each
-	int analysable_steps = simulation->getStep() - 2;
+	printf("Get step %d\n", simulation->getStep());
+	int analysable_steps = simulation->getStep() - 3;
 	if (analysable_steps < 1)
 		return;
 
 	Float3* average_energy = new Float3[analysable_steps];
 	
+	for (int i = 0; i < simulation->getStep(); i++) {
+		//printf("Step %d potE %f\n", i, simulation->potE_buffer[i]);
+	}
+	//exit(0);
+
 
 																		// TODO: I think maybe i am missing 1 datapoint here? Something about only loading 99 steps in??
 	cudaMalloc(&traj_buffer_device, sizeof(Float3) * simulation->total_particles_upperbound * simulation->getStep());
@@ -185,6 +190,7 @@ void Analyzer::analyzeEnergy(Simulation* simulation) {	// Calculates the avg J/m
 	
 
 	for (int i = 0; i < analysable_steps; i++) {
+		printf("\n");
 		average_compound_energy[i].print('c');
 		average_solvent_energy[i].print('s');
 		average_energy[i] = (average_solvent_energy[i] * simulation->box->n_solvents * 1 + average_compound_energy[i] * simulation->box->compounds[0].n_particles) * (1.f/ (simulation->box->n_solvents + simulation->box->compounds[0].n_particles));

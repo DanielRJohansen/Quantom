@@ -17,7 +17,7 @@ constexpr double FOCUS_LEN_HALF = BLOCK_LEN / 4.f;
 
 
 const int STEPS_PER_NLIST_UPDATE = 50;
-const int STEPS_PER_LOGTRANSFER = 100;
+const int STEPS_PER_LOGTRANSFER = 50;
 
 
 const int LOGBLOCK = 0;
@@ -56,7 +56,7 @@ const int THREADS_PER_COMPOUNDBLOCK = 128; // Must be >= max comp particles
 const int N_LIPID_COPIES = 32;
 
 
-const int SIMULATION_STEPS = 100;
+const int SIMULATION_STEPS = 200;
 
 //constexpr double SOLVENT_MASS = 18.01528f * 1e-3;	// kg/mol
 constexpr double SOLVENT_MASS = 12.0107 * 1e-3;	// kg/mol
