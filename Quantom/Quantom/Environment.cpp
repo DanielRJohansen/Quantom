@@ -57,7 +57,6 @@ void Environment::run() {
 	printf("Simulation started\n\n");
 	time0 = std::chrono::high_resolution_clock::now();
 
-	
 
 	while (display->window->isOpen()) {
 

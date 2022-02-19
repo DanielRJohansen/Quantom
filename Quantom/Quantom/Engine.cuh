@@ -3,9 +3,9 @@
 #include <iostream>
 #include <chrono>
 
-#include "Bodies.cuh"
+//#include "Bodies.cuh"
 #include "Simulation.cuh"
-#include "BoxBuilder.cuh"
+//#include "BoxBuilder.cuh"
 
 #include <cuda.h>
 #include "cuda_runtime.h"
@@ -21,7 +21,20 @@
 
 __global__ void forceKernel(Box* box);
 __global__ void solventForceKernel(Box* box);
-__global__ void initKernel(Box* box);	// For now, just initializes previous potential energy
+
+
+
+
+class LIMAENG {
+public:
+	static void __device__ __host__ applyHyperpos(Float3* static_particle, Float3* movable_particle) {
+		for (int i = 0; i < 3; i++) {
+			*movable_particle->placeAt(i) += BOX_LEN * ((static_particle->at(i) - movable_particle->at(i)) > BOX_LEN_HALF);
+			*movable_particle->placeAt(i) -= BOX_LEN * ((static_particle->at(i) - movable_particle->at(i)) < -BOX_LEN_HALF);	// use at not X!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		}	}
+
+};
+
 
 
 

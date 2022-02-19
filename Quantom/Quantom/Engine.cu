@@ -1,5 +1,13 @@
 #include "Engine.cuh"
 
+//using namespace LIMAENG;
+
+
+
+
+
+
+
 
 Engine::Engine() {}
 Engine::Engine(Simulation* simulation) {
@@ -75,7 +83,7 @@ void Engine::offloadPositionData(Simulation* simulation) {
 	cudaMemcpy(nlist_data_collection->solvents, simulation->box->solvents, sizeof(Solvent) * simulation->n_solvents, cudaMemcpyDeviceToHost);
 }
 
-void __device__ __host__ applyHyperpos(Float3* static_particle, Float3* movable_particle);
+//(void __device__ __host__ applyHyperpos(Float3* static_particle, Float3* movable_particle);
 void Engine::cullDistantNeighbors(NListDataCollection* nlist_data_collection) {	// Calling with nlist avoids writing function for both solvent and compound
 	for (int i = 0; i < nlist_data_collection->n_compounds; i++) {
 		int id_self = i;
@@ -88,7 +96,7 @@ void Engine::cullDistantNeighbors(NListDataCollection* nlist_data_collection) {	
 			if (id_self < id_neighbor) {
 				Float3 pos_neighbor = nlist_data_collection->compound_key_positions[id_neighbor];
 				NeighborList* nlist_neighbor = &nlist_data_collection->compound_neighborlists[id_neighbor];
-				applyHyperpos(&pos_self, &pos_neighbor);
+				LIMAENG::applyHyperpos(&pos_self, &pos_neighbor);
 				double dist = (pos_neighbor - pos_self).len();
 				if (dist > CUTOFF) {
 					nlist_self->removeId(id_neighbor, NeighborList::NEIGHBOR_TYPE::COMPOUND);
@@ -106,7 +114,7 @@ void Engine::cullDistantNeighbors(NListDataCollection* nlist_data_collection) {	
 			Float3 pos_neighbor = nlist_data_collection->solvent_positions[id_neighbor];
 			NeighborList* nlist_neighbor = &nlist_data_collection->solvent_neighborlists[id_neighbor];
 
-			applyHyperpos(&pos_self, &pos_neighbor);
+			LIMAENG::applyHyperpos(&pos_self, &pos_neighbor);
 			double dist = (pos_neighbor - pos_self).len();
 			if (dist > CUTOFF) {
 				nlist_self->removeId(id_neighbor, NeighborList::NEIGHBOR_TYPE::SOLVENT);
@@ -129,7 +137,7 @@ void Engine::cullDistantNeighbors(NListDataCollection* nlist_data_collection) {	
 				Float3 pos_neighbor = nlist_data_collection->solvent_positions[id_neighbor];
 				NeighborList* nlist_neighbor = &nlist_data_collection->solvent_neighborlists[id_neighbor];
 
-				applyHyperpos(&pos_self, &pos_neighbor);
+				LIMAENG::applyHyperpos(&pos_self, &pos_neighbor);
 				double dist = (pos_neighbor - pos_self).len();
 				if (dist > CUTOFF) {
 					nlist_self->removeId(id_neighbor, NeighborList::NEIGHBOR_TYPE::SOLVENT);
@@ -166,7 +174,7 @@ void Engine::updateNeighborLists(Simulation* simulation, NListDataCollection* nl
 			for (int j = 0; j < nlist_neighbor->n_solvent_neighbors; j++) {
 				int id_candidate = nlist_neighbor->neighborsolvent_ids[j];
 				Float3 pos_candidate = nlist_data_collection->solvent_positions[id_candidate];
-				applyHyperpos(&pos_self, &pos_candidate);
+				LIMAENG::applyHyperpos(&pos_self, &pos_candidate);
 				double dist = (pos_self - pos_candidate).len();
 				if (dist < CUTOFF) {
 					NeighborList* nlist_candidate = &nlist_data_collection->solvent_neighborlists[id_candidate];
@@ -182,7 +190,7 @@ void Engine::updateNeighborLists(Simulation* simulation, NListDataCollection* nl
 
 		for (int id_candidate = id_self + 1; id_candidate < simulation->n_compounds; id_candidate++) {	// For finding new nearby compounds, it is faster and simpler to just check all compounds, since there is so few
 			Float3 pos_candidate = nlist_data_collection->compound_key_positions[id_candidate];
-			applyHyperpos(&pos_self, &pos_candidate);
+			LIMAENG::applyHyperpos(&pos_self, &pos_candidate);
 			double dist = (pos_self, pos_candidate).len();			
 			if (dist < CUTOFF) {
 				NeighborList* nlist_candidate = &nlist_data_collection->compound_neighborlists[id_candidate];
@@ -211,7 +219,7 @@ void Engine::updateNeighborLists(Simulation* simulation, NListDataCollection* nl
 
 
 				Float3 pos_candidate = nlist_data_collection->solvent_positions[id_candidate];
-				applyHyperpos(&pos_self, &pos_candidate);
+				LIMAENG::applyHyperpos(&pos_self, &pos_candidate);
 				double dist = (pos_self - pos_candidate).len();
 				if (dist < CUTOFF) {
 					NeighborList* nlist_candidate = &nlist_data_collection->solvent_neighborlists[id_candidate];
@@ -313,20 +321,17 @@ __device__ double cudaMin(double a, double b) {
 
 
 
-
-void __device__ __host__ applyHyperpos(Float3* static_particle, Float3* movable_particle) {
+/*
+void __device__ __host__ LIMAENG::applyHyperpos(Float3* static_particle, Float3* movable_particle) {
 	//Float3 tmp = *movable_particle;
 	for (int i = 0; i < 3; i++) {
 		*movable_particle->placeAt(i) += BOX_LEN * ((static_particle->at(i) - movable_particle->at(i)) > BOX_LEN_HALF);
 		*movable_particle->placeAt(i) -= BOX_LEN * ((static_particle->at(i) - movable_particle->at(i)) < -BOX_LEN_HALF);	// use at not X!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	}
-	/*
-	if ((*movable_particle - tmp).len() > 0.1 && !(tmp == Float3(0,0,0))) {
-		static_particle->print('s');
-		tmp.print('f');
-		movable_particle->print('t');
-	}*/
+
 }
+*/
+
 
 __device__ void applyPBC(Float3* current_position) {	// Only changes position if position is outside of box;
 	for (int dim = 0; dim < 3; dim++) {
@@ -620,7 +625,7 @@ __device__ Float3 computeSolventToSolventLJForces(Float3* self_pos, int self_ind
 	for (int i = 0; i < n_particles; i++) {
 		if (i != self_index) {
 			Float3 hyperpos = positions[i];			// copy, DONT ref it as all threads will cann applyHyperpos
-			applyHyperpos(self_pos, &hyperpos);
+			LIMAENG::applyHyperpos(self_pos, &hyperpos);
 			force += calcLJForce(self_pos, &hyperpos, data_ptr, potE_sum);
 		}		
 	}
@@ -751,7 +756,7 @@ __global__ void forceKernel(Box* box) {
 
 	// ------------------------------------------------------------ Intramolecular Operations ------------------------------------------------------------ //
 	{
-		applyHyperpos(&compound_state.positions[0], &compound_state.positions[threadIdx.x]);
+		LIMAENG::applyHyperpos(&compound_state.positions[0], &compound_state.positions[threadIdx.x]);
 		force_bond = computePairbondForces(&compound, &compound_state, utility_buffer, &potE_sum);
 		if (force_bond.x != force_bond.x) {
 			force_bond.print('p');
@@ -774,7 +779,7 @@ __global__ void forceKernel(Box* box) {
 
 		if (threadIdx.x < n_particles) {	
 			utility_buffer[threadIdx.x] = box->compound_state_array[i].positions[threadIdx.x];
-			applyHyperpos(&compound_state.positions[0], &utility_buffer[threadIdx.x]);
+			LIMAENG::applyHyperpos(&compound_state.positions[0], &utility_buffer[threadIdx.x]);
 		}
 		__syncthreads();
 		force_LJ_com += computeLJForces(&compound_state.positions[threadIdx.x], n_particles, utility_buffer, data_ptr, &potE_sum);
@@ -787,7 +792,7 @@ __global__ void forceKernel(Box* box) {
 	// --------------------------------------------------------------- Solvation forces --------------------------------------------------------------- //
 	for (int i = threadIdx.x; i < neighborlist.n_solvent_neighbors; i += blockDim.x) {
 		utility_buffer[i] = box->solvents[neighborlist.neighborsolvent_ids[i]].pos;
-		applyHyperpos(&compound_state.positions[0], &utility_buffer[i]);
+		LIMAENG::applyHyperpos(&compound_state.positions[0], &utility_buffer[i]);
 	}
 	__syncthreads();
 	if (threadIdx.x < compound.n_particles) {
@@ -833,7 +838,7 @@ __global__ void forceKernel(Box* box) {
 		//if (blockIdx.x == 0 && ((compound_state.positions[0]-Float3(0.f)).len() > BOX_LEN))
 		//compound_state.positions[0].print('s');
 	}
-	applyHyperpos(&compound_state.positions[0], &compound_state.positions[threadIdx.x]);	// So all particles follows p0
+	LIMAENG::applyHyperpos(&compound_state.positions[0], &compound_state.positions[threadIdx.x]);	// So all particles follows p0
 	// ------------------------------------------------------------------------------------------------------------------------------------------------------------------ //
 	
 
@@ -923,7 +928,7 @@ __global__ void solventForceKernel(Box* box) {
 		__syncthreads();
 
 		//Only do if mol is neighbor to the particular solvent
-		applyHyperpos(&utility_buffer[0], &solvent_positions[threadIdx.x]);
+		LIMAENG::applyHyperpos(&utility_buffer[0], &solvent_positions[threadIdx.x]);
 		force += computeLJForces(&solvent_positions[threadIdx.x], n_particles, utility_buffer, data_ptr, &potE_sum);
 
 	}

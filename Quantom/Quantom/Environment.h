@@ -8,6 +8,8 @@
 #include "Analyzer.cuh"
 #include "CompoundBuilder.h"
 #include "VirtualPathMaker.h"
+#include "BoxBuilder.cuh"
+
 
 // For logging
 #include <fstream>

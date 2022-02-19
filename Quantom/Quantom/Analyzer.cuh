@@ -1,9 +1,11 @@
+#pragma once
+
 #include <iostream>
 #include <chrono>
 
-#include "Bodies.cuh"
+//#include "Bodies.cuh"
 #include "Simulation.cuh"
-#include "BoxBuilder.cuh"
+//#include "BoxBuilder.cuh"
 #include "Engine.cuh"
 
 

@@ -5,13 +5,6 @@
 
 
 
-void __device__ applyHyperposA(Float3* static_particle, Float3* movable_particle) {
-	for (int i = 0; i < 3; i++) {
-		*movable_particle->placeAt(i) += BOX_LEN * ((static_particle->at(i) - movable_particle->at(i)) > BOX_LEN_HALF);
-		*movable_particle->placeAt(i) -= BOX_LEN * ((static_particle->at(i) - movable_particle->at(i)) < -BOX_LEN_HALF);	// use at not X!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-	}
-}
-
 template<typename T>
 void __device__ distributedSummation(T* arrayptr, int array_len) {				// Places the result at pos 0 of input_array
 	T temp;			// This is a lazy soluation, but maybe it is also fast? Definitely simple..
@@ -26,7 +19,8 @@ void __device__ distributedSummation(T* arrayptr, int array_len) {				// Places 
 }
 
 double __device__ calcKineticEnergy(Float3* pos1, Float3* pos2, double mass, double dt) {
-	applyHyperposA(pos1, pos2);
+	LIMAENG::applyHyperpos(pos1, pos2);
+
 
 	double vel = (*pos1 - *pos2).len() * 0.5f / dt;
 	double kinE = 0.5 * mass * vel * vel;
@@ -61,6 +55,8 @@ void __global__ monitorCompoundEnergyKernel(Box* box, Float3* traj_buffer, doubl
 
 	Float3 pos_tsub1 = traj_buffer[threadIdx.x + compound_index * MAX_COMPOUND_PARTICLES + (step - 1) * box->total_particles_upperbound];
 	Float3 pos_tadd1 = traj_buffer[threadIdx.x + compound_index * MAX_COMPOUND_PARTICLES + (step + 1) * box->total_particles_upperbound];
+	//LIMAENG::applyHyperpos(&pos_tadd1, &pos_tsub1);
+	//testspace::testerfn(4);
 	double kinE = calcKineticEnergy(&pos_tadd1, &pos_tsub1, compound.particles[threadIdx.x].mass, box->dt);
 	/*
 	applyHyperposA(&pos_tadd1, &pos_tsub1);
@@ -146,6 +142,11 @@ void Analyzer::analyzeEnergy(Simulation* simulation) {	// Calculates the avg J/m
 	int analysable_steps = simulation->getStep() - 3;
 	if (analysable_steps < 1)
 		return;
+
+	Float3 a(0.4);
+	Float3 b(2.f);
+	//LIMAENG::applyHyperpos(&a, &b);
+	//testspace::testerfn(4);
 
 	Float3* average_energy = new Float3[analysable_steps];
 	
