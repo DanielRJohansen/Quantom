@@ -75,21 +75,13 @@ void __global__ monitorCompoundEnergyKernel(Box* box, Float3* traj_buffer, doubl
 	__syncthreads();
 
 
-	distributedSummation(energy, MAX_COMPOUND_PARTICLES);
-	/*
-	for (int i = 1; i < MAX_COMPOUND_PARTICLES; i *= 2) {	// Distributed averaging							// Make a generic and SAFER function for this, PLEASE OK??
-		Float3 temp;			// This is a lazy soluation, but maybe it is also fast? Definitely simple..
-		if ((threadIdx.x + i) < MAX_COMPOUND_PARTICLES) {
-			//energy[threadIdx.x] = (energy[threadIdx.x] + energy[threadIdx.x + i]);// *0.5f;	// easier to just divide by sum of solvents at host
-			temp = energy[threadIdx.x] + energy[threadIdx.x + i];// *0.5f;	// easier to just divide by sum of solvents at host
-		}
-		__syncthreads();
-		energy[threadIdx.x] = temp;
-		__syncthreads();
-	}
-	*/
-	
+	/*if (energy[threadIdx.x].len() > 40000) {
+		printf("Step %d\n", step);
+		energy[threadIdx.x].print('c');
+	}*/
 
+	distributedSummation(energy, MAX_COMPOUND_PARTICLES);
+	
 	__syncthreads();
 	if (threadIdx.x == 0) {
 		data_out[compound_index + (step - 1) * box->n_compounds] = energy[0];
@@ -124,12 +116,6 @@ void __global__ monitorSolventEnergyKernel(Box* box, Float3* traj_buffer, double
 	Float3 pos_tadd1 = traj_buffer[compounds_offset + solvent_index + (step + 1) * box->total_particles_upperbound];
 	double kinE = calcKineticEnergy(&pos_tadd1, &pos_tsub1, SOLVENT_MASS, box->dt);
 
-	/*
-	applyHyperposA(&pos_tadd1, &pos_tsub1);
-	double vel = (pos_tadd1 - pos_tsub1).len() * 0.5f / box->dt;
-	double kinE = 0.5 * SOLVENT_MASS * vel * vel;
-	*/
-
 	double potE = potE_buffer[compounds_offset + solvent_index + step * box->total_particles_upperbound];
 
 	if (potE > 200'000) {
@@ -142,10 +128,6 @@ void __global__ monitorSolventEnergyKernel(Box* box, Float3* traj_buffer, double
 	__syncthreads();
 
 
-	if (threadIdx.x == 0 && energy[0].x < 400) {
-		printf("Step %d\n", step);
-		energy[0].print('0');
-	}
 		
 
 	distributedSummation(energy, 256);
@@ -154,8 +136,7 @@ void __global__ monitorSolventEnergyKernel(Box* box, Float3* traj_buffer, double
 		data_out[step-1] = energy[0];
 		//data_out[blockIdx.y + (step - 1) * 256] = Float3(1,2,3);
 		//data_out[blockIdx.y + step * 256].print('g');
-	}
-	
+	}	
 }
 
 
@@ -187,16 +168,16 @@ void Analyzer::analyzeEnergy(Simulation* simulation) {	// Calculates the avg J/m
 	cudaFree(traj_buffer_device);
 	cudaFree(potE_buffer_device);
 
+
 	
-
 	for (int i = 0; i < analysable_steps; i++) {
-		printf("\n");
-		average_compound_energy[i].print('c');
-		average_solvent_energy[i].print('s');
+		//printf("\n");
+		//average_compound_energy[i].print('c');
+		//average_solvent_energy[i].print('s');
 		average_energy[i] = (average_solvent_energy[i] * simulation->box->n_solvents * 1 + average_compound_energy[i] * simulation->box->compounds[0].n_particles) * (1.f/ (simulation->box->n_solvents + simulation->box->compounds[0].n_particles));
-		average_energy[i].print('a');
+		//average_energy[i].print('a');
 	}
-
+	
 
 	printEnergies(average_energy, analysable_steps);
 

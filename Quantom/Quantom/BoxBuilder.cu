@@ -89,12 +89,12 @@ void BoxBuilder::finishBox(Simulation* simulation)
 
 
 	int n_points = simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER;
-	cudaMalloc(&simulation->box->potE_buffer, sizeof(double) * simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER);	// Can only log molecules of size 3 for now...
+	cudaMallocManaged(&simulation->box->potE_buffer, sizeof(double) * simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER);	// Can only log molecules of size 3 for now...
 	simulation->potE_buffer = new double[simulation->total_particles_upperbound * simulation->n_steps];
 
 
 
-	cudaMalloc(&simulation->box->trajectory, sizeof(Float3) * simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER);
+	cudaMallocManaged(&simulation->box->trajectory, sizeof(Float3) * simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER);
 	simulation->traj_buffer = new Float3[simulation->total_particles_upperbound * simulation->n_steps];
 
 	printf("Reserving %d MB for logging\n", (int)((sizeof(double) + sizeof(Float3)) * n_points / 1e+6));

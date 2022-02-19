@@ -30,7 +30,7 @@ void Engine::deviceMaster() {
 }
 
 void Engine::hostMaster() {
-	if ((simulation->getStep() % STEPS_PER_LOGTRANSFER) == STEPS_PER_LOGTRANSFER - 1) {
+	if ((simulation->getStep() % STEPS_PER_LOGTRANSFER) == 0) {
 		offloadLoggingData();
 	}
 
@@ -236,11 +236,22 @@ void Engine::updateNeighborLists(Simulation* simulation, NListDataCollection* nl
 
 
 void Engine::offloadLoggingData() {
-	int step_offset = (simulation->getStep()+1 - STEPS_PER_LOGTRANSFER) * simulation->total_particles_upperbound;	// Tongue in cheek here, i think this is correct...
-	printf("Offloading data to position %d %d\n", simulation->getStep() + 1 - STEPS_PER_LOGTRANSFER, step_offset);
+	int step_offset = (simulation->getStep() - STEPS_PER_LOGTRANSFER) * simulation->total_particles_upperbound;	// Tongue in cheek here, i think this is correct...
+	//printf("Offloading data to position %d %d\n", simulation->getStep() - STEPS_PER_LOGTRANSFER, step_offset);
 
-	//cudaMemcpy(&simulation->potE_buffer[step_offset], simulation->box->potE_buffer, sizeof(double) * simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER, cudaMemcpyDeviceToHost);
-	//cudaMemcpy(&simulation->traj_buffer[step_offset], simulation->box->trajectory, sizeof(Float3) * simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER, cudaMemcpyDeviceToHost);
+
+
+	cudaMemcpy(&simulation->potE_buffer[step_offset], simulation->box->potE_buffer, sizeof(double) * simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER, cudaMemcpyDeviceToHost);
+	cudaMemcpy(&simulation->traj_buffer[step_offset], simulation->box->trajectory, sizeof(Float3) * simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER, cudaMemcpyDeviceToHost);
+
+	/*printf("Step %d\n", simulation->getStep());
+	for (int i = 0; i < 10; i++) {
+		//printf("potE: %f\n", simulation->potE_buffer[step_offset + 0 + i * simulation->total_particles_upperbound]);
+		
+		//printf("INdex %d\n", step_offset + 0 + i * simulation->total_particles_upperbound);
+		//simulation->box->trajectory[0 + i * simulation->total_particles_upperbound].print('D');
+		//simulation->traj_buffer[step_offset + 0 + i * simulation->total_particles_upperbound].print('H');
+	}*/
 }
 
 
@@ -830,9 +841,11 @@ __global__ void forceKernel(Box* box) {
 	
 	// ------------------------------------ DATA LOG ------------------------------- //
 	{
-		int step_offset = (box->step % STEPS_PER_LOGTRANSFER) * box->total_particles_upperbound;
-		box->potE_buffer[threadIdx.x + blockIdx.x * MAX_COMPOUND_PARTICLES + step_offset] = potE_sum;//data_ptr[0] + data_ptr[2];
-		box->trajectory[threadIdx.x + blockIdx.x * MAX_COMPOUND_PARTICLES + step_offset] = compound_state.positions[threadIdx.x];
+		if (threadIdx.x < compound.n_particles) {
+			int step_offset = (box->step % STEPS_PER_LOGTRANSFER) * box->total_particles_upperbound;
+			box->potE_buffer[threadIdx.x + blockIdx.x * MAX_COMPOUND_PARTICLES + step_offset] = potE_sum;//data_ptr[0] + data_ptr[2];
+			box->trajectory[threadIdx.x + blockIdx.x * MAX_COMPOUND_PARTICLES + step_offset] = compound_state.positions[threadIdx.x];
+		}		
 		__syncthreads();
 /*
 		if (blockIdx.x == LOGBLOCK && threadIdx.x == LOGTHREAD && LOGTYPE == 1) {
