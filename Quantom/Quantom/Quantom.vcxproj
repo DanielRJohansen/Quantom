@@ -83,7 +83,6 @@
   <ItemGroup>
     <ClCompile Include="BoxBuilder.cu" />
     <ClCompile Include="CompoundBuilder.cpp" />
-    <ClCompile Include="Display.cpp" />
     <ClCompile Include="DisplayV2.cpp" />
     <ClCompile Include="Environment.cpp" />
     <ClCompile Include="Interface.cpp" />
@@ -95,14 +94,12 @@
     <ClInclude Include="Bodies.cuh" />
     <ClInclude Include="BoxBuilder.cuh" />
     <ClInclude Include="CompoundBuilder.h" />
-    <ClInclude Include="Display.h" />
     <ClInclude Include="DisplayV2.h" />
     <ClInclude Include="Engine.cuh" />
     <ClInclude Include="Environment.h" />
     <ClInclude Include="Interface.h" />
     <ClInclude Include="QuantomTypes.cuh" />
     <ClInclude Include="Rasterizer.cuh" />
-    <ClInclude Include="Raytracer.cuh" />
     <ClInclude Include="Simulation.cuh" />
     <ClInclude Include="VirtualPathMaker.h" />
   </ItemGroup>
@@ -112,7 +109,6 @@
     <CudaCompile Include="Engine.cu" />
     <CudaCompile Include="QuantomTypes.cu" />
     <CudaCompile Include="Rasterizer.cu" />
-    <CudaCompile Include="Raytracer.cu" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
