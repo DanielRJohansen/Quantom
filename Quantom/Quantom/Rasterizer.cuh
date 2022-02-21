@@ -26,6 +26,7 @@ public:
 	RenderBall* render(Simulation* simulation);
 
 	int actual_n_particles;
+	int solvent_offset;
 
 private:
 	RenderAtom* getAllAtoms(Simulation* simulation);
@@ -35,5 +36,4 @@ private:
 
 	int n_threadblocks;
 	//int actual_n_particles;
-	int solvent_offset;
 };

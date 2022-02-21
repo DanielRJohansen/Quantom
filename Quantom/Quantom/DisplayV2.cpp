@@ -7,22 +7,19 @@ DisplayV2::DisplayV2() {
 
 
 void DisplayV2::drawFilledCircle(GLfloat x, GLfloat y, GLfloat radius, Int3 color) {
+    float light = 0.5;
+    Int3 shaded_color = color * light;
+    glColor3ub((uint8_t)shaded_color.x, (uint8_t)shaded_color.y, (uint8_t)shaded_color.z);
+
 
     glBegin(GL_TRIANGLE_FAN);
     glVertex2f(x, y); // center of circle
-    glClear(GL_COLOR_BUFFER_BIT);
 
     for (int i = 0; i <= triangleAmount; i++) {
-        float light = (sin(i * 2 * PI / triangleAmount) + 1.f) / 2.f;
-        light = 1.f;
-        //printf("light %f\n", light);
-        Int3 shaded_color = color * light;
+        light = (sin(i * 2 * PI / triangleAmount) + 1.f) / 2.f;
+        shaded_color = color * light;
 
-        //printf("Color %u %u %u\n", (uint8_t)shaded_color.x, (uint8_t)shaded_color.y, (uint8_t)shaded_color.z);
-        //exit(0);
         glColor3ub((uint8_t)shaded_color.x, (uint8_t)shaded_color.y, (uint8_t)shaded_color.z);
-        //int c = floor(255.f * (sin(i * 2 * PI / triangleAmount) + 1.f) / 2.f);
-        //glColor3ub(c, 0, 0);
 
         glVertex2f(
             x + (radius * cos(i * twicePi / triangleAmount)),
@@ -55,8 +52,8 @@ void drawTwoSquares() {
 
 void DisplayV2::drawBalls(RenderBall* balls, int n_balls) {
     for (int i = 0; i < n_balls; i++) {
-        //balls[i].pos.print('b');
         RenderBall ball = balls[i];
+
         drawFilledCircle(ball.pos.x, ball.pos.z, ball.radius, ball.color);
     }
 }
@@ -69,20 +66,6 @@ void DisplayV2::render(Simulation* simulation) {
 
 
     drawBalls(balls, rasterizer.actual_n_particles);
-    /* Render here */
-
-    //drawTwoSquares();
-
-    //drawFilledCircle(0.2, 0.2, 0.3);
-    /*
-    glBegin(GL_TRIANGLES);
-    glVertex2f(-0.5f + x, -0.5f);
-    glVertex2f(-0.f, 0.5f);
-    glVertex2f(-0.5f, 0.5f);
-    glEnd();
-    */
-    //DrawCircle(0.5, 0.5, 0.1, 50);
-    //drawFilledSun();
 
     /* Swap front and back buffers */
     glfwSwapBuffers(window);
