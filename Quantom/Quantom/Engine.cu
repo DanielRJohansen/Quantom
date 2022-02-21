@@ -349,60 +349,66 @@ __device__ void applyPBC(Float3* current_position) {	// Only changes position if
 
 
 
-constexpr double sigma = 0.3923f;	//nm, basicllay break 0 point
-constexpr double epsilon = 0.5986 * 1'000.f; // J/mol
-__device__ Float3 calcLJForce(Float3* pos0, Float3* pos1, double* data_ptr, double* potE) {	// Applying force to p0 only! Returns force in J/mol
-	double dist = (*pos0 - *pos1).len();
-	double fraction = sigma / dist;		//nm/nm, so unitless
+constexpr double sigma = 0.3923f;										//nm, point at which d/dE or force is 0.
+constexpr double epsilon = 0.5986 * 1'000.f;							// J/mol
+__device__ Float3 calcLJForce(Float3* pos0, Float3* pos1, double* data_ptr, double* potE) {	
+	// Calculates LJ force on p0	//
+	//	Returns force in J/mol*M		//
 
+	double dist = (*pos0 - *pos1).len();								// [nm]
+
+	double fraction = sigma / dist;										// [nm/nm], so unitless
 	double f2 = fraction * fraction;
 	double f6 = f2 * f2 * f2;
-	double f12 = f6 * f6;
 
-	//double force = 1.f / (dist) * f6 * (1.f - 2.f * f6);
-	//double force = 24.f * (epsilon / dist) * f6 * (1.f - 2.f * f6);
-	double force = 24.f * (epsilon / (dist)) * f6 * (1.f - 2.f * f6);
+	double force = 24.f * (epsilon / (dist)) * f6 * (1.f - 2.f * f6);	// [N/mol] (or J/mol??, no direction)
 
-	double LJ_pot = 4.f * epsilon * (f12 - f6);
+	double LJ_pot = 4.f * epsilon * (f6 * f6 - f6);
 	Float3 force_unit_vector = (*pos1 - *pos0).norm();
 
+	*potE += LJ_pot * 0.5;												// Log this value for energy monitoring purposes
 
-	//printf("Mol %d force %f\n", blockIdx.x, (force_unit_vector * force).x);
-	//data_ptr[0] += LJ_pot *0.5 * 2;																	// WATCH OUT FOR 2 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-	data_ptr[1] += force;
-	data_ptr[2] = cudaMin(data_ptr[2], dist);
-	*potE += LJ_pot * 0.5;
-
-
-	Float3 force_vec = force_unit_vector * force;
-	if (force_vec.x != force_vec.x) {
-		printf("Force: %f\n", force);
-		force_unit_vector.print('u');
+	{	
+		data_ptr[1] += force;
+		data_ptr[2] = cudaMin(data_ptr[2], dist);
+		Float3 force_vec = force_unit_vector * force;
+		if (force_vec.x != force_vec.x) {
+			printf("Force: %f\n", force);
+			force_unit_vector.print('u');
+		}
+		if (dist < 0.1f || abs(force) > 100e+6) {
+			printf("\nThread %d Block %d step %d dist %f force %f\n", threadIdx.x, blockIdx.x, (int)data_ptr[3], (*pos0 - *pos1).len(), force);
+		}
 	}
 
-	//|| (threadIdx.x == 0 && blockIdx.x == 1)
-	if (dist < 0.1f || abs(force) > 100e+6 ) {
-	//if (abs(LJ_pot) > 7000) {
-		printf("\nThread %d Block %d step %d dist %f force %f\n", threadIdx.x, blockIdx.x, (int) data_ptr[3], (*pos0 - *pos1).len(), force);
-		//(*pos0 - *pos1).print('v');
-		//(force_unit_vector * force).print('f');
-		//pos0->print('0');
-		//pos1->print('1');
-		//printf("\n\n KILOFORCE! Block %d thread %d\n", blockIdx.x, threadIdx.x);
-		//(force_unit_vector * force).print('f');
-	}
-	return force_unit_vector * force;	//J/mol*M	(M is direction)
+	return force_unit_vector * force;									//J/mol*M	(M is direction)
 }
 
 
 
 constexpr double kb = 17.5 * 1e+6;		//	J/(mol*nm^2)
+__device__ void calcPairbondForces(Float3* pos_a, Float3* pos_b, double* reference_dist, Float3* results, double* potE) {
+	// Calculates bond force on both particles					//
+	// Calculates forces as J/mol*M								//
+
+	Float3 difference = *pos_a - *pos_b;						//	[nm]
+	double error = difference.len() - *reference_dist;			//	[nm]
+
+	*potE += 0.5 * kb * (error * error) * 0.5;					// [J/mol]
+
+	difference = difference.norm();								// dif_unit_vec, but shares register with dif
+	double force_scalar = -kb * error;							// [N/mol] directionless, yes?
+
+	results[0] = difference * force_scalar;
+	results[1] = difference * force_scalar * -1;
+}
+
 /*
 __device__ Float3 calcPairbondForce(Float3* self_pos, Float3* other_pos, double* reference_dist, double* potE) {
 	Float3 v = *self_pos - *other_pos;
 	double dif = v.len() - *reference_dist;
 	double invert = v.len() > *reference_dist ? -1 : 1;
-	
+
 	Float3 force = v.norm() * kb * (-dif);
 
 
@@ -426,19 +432,6 @@ __device__ Float3 calcPairbondForce(Float3* self_pos, Float3* other_pos, double*
 	//return v.norm() * (0.5 * kb * (dif * dif) * invert) *1.99 * 10e+4;
 }
 */
-
-__device__ void calcPairbondForces(Float3* pos_a, Float3* pos_b, double* reference_dist, Float3* results, double* potE) {
-	Float3 vec1 = *pos_a - *pos_b;
-	double error = vec1.len() - *reference_dist;
-
-	*potE += 0.5 * kb * (error * error) * 0.5;// *1 * 10e+4;
-
-	vec1 = vec1.norm();
-	double force_scalar = -kb * error;
-	results[0] = vec1 * force_scalar;
-	results[1] = vec1 * force_scalar * -1;
-}
-
 
 constexpr double ktheta = 65 * 1e+3;	// J/mol
 /*
