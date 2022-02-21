@@ -3,6 +3,11 @@
 
 
 Environment::Environment() {
+
+	display = new DisplayV2();
+
+	
+
 	simulation = new Simulation();
 	if (!verifySimulationParameters()) {
 		exit(0);
@@ -29,8 +34,8 @@ Environment::Environment() {
 
 
 
-	display = new Display(simulation);
-	interface = new Interface(display->window);
+	//display = new Display(simulation);
+	//interface = new Interface(display->window);
 	if (cudaGetLastError() != cudaSuccess) {
 		fprintf(stderr, "Error during Display Initiation\n");
 		exit(1);
@@ -58,8 +63,8 @@ void Environment::run() {
 	time0 = std::chrono::high_resolution_clock::now();
 
 
-	while (display->window->isOpen()) {
-
+	//while (display->window->isOpen()) {
+	while (display->checkWindowStatus()) {
 		
 		engine->deviceMaster();		// Device first, otherwise offloading data always needs the last datapoint!
 		engine->hostMaster();
@@ -78,7 +83,10 @@ void Environment::run() {
 		}
 	}
 	printf("\n\n\n########################## SIMULATION FINISHED ##########################\n\n\n\n");
-	postRunEvents();
+
+	if (simulation->finished) {
+		postRunEvents();
+	}
 }
 
 void Environment::postRunEvents() {
@@ -112,12 +120,14 @@ void Environment::handleStatus(Simulation* simulation) {
 }
 
 void Environment::handleDisplay(Simulation* simulation) {
+	//display->render(simulation);
+	
 	if (!(simulation->getStep() % simulation->steps_per_render)) {
 		display->render(simulation);
 
-		interface->handleEvents();
-		if (interface->quit)
-			display->terminate();
+		//interface->handleEvents();
+		//if (interface->quit)
+			//display->terminate();
 	}
 }
 
@@ -135,6 +145,7 @@ bool Environment::handleTermination(Simulation* simulation)
 
 void Environment::renderTrajectory(string trj_path)
 {
+	/*
 	Trajectory* trj = new Trajectory(trj_path);
 	for (int i = 0; i < trj->n_particles; i++) {
 		trj->particle_type[i] = 0;
@@ -142,6 +153,7 @@ void Environment::renderTrajectory(string trj_path)
 	trj->particle_type[0] = 1;
 
 	display->animate(trj);
+	*/
 }
 
 void Environment::makeVirtualTrajectory(string trj_path, string waterforce_path) {

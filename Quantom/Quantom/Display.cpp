@@ -10,8 +10,8 @@ Display::Display(Simulation* simulation) {
 
     raytracer = new Raytracer(simulation, false);
 
-    
     sf::Image blank_image;
+    
     texture.create(WINDOW_SIZE, WINDOW_SIZE);
 
 

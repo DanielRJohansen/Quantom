@@ -2,7 +2,8 @@
 
 //#include "QuantomTypes.cuh"
 #include "Bodies.cuh"
-#include "Display.h"
+//#include "Display.h"
+#include "DisplayV2.h"
 #include "Interface.h"
 #include "Engine.cuh"
 #include "Analyzer.cuh"
@@ -40,7 +41,8 @@ public:
 
 private:
 	bool verifySimulationParameters();
-	Display* display;
+	//Display* display;
+	DisplayV2* display;
 	Interface* interface;
 	Engine* engine;
 	Analyzer analyzer;

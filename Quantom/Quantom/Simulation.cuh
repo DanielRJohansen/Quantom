@@ -158,7 +158,7 @@ public:
 	int n_steps = SIMULATION_STEPS;
 
 	const double dt = 1 * 1e-6;		// ns, so first val corresponds to fs
-	int steps_per_render = 100;
+	int steps_per_render = 4;
 	//int n_bodies = N_BODIES_START;
 	Box* box;
 

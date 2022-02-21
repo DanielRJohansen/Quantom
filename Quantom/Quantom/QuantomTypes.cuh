@@ -25,6 +25,8 @@ struct Int3 {
 
 	__host__ __device__ inline Int3 operator + (const Int3 a) const { return Int3(x + a.x, y + a.y, z + a.z); }
 	__host__ __device__ inline Int3 operator - (const Int3 a) const { return Int3(x - a.x, y - a.y, z - a.z); }
+	__host__ __device__ inline Int3 operator * (const int a) const { return Int3(x * a, y * a, z * a); }
+	__host__ __device__ inline Int3 operator * (const float a) const { return Int3(floor((float)x * a), floor((float)y * a), floor((float)z * a)); }
 
 
 	int x=0, y=0, z = 0;
@@ -347,6 +349,17 @@ private:
 
 
 
+
+
+
+
+struct RenderBall {
+	RenderBall(){}
+	__host__ __device__ RenderBall(Float3 pos, float radius, Int3 color) :pos(pos), radius(radius), color(color) {}
+	Float3 pos;	// only uses x and y
+	float radius;
+	Int3 color;
+};
 
 
 
