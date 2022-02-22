@@ -6,6 +6,7 @@
 
 
 
+void mergeSortAPI(RenderBall* balls, int n_balls);
 
 
 RenderBall* Rasterizer::render(Simulation* simulation) {    
@@ -16,10 +17,10 @@ RenderBall* Rasterizer::render(Simulation* simulation) {
 
 	RenderAtom* atoms = getAllAtoms(simulation);
 
-    sortAtoms(atoms, 1);    // dim 1 is y
+    //sortAtoms(atoms, 1);    // dim 1 is y
 
     RenderBall* balls = processAtoms(atoms);
-
+    mergeSortAPI(balls, actual_n_particles);
 
 	return balls;
 }
@@ -37,6 +38,7 @@ RenderBall* Rasterizer::render(Simulation* simulation) {
 __global__ void loadCompoundatomsKernel(Box* box, RenderAtom* atoms);
 __global__ void loadSolventatomsKernel(Box* box, RenderAtom* atoms, int offset);
 __global__ void processAtomsKernel(RenderAtom* atoms, RenderBall* balls, int n_atoms);
+
 
 RenderAtom* Rasterizer::getAllAtoms(Simulation* simulation) {
 	
@@ -188,4 +190,74 @@ __global__ void processAtomsKernel(RenderAtom* atoms, RenderBall* balls, int n_a
 
     RenderBall ball(atom.pos, atom.radius, atom.color);
     balls[index] = ball;
+}
+
+
+RenderBall* merge(const RenderBall* left, int n_left, const RenderBall* right, int n_right) {
+    RenderBall* merged = new RenderBall[n_left + n_right];
+    int l = 0;
+    int r = 0;
+    int index = 0;
+
+    while (l < n_left && r < n_right) {
+        if (left[l].pos.y < right[r].pos.y) {
+            merged[index++] = left[l++];
+        }
+        else {
+            merged[index++] = right[r++];
+        }
+    }
+    while (l < n_left) { merged[index++] = left[l++]; }
+    while (r < n_right) { merged[index++] = right[r++]; }
+
+
+    return merged;
+}
+
+RenderBall* mergeSort(const RenderBall* atoms, const int l, const int r) {	// l and r are indexes of the two extremes
+    int m = (l + r) / 2;
+
+    RenderBall* left;
+    RenderBall* right;
+
+    //printf("step\n");
+    if (r - l > 1) {
+        //printf("l %d r %d\n", l, r);
+        left = mergeSort(atoms, l, m - 1);
+        right = mergeSort(atoms, m, r);
+        RenderBall* merged = merge(left, m - l, right, r - m + 1);
+
+        if (l == m - 1)		// Take care of special case, where only left side can be a single object instead of array!
+            delete left;
+        else
+            delete[] left;
+        delete[] right;
+
+        return merged;
+    }
+    else if (r - l == 1) {
+        return merge(&atoms[l], 1, &atoms[r], 1);
+    }
+    else {
+        return new RenderBall(atoms[l]);
+    }
+}
+
+void mergeSortAPI(RenderBall* balls, int n_balls) {					// Returns a mapping where mapping[0] is the closest id, mapping [1] seconds closest, so on
+
+    //RenderBall* balls_temp = new RenderBall[n_balls];
+    //memcpy(balls_temp, balls, sizeof(RenderBall) * n_balls);
+
+
+
+
+    RenderBall* sorted_balls = mergeSort(balls, 0, n_balls - 1);
+    for (int i = 0; i < n_balls; i++) {
+        balls[i] = sorted_balls[i];
+    }
+
+    int* mapping = new int[n_balls];
+    //for (int i = 0; i < n_atoms; i++) mapping[i] = sorted_atoms[i].id;
+
+    delete[] sorted_balls;
 }
