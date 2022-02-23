@@ -31,7 +31,17 @@ public:
 		for (int i = 0; i < 3; i++) {
 			*movable_particle->placeAt(i) += BOX_LEN * ((static_particle->at(i) - movable_particle->at(i)) > BOX_LEN_HALF);
 			*movable_particle->placeAt(i) -= BOX_LEN * ((static_particle->at(i) - movable_particle->at(i)) < -BOX_LEN_HALF);	// use at not X!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		}	}
+		}	
+	}
+
+	static float __device__ __host__ calcKineticEnergy(Float3* pos1, Float3* pos2, double mass, double dt) {	// pos1/2 MUST be 2 steps apart!!!!
+		LIMAENG::applyHyperpos(pos1, pos2);
+
+
+		double vel = (*pos1 - *pos2).len() * 0.5l / dt;
+		float kinE = 0.5 * mass * vel * vel;
+		return kinE;
+	}
 
 };
 
@@ -122,8 +132,11 @@ private:
 
 	// streams every n steps
 	void offloadLoggingData();
-	void offloadPositionData();	
+	void offloadPositionData();
 
+
+	float getBoxTemperature();
+	void applyThermostat();
 
 
 	int prev_nlist_update_step = 0;

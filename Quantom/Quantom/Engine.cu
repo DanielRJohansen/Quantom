@@ -38,9 +38,13 @@ void Engine::deviceMaster() {
 }
 
 void Engine::hostMaster() {
+	auto t0 = std::chrono::high_resolution_clock::now();
 	if ((simulation->getStep() % STEPS_PER_LOGTRANSFER) == 0) {
 		offloadLoggingData();
 		offloadPositionData();
+		if ((simulation->getStep() % STEPS_PER_THERMOSTAT) == 0) {
+			applyThermostat();
+		}
 	}
 
 	
@@ -65,6 +69,14 @@ void Engine::hostMaster() {
 		prev_nlist_update_step = simulation->getStep();
 	}
 	*/
+	if ((simulation->getStep() % STEPS_PER_THERMOSTAT) == 1) {	// So this runs 1 step AFTER applyThermostat
+		simulation->box->thermostat_scalar = 1.f;
+	}
+
+	auto t1 = std::chrono::high_resolution_clock::now();
+
+	int cpu_duration = (int)std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
+	timings = timings + Int3(0,0,cpu_duration);
 }
 
 
@@ -274,6 +286,55 @@ void Engine::offloadLoggingData() {
 void Engine::offloadPositionData() {
 	const int step_offset = (simulation->getStep() - STEPS_PER_LOGTRANSFER) * simulation->total_particles_upperbound;	// Tongue in cheek here, i think this is correct...
 	cudaMemcpy(&simulation->traj_buffer[step_offset], simulation->box->traj_buffer, sizeof(Float3) * simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER, cudaMemcpyDeviceToHost);
+}
+
+
+
+
+float Engine::getBoxTemperature() {
+	
+	const int step = simulation->getStep() - 1;
+
+	long double temp_sum = 0;				// [k]
+
+	long double kinE_sum = 0;
+
+	const int step_offset_a = step * simulation->total_particles_upperbound;
+	const int step_offset_b = (step - 2) * simulation->total_particles_upperbound;
+	const int solvent_offset = MAX_COMPOUND_PARTICLES;
+
+
+	const int particles_in_compounds = simulation->box->compounds[0].n_particles;
+	const int particles_total = simulation->n_solvents;
+
+	for (int i = 0; i < particles_in_compounds; i++) {	// i gotta move this somewhere else....
+		int p_index = i;
+		
+		Float3 posa = simulation->traj_buffer[i + step_offset_a];
+		Float3 posb = simulation->traj_buffer[i + step_offset_b];
+		float kinE = LIMAENG::calcKineticEnergy(&posa, &posb, simulation->box->compounds[0].particles[i].mass, simulation->dt);
+		kinE_sum += kinE;
+	}
+	for (int i = 0; i < simulation->n_solvents; i++) {
+		Float3 posa = simulation->traj_buffer[i + solvent_offset + step_offset_a];
+		Float3 posb = simulation->traj_buffer[i + solvent_offset + step_offset_b];
+		float kinE = LIMAENG::calcKineticEnergy(&posa, &posb, SOLVENT_MASS, simulation->dt);
+		kinE_sum += kinE;
+	}
+
+	double avg_kinE = kinE_sum / (long double)particles_total;
+	float temperature = avg_kinE * 2 / (3 * 8.3145);
+	//printf("\nTemp: %f\n", temperature);
+	return temperature;
+}
+
+void Engine::applyThermostat() {
+	const float max_temp = 300.f;				// [k]
+	float temp = getBoxTemperature();
+	if (temp > max_temp) {
+		simulation->box->thermostat_scalar = max_temp / temp;
+		//printf("Scalar: %f\n", simulation->box->thermostat_scalar);
+	}
 }
 
 
@@ -525,10 +586,13 @@ __device__ Float3 computeAnglebondForces(Compound* compound, CompoundState* comp
 }
 
 
-__device__ void integratePosition(Float3* pos, Float3* pos_tsub1, Float3* force, double mass, double dt) {
+__device__ void integratePosition(Float3* pos, Float3* pos_tsub1, Float3* force, const double mass, const double dt, float* thermostat_scalar) {
 	Float3 temp = *pos;
 	*pos = *pos * 2 - *pos_tsub1 + *force * (1.f / mass) * dt * dt;	// no *0.5?
 	*pos_tsub1 = temp;
+
+	Float3 delta_pos = *pos - *pos_tsub1;
+	*pos = *pos_tsub1 + delta_pos * *thermostat_scalar;
 	if (force->len() > 200e+6) {
 		printf("\nThread %d blockId %d\tForce %f \tFrom %f %f %f\tTo %f %f %f\n", threadIdx.x, blockIdx.x, force->len(), pos_tsub1->x, pos_tsub1->y, pos_tsub1->z, pos->x, pos->y, pos->z);
 		
@@ -649,7 +713,7 @@ __global__ void forceKernel(Box* box) {
 	
 	// ------------------------------------------------------------ Integration ------------------------------------------------------------ //
 	if (threadIdx.x < compound.n_particles) {
-		integratePosition(&compound_state.positions[threadIdx.x], &compound.particles[threadIdx.x].pos_tsub1, &force, compound.particles[threadIdx.x].mass, box->dt);
+		integratePosition(&compound_state.positions[threadIdx.x], &compound.particles[threadIdx.x].pos_tsub1, &force, compound.particles[threadIdx.x].mass, box->dt, &box->thermostat_scalar);
 		box->compounds[blockIdx.x].particles[threadIdx.x].pos_tsub1 = compound.particles[threadIdx.x].pos_tsub1;
 	}
 	__syncthreads();
@@ -771,7 +835,7 @@ __global__ void solventForceKernel(Box* box) {
 
 
 	if (threadIdx.x < box->n_solvents) {
-		integratePosition(&solvent.pos, &solvent.pos_tsub1, &force, SOLVENT_MASS, box->dt);
+		integratePosition(&solvent.pos, &solvent.pos_tsub1, &force, SOLVENT_MASS, box->dt, &box->thermostat_scalar);
 	}
 
 	if (threadIdx.x < box->n_solvents) {

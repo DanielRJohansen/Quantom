@@ -50,6 +50,7 @@ bool Environment::verifySimulationParameters() {	// Not yet implemented
 	//assert(BOX_LEN >= CUTOFF + 0.5f);
 	assert(simulation->n_compounds <= 1);	// Otherwise data_GAN goes haywire
 	assert(simulation->n_steps % STEPS_PER_LOGTRANSFER == 0);
+	assert(STEPS_PER_LOGTRANSFER % STEPS_PER_LOGTRANSFER == 0);		// Change to trajtransfer later
 	return true;
 }
 
@@ -112,7 +113,7 @@ void Environment::handleStatus(Simulation* simulation) {
 		printf("\r\tStep #%06d", simulation->box->step);
 		double duration = (double)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - time0).count();
 		int remaining_minutes = (int)(1.f / 1000 * duration / simulation->steps_per_render * (simulation->n_steps - simulation->box->step) / 60);
-		printf("\tAvg. step time: %.1fms (%05d/%05d/%05d) \tRemaining: %04d min", duration / simulation->steps_per_render, engine->timings.x / simulation->steps_per_render, engine->timings.y / simulation->steps_per_render, engine->timings.z, remaining_minutes);
+		printf("\tAvg. step time: %.1fms (%05d/%05d/%05d) \tRemaining: %04d min", duration / simulation->steps_per_render, engine->timings.x / simulation->steps_per_render, engine->timings.y / simulation->steps_per_render, engine->timings.z/simulation->steps_per_render, remaining_minutes);
 		engine->timings = Int3(0, 0, 0);
 
 		time0 = std::chrono::high_resolution_clock::now();

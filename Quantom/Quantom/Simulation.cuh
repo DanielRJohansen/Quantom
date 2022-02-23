@@ -18,8 +18,8 @@ constexpr double FOCUS_LEN_HALF = BLOCK_LEN / 4.f;
 
 const int STEPS_PER_NLIST_UPDATE = 50;
 const int STEPS_PER_LOGTRANSFER = 100;
-const int STEPS_PER_TRAJTRANSFER = 100;
-
+//const int STEPS_PER_TRAJTRANSFER = 100;
+const int STEPS_PER_THERMOSTAT = 200;
 
 const int LOGBLOCK = 0;
 const int LOGTHREAD = 0;
@@ -96,6 +96,10 @@ public:
 	double* potE_buffer;		// For total energy summation
 	Float3* traj_buffer;
 	Float3* data_GAN;			// Only works if theres 1 compounds right now.
+
+
+	float thermostat_scalar = 1.f;
+
 
 	void moveToDevice() {	// Loses pointer to RAM location!
 		compounds = genericMoveToDevice(compounds, n_compounds);
