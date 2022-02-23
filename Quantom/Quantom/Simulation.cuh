@@ -18,6 +18,7 @@ constexpr double FOCUS_LEN_HALF = BLOCK_LEN / 4.f;
 
 const int STEPS_PER_NLIST_UPDATE = 50;
 const int STEPS_PER_LOGTRANSFER = 100;
+const int STEPS_PER_TRAJTRANSFER = 100;
 
 
 const int LOGBLOCK = 0;
@@ -93,7 +94,7 @@ public:
 	bool critical_error_encountered = 0;
 
 	double* potE_buffer;		// For total energy summation
-	Float3* trajectory;
+	Float3* traj_buffer;
 	Float3* data_GAN;			// Only works if theres 1 compounds right now.
 
 	void moveToDevice() {	// Loses pointer to RAM location!

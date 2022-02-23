@@ -40,6 +40,7 @@ void Engine::deviceMaster() {
 void Engine::hostMaster() {
 	if ((simulation->getStep() % STEPS_PER_LOGTRANSFER) == 0) {
 		offloadLoggingData();
+		offloadPositionData();
 	}
 
 	
@@ -77,11 +78,21 @@ void Engine::hostMaster() {
 //--------------------------------------------------------------------------	CPU workload --------------------------------------------------------------//
 
 
-void Engine::offloadPositionData(Simulation* simulation) {
+void Engine::offloadPositionDataNLIST(Simulation* simulation) {
 	//cudaMemcpyAsync(compoundstatearray_host, simulation->box->compound_state_array, sizeof(CompoundState) * simulation->box->n_compounds, cudaMemcpyDeviceToHost);
 	cudaMemcpy(nlist_data_collection->compoundstates, simulation->box->compound_state_array, sizeof(CompoundState) * simulation->n_compounds, cudaMemcpyDeviceToHost);
 	cudaMemcpy(nlist_data_collection->solvents, simulation->box->solvents, sizeof(Solvent) * simulation->n_solvents, cudaMemcpyDeviceToHost);
 }
+
+/*
+void Engine::offloadPositionData(Simulation* simulation) {
+	//cudaMemcpyAsync(compoundstatearray_host, simulation->box->compound_state_array, sizeof(CompoundState) * simulation->box->n_compounds, cudaMemcpyDeviceToHost);
+
+	const int step_offset = (simulation->getStep() - STEPS_PER_LOGTRANSFER) * simulation->total_particles_upperbound;	// Tongue in cheek here, i think this is correct...
+	cudaMemcpy(&nlist_data_collection->compoundstates[step_offset], simulation->box->compound_state_array, sizeof(CompoundState) * simulation->n_compounds, cudaMemcpyDeviceToHost);
+	cudaMemcpy(&nlist_data_collection->solvents[step_offset], simulation->box->solvents, sizeof(Solvent) * simulation->n_solvents, cudaMemcpyDeviceToHost);
+}
+*/
 
 //(void __device__ __host__ applyHyperpos(Float3* static_particle, Float3* movable_particle);
 void Engine::cullDistantNeighbors(NListDataCollection* nlist_data_collection) {	// Calling with nlist avoids writing function for both solvent and compound
@@ -244,13 +255,11 @@ void Engine::updateNeighborLists(Simulation* simulation, NListDataCollection* nl
 
 
 void Engine::offloadLoggingData() {
-	int step_offset = (simulation->getStep() - STEPS_PER_LOGTRANSFER) * simulation->total_particles_upperbound;	// Tongue in cheek here, i think this is correct...
+	const int step_offset = (simulation->getStep() - STEPS_PER_LOGTRANSFER) * simulation->total_particles_upperbound;	// Tongue in cheek here, i think this is correct...
 	//printf("Offloading data to position %d %d\n", simulation->getStep() - STEPS_PER_LOGTRANSFER, step_offset);
 
-
-
 	cudaMemcpy(&simulation->potE_buffer[step_offset], simulation->box->potE_buffer, sizeof(double) * simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER, cudaMemcpyDeviceToHost);
-	cudaMemcpy(&simulation->traj_buffer[step_offset], simulation->box->trajectory, sizeof(Float3) * simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER, cudaMemcpyDeviceToHost);
+	//cudaMemcpy(&simulation->traj_buffer[step_offset], simulation->box->traj_buffer, sizeof(Float3) * simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER, cudaMemcpyDeviceToHost);
 
 	/*printf("Step %d\n", simulation->getStep());
 	for (int i = 0; i < 10; i++) {
@@ -262,6 +271,10 @@ void Engine::offloadLoggingData() {
 	}*/
 }
 
+void Engine::offloadPositionData() {
+	const int step_offset = (simulation->getStep() - STEPS_PER_LOGTRANSFER) * simulation->total_particles_upperbound;	// Tongue in cheek here, i think this is correct...
+	cudaMemcpy(&simulation->traj_buffer[step_offset], simulation->box->traj_buffer, sizeof(Float3) * simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER, cudaMemcpyDeviceToHost);
+}
 
 
 //--------------------------------------------------------------------------	SIMULATION BEGINS HERE --------------------------------------------------------------//
@@ -338,12 +351,6 @@ __device__ void applyPBC(Float3* current_position) {	// Only changes position if
 		*current_position->placeAt(dim) += BOX_LEN * (current_position->at(dim) < 0);
 		*current_position->placeAt(dim) -= BOX_LEN * (current_position->at(dim) > BOX_LEN);
 	}
-	
-	/**current_position += Float3(BOX_LEN, BOX_LEN, BOX_LEN);
-	current_position->x -= BOX_LEN * (current_position->x > BOX_LEN);
-	current_position->y -= BOX_LEN * (current_position->y > BOX_LEN);
-	current_position->z -= BOX_LEN * (current_position->z > BOX_LEN);
-	//*current_position = current_position->elementwiseModulus(BOX_LEN);*/
 }
 
 
@@ -403,76 +410,8 @@ __device__ void calcPairbondForces(Float3* pos_a, Float3* pos_b, double* referen
 	results[1] = difference * force_scalar * -1;
 }
 
-/*
-__device__ Float3 calcPairbondForce(Float3* self_pos, Float3* other_pos, double* reference_dist, double* potE) {
-	Float3 v = *self_pos - *other_pos;
-	double dif = v.len() - *reference_dist;
-	double invert = v.len() > *reference_dist ? -1 : 1;
-
-	Float3 force = v.norm() * kb * (-dif);
-
-
-	*potE += 0.5 * kb * (dif * dif) * 0.5;// *1 * 10e+4;
-
-	if (abs(*potE) > 300000) {
-		printf("\n");
-		printf("threadid %d from: %f to: %f\n", threadIdx.x, *potE - 0.5 * kb * (dif * dif) * 0.5, *potE);
-
-		self_pos->print('s');
-		other_pos->print('o');
-		printf("len %f\tdif: %f\t force %f\n", v.len(), dif, force.len());
-	}
-
-	// Logging stuff
-	if (threadIdx.x == LOGTHREAD && blockIdx.x == LOGBLOCK) {
-		//self_pos[63 - threadIdx.x].x = v.len();
-		//self_pos[63 - threadIdx.x].y = *potE;
-	}
-	return force;
-	//return v.norm() * (0.5 * kb * (dif * dif) * invert) *1.99 * 10e+4;
-}
-*/
 
 constexpr double ktheta = 65 * 1e+3;	// J/mol
-/*
-__device__ Float3 calcAngleForce(CompoundState* statebuffer, AngleBond* anglebond, double* potE) {	// We fix the middle particle and move the other particles so they are closest as possible
-	// HOLY FUUUCK this shit is unsafe. Works if atoma are ordered left to right, with angles BELOW 180. Dont know which checks to implement yet
-	Float3 v1 = statebuffer->positions[anglebond->atom_indexes[0]] - statebuffer->positions[anglebond->atom_indexes[1]];
-	Float3 v2 = statebuffer->positions[anglebond->atom_indexes[2]] - statebuffer->positions[anglebond->atom_indexes[1]];
-	Float3 plane_normal = v1.cross(v2);
-
-	Float3 force_direction = anglebond->atom_indexes[0] == threadIdx.x ? plane_normal.cross(v1) : v2.cross(plane_normal);	// Calculates "inward" force orthogonal to the bond direction of the atom of interest to middle atom
-	force_direction = force_direction.norm();
-
-	
-		
-
-
-	double angle = Float3::getAngle(v1, v2);
-	potE[1] = angle;					// Temp
-	double dif = angle - anglebond->reference_angle;
-	dif = dif / 2.f / PI * 360.f;
-	*potE += 0.5 * ktheta * dif * dif * 0.5;
-	double force_scalar = ktheta * (dif);
-
-
-	//if (threadIdx.x == 1 ) {
-	if (force_scalar > 1000) {
-		//printf("\n");
-		//v1.print('1');
-		//v2.print('2');
-		//plane_normal.print('n');
-		//force_direction.print('d');
-		printf("dif: %f\tforce: %f\n", dif, force_scalar);
-		//printf("\nAngle %f ref %f\n", angle, anglebond->reference_angle);
-		//(force_direction * force_scalar).print('f');
-	}
-
-	//force_scalar = dif < 0 ? force_scalar * -1 : force_scalar;	// Invert force if we need to push outwards
-	
-	return force_direction * force_scalar;
-}
-*/
 __device__ void calcAnglebondForces(Float3* pos_left, Float3* pos_middle, Float3* pos_right, double* reference_angle, Float3* results, double* potE) {
 	Float3 v1 = *pos_left - *pos_middle;
 	Float3 v2 = *pos_right - *pos_middle;
@@ -498,111 +437,6 @@ __device__ void calcAnglebondForces(Float3* pos_left, Float3* pos_middle, Float3
 		//printf("Error %f force %f \n", error, force_scalar);
 }
 
-
-
-// compoundkernel for other compounds
-/*
-__device__ Float3 computeLJForces(Box * box, Compound* compound, CompoundNeighborList* neighborlist, CompoundState* self_state, CompoundState* neighborstate_buffer, Float3* utility_buffer, double* data_ptr) {
-	Float3 force(0, 0, 0);
-	for (int neighbor_index = 0; neighbor_index < neighborlist->n_neighbors; neighbor_index++) {
-		// ------------ Load and process neighbor molecule ------------ //
-		neighborstate_buffer->n_particles = box->compound_state_array[neighborlist->neighborcompound_indexes[neighbor_index]].n_particles;						// These two lines may be optimizable.
-		neighborstate_buffer->positions[threadIdx.x] = box->compound_state_array[neighborlist->neighborcompound_indexes[neighbor_index]].positions[threadIdx.x];
-		__syncthreads(); // Necessary?
-
-
-		// Hyperpositioning the entire molecule
-		determineMoleculerHyperposOffset(&utility_buffer[0], &compound->center_of_mass, &box->compounds[neighborlist->neighborcompound_indexes[neighbor_index]].center_of_mass);
-		neighborstate_buffer->positions[threadIdx.x] = neighborstate_buffer->positions[threadIdx.x] + utility_buffer[0];
-		__syncthreads();		
-		// ------------------------------------------------------------ //
-
-
-
-		for (int neighbor_particle_index = 0; neighbor_particle_index < neighborstate_buffer->n_particles; neighbor_particle_index++) {
-			if (threadIdx.x < compound->n_particles) {
-				force = force + calcLJForce(&self_state->positions[threadIdx.x], &neighborstate_buffer->positions[neighbor_particle_index], data_ptr);
-
-				if (threadIdx.x == LOGTHREAD && blockIdx.x == LOGBLOCK) {
-					double len = (self_state->positions[threadIdx.x] - neighborstate_buffer->positions[neighbor_particle_index]).len();
-					self_state->positions[60].x = cudaMin(self_state->positions[60].x, len);
-				}
-			}
-		}
-		__syncthreads();
-	}
-	//force = force * 24.f * epsilon;
-	return force;
-}
-*/
-
-// compoundkernel for solvents
-/*
-__device__ Float3 computeLJForces(Box* box, Compound* compound, SolventNeighborList* neighborlist, CompoundState* self_state, Float3* utility_buffer, double* data_ptr) {
-	Float3 force(0, 0, 0);
-
-	// ------------ Load and process neighbor molecule ------------ //
-	for (int i = 0; i < 256; i += MAX_COMPOUND_PARTICLES) {
-		int solvent_index = threadIdx.x + i;
-		if ((solvent_index) < neighborlist->n_neighbors) {				// Dont think we have enough threads for this...
-			utility_buffer[solvent_index] = box->solvents[neighborlist->neighborsolvent_indexes[solvent_index]].pos;
-			//applyHyperpos(&self_state->positions[threadIdx.x], &utility_buffer[solvent_index]);
-			//utility_buffer[solvent_index] = utility_buffer[solvent_index] + getSolventHyperposOffset(&self_state->positions[threadIdx.x], &utility_buffer[solvent_index]);
-		}
-	}
-	__syncthreads(); 
-	// ---------------------------------------------- ------------ //
-
-	if (threadIdx.x < compound->n_particles) {
-
-		for (int i = 0; i < neighborlist->n_neighbors; i++) {
-			force = force + calcLJForce(&self_state->positions[threadIdx.x], &utility_buffer[i], data_ptr);			
-			//force.print('f');
-		}
-	}
-
-	//force = force * 24.f * epsilon;
-	return force;
-}
-
-// solventkernel for solvents and compounds
-__device__ Float3 computeLJForces(Box* box, Float3* self_pos, CompoundNeighborList* compoundneighbor_list, SolventNeighborList* solventneighbor_list,  double* data_ptr, Float3* utility_buffer) {
-	Float3 force(0, 0, 0);
-
-	// ------------ Load and process neighbor molecule ------------ //
-	for (int i = 0; i < compoundneighbor_list->n_neighbors; i++) {
-		int compound_index = compoundneighbor_list->neighborcompound_indexes[i];
-		CompoundState* compoundstate = &box->compound_state_array[compound_index];
-
-		if (threadIdx.x < compoundstate->n_particles) {
-			utility_buffer[threadIdx.x] = compoundstate->positions[threadIdx.x];
-			applyHyperpos(self_pos, &utility_buffer[threadIdx.x]);
-		}
-		__syncthreads();
-
-		for (int j = 0; j < compoundstate->n_particles; j++) {
-			force += calcLJForce(self_pos, &utility_buffer[j], data_ptr);
-
-			/*
-			float dist = (utility_buffer[j] - *self_pos).len();
-			if (dist < 0.7) {
-				self_pos->print('s');
-				utility_buffer[j].print('o');
-				printf("dist: %f force: %f\n", dist, force.len());
-			}
-				//*
-		}
-		__syncthreads();
-	}
-
-	for (int i = 0; i < solventneighbor_list->n_neighbors; i++) {
-		Float3 other_pos = box->solvents[solventneighbor_list->neighborsolvent_indexes[i]].pos;
-		//applyHyperpos(self_pos, &other_pos);
-		force += calcLJForce(self_pos, &other_pos, data_ptr);
-	}
-	return force;
-}
-*/
 __device__ Float3 computeLJForces(Float3* self_pos, int n_particles, Float3* positions, double* data_ptr, double* potE_sum) {	// Assumes all positions are 
 	Float3 force(0, 0, 0);
 	for (int i = 0; i < n_particles; i++) {
@@ -842,7 +676,7 @@ __global__ void forceKernel(Box* box) {
 		if (threadIdx.x < compound.n_particles) {
 			int step_offset = (box->step % STEPS_PER_LOGTRANSFER) * box->total_particles_upperbound;
 			box->potE_buffer[threadIdx.x + blockIdx.x * MAX_COMPOUND_PARTICLES + step_offset] = potE_sum;//data_ptr[0] + data_ptr[2];
-			box->trajectory[threadIdx.x + blockIdx.x * MAX_COMPOUND_PARTICLES + step_offset] = compound_state.positions[threadIdx.x];
+			box->traj_buffer[threadIdx.x + blockIdx.x * MAX_COMPOUND_PARTICLES + step_offset] = compound_state.positions[threadIdx.x];
 		}		
 		__syncthreads();
 /*
@@ -956,7 +790,7 @@ __global__ void solventForceKernel(Box* box) {
 
 		box->potE_buffer[compounds_offset + solvent_index + step_offset] = 404; // potE_sum;	//  data_ptr[0];
 		//printf("pot: %f\n", box->potE_buffer[compounds_offset + solvent_index + (box->step) * box->total_particles]);
-		box->trajectory[compounds_offset + solvent_index + step_offset] = solvent.pos;
+		box->traj_buffer[compounds_offset + solvent_index + step_offset] = solvent.pos;
 		
 		/*
 		if (solvent_index == LOGTHREAD && LOGTYPE == 0) {

@@ -93,11 +93,6 @@ public:
 
 
 
-
-
-
-
-
 	// ----- Functions used by analyzer aswell ----- //
 	//__device__ Float3 computeLJForces(Box* box, Compound* compound, CompoundNeighborList* neighborlist, 
 		//CompoundState* self_state, CompoundState* neighborstate_buffer, Float3* utility_buffer);
@@ -118,14 +113,16 @@ private:
 	void step();
 
 	// -------------------------------------- CPU LOAD -------------------------------------- //
-	void offloadPositionData(Simulation* simulation);
+	void offloadPositionDataNLIST(Simulation* simulation);	// all at once
 	void onloadNeighborlists();
 	static void updateNeighborLists(Simulation* simulation, NListDataCollection* nlist_data_collection, 
 		volatile bool* finished, int* timing);	// thread worker, can't own engine object, thus pass ref
 	static void cullDistantNeighbors(NListDataCollection* nlist_data_collection);
 	NListDataCollection* nlist_data_collection;
 
+	// streams every n steps
 	void offloadLoggingData();
+	void offloadPositionData();	
 
 
 
