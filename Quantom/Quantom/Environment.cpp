@@ -220,7 +220,7 @@ void Environment::printTrajectory(Simulation* simulation) {
 
 	int n_points = simulation->total_particles_upperbound * simulation->n_steps;
 	Float3* traj_host = new Float3[n_points];
-	cudaMemcpy(traj_host, simulation->box->trajectory, sizeof(Float3) * n_points, cudaMemcpyDeviceToHost);
+	cudaMemcpy(traj_host, simulation->box->traj_buffer, sizeof(Float3) * n_points, cudaMemcpyDeviceToHost);
 
 	for (int i = 0; i < simulation->box->step; i++) {
 		for (int j = 0; j < simulation->total_particles_upperbound; j++) {

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Simulation.cuh"
-#include <GLFW/glfw3.h>
+#include <glfw3.h>
 #include "Rasterizer.cuh"
 #include "QuantomTypes.cuh"
 

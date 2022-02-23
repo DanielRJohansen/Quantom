@@ -1,0 +1,4 @@
+$(SolutionDir)Dependencies\GLFW\include
+$(SolutionDir)Dependencies\GLFW\lib-vc2019
+;glfw3.lib;opengl32.lib;
+	User32.lib;Gdi32.lib;Shell32.lib
