@@ -56,7 +56,7 @@ const int THREADS_PER_COMPOUNDBLOCK = 128; // Must be >= max comp particles
 const int N_LIPID_COPIES = 32;
 
 
-const int SIMULATION_STEPS = 10000;
+const int SIMULATION_STEPS = 100000;
 
 //constexpr double SOLVENT_MASS = 18.01528f * 1e-3;	// kg/mol
 constexpr double SOLVENT_MASS = 12.0107 * 1e-3;	// kg/mol
@@ -158,7 +158,7 @@ public:
 	int n_steps = SIMULATION_STEPS;
 
 	const double dt = 1 * 1e-6;		// ns, so first val corresponds to fs
-	int steps_per_render = 4;
+	int steps_per_render = 50;
 	//int n_bodies = N_BODIES_START;
 	Box* box;
 

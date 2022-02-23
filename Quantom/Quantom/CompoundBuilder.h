@@ -4,7 +4,7 @@
 #include "Bodies.cuh"
 #include <string.h>
 #include <fstream>
-
+#include <vector>
 
 
 using namespace std;

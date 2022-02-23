@@ -857,7 +857,8 @@ __global__ void forceKernel(Box* box) {
 			box->outdata[5 + box->step * 10] = data_ptr[2];// closest particle
 			box->outdata[6 + box->step * 10] = data_ptr[1];// force.len();
 		}
-		*/
+*/
+
 		box->data_GAN[0 + threadIdx.x * 6 + box->step * MAX_COMPOUND_PARTICLES * 6] = compound_state.positions[threadIdx.x];
 		box->data_GAN[1 + threadIdx.x * 6 + box->step * MAX_COMPOUND_PARTICLES * 6] = force_bond + force_angle;
 		box->data_GAN[2 + threadIdx.x * 6 + box->step * MAX_COMPOUND_PARTICLES * 6] = force_LJ_com;
@@ -871,7 +872,8 @@ __global__ void forceKernel(Box* box) {
 	
 	// ----------------------------------------------------------------------------- //
 
-	
+	if (force.len() > 200e+6)
+		box->critical_error_encountered = true;
 	
 	box->compound_state_array_next[blockIdx.x].loadData(&compound_state);
 }

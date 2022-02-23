@@ -1,7 +1,6 @@
 #pragma once
 
 #include "QuantomTypes.cuh"
-#include <SFML/Graphics.hpp>
 #include <iostream>
 
 
