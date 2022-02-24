@@ -115,7 +115,7 @@ void __global__ monitorSolventEnergyKernel(Box* box, Float3* traj_buffer, double
 	double potE = potE_buffer[compounds_offset + solvent_index + step * box->total_particles_upperbound];
 
 	if (potE > 200'000) {
-		printf("step %04d solvate %04d pot %f\n", step, solvent_index, potE);
+		//printf("step %04d solvate %04d pot %f\n", step, solvent_index, potE);
 	}
 
 	double totalE = potE + kinE;
@@ -258,7 +258,7 @@ Float3* Analyzer::analyzeCompoundEnergy(Simulation* simulation, int n_steps) {
 
 
 void Analyzer::printEnergies(Float3* energy_data, int analysable_steps) {
-	std::ofstream myfile("D:\\Quantom\\energies.csv");
+	std::ofstream myfile("D:\\Quantom\\energies_steps_" + to_string(analysable_steps) + ".csv");
 
 
 	for (int i = 0; i < analysable_steps; i++) {

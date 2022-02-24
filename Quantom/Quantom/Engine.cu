@@ -42,7 +42,7 @@ void Engine::hostMaster() {
 	if ((simulation->getStep() % STEPS_PER_LOGTRANSFER) == 0) {
 		offloadLoggingData();
 		offloadPositionData();
-		if ((simulation->getStep() % STEPS_PER_THERMOSTAT) == 0) {
+		if ((simulation->getStep() % STEPS_PER_THERMOSTAT) == 0 && APPLY_THERMOSTAT) {
 			applyThermostat();
 		}
 	}
@@ -519,7 +519,15 @@ __device__ Float3 computeSolventToSolventLJForces(Float3* self_pos, int self_ind
 	}
 	return force;
 }
-
+__device__ Float3 computeCompoundToSolventLJForces(Float3* self_pos, int n_particles, Float3* positions, double* data_ptr, double* potE_sum) {	// Specific to solvent kernel
+	Float3 force(0, 0, 0);
+	for (int i = 0; i < n_particles; i++) {
+		Float3 hyperpos = positions[i];			// copy, DONT ref it as all threads will cann applyHyperpos
+		LIMAENG::applyHyperpos(self_pos, &hyperpos);
+		force += calcLJForce(self_pos, &hyperpos, data_ptr, potE_sum);	
+	}
+	return force;
+}
 
 __device__ Float3 computePairbondForces(Compound* compound, CompoundState* compound_state, Float3* utility_buffer, double* potE) {	// only works if n threads >= n bonds
 	utility_buffer[threadIdx.x] = Float3(0, 0, 0);
@@ -586,15 +594,16 @@ __device__ Float3 computeAnglebondForces(Compound* compound, CompoundState* comp
 }
 
 
-__device__ void integratePosition(Float3* pos, Float3* pos_tsub1, Float3* force, const double mass, const double dt, float* thermostat_scalar) {
+__device__ void integratePosition(Float3* pos, Float3* pos_tsub1, Float3* force, const double mass, const double dt, float* thermostat_scalar, int p_index) {
 	Float3 temp = *pos;
+	LIMAENG::applyHyperpos(pos, pos_tsub1);
 	*pos = *pos * 2 - *pos_tsub1 + *force * (1.f / mass) * dt * dt;	// no *0.5?
 	*pos_tsub1 = temp;
 
 	Float3 delta_pos = *pos - *pos_tsub1;
 	*pos = *pos_tsub1 + delta_pos * *thermostat_scalar;
 	if (force->len() > 200e+6) {
-		printf("\nThread %d blockId %d\tForce %f \tFrom %f %f %f\tTo %f %f %f\n", threadIdx.x, blockIdx.x, force->len(), pos_tsub1->x, pos_tsub1->y, pos_tsub1->z, pos->x, pos->y, pos->z);
+		printf("\nP_index %d Thread %d blockId %d\tForce %f \tFrom %f %f %f\tTo %f %f %f\n", p_index, threadIdx.x, blockIdx.x, force->len(), pos_tsub1->x, pos_tsub1->y, pos_tsub1->z, pos->x, pos->y, pos->z);
 		
 	}
 	//printf("force: %f\n", force->len());
@@ -713,7 +722,8 @@ __global__ void forceKernel(Box* box) {
 	
 	// ------------------------------------------------------------ Integration ------------------------------------------------------------ //
 	if (threadIdx.x < compound.n_particles) {
-		integratePosition(&compound_state.positions[threadIdx.x], &compound.particles[threadIdx.x].pos_tsub1, &force, compound.particles[threadIdx.x].mass, box->dt, &box->thermostat_scalar);
+		int p_index = threadIdx.x;
+		integratePosition(&compound_state.positions[threadIdx.x], &compound.particles[threadIdx.x].pos_tsub1, &force, compound.particles[threadIdx.x].mass, box->dt, &box->thermostat_scalar, p_index );
 		box->compounds[blockIdx.x].particles[threadIdx.x].pos_tsub1 = compound.particles[threadIdx.x].pos_tsub1;
 	}
 	__syncthreads();
@@ -821,8 +831,9 @@ __global__ void solventForceKernel(Box* box) {
 		__syncthreads();
 
 		//Only do if mol is neighbor to the particular solvent
-		LIMAENG::applyHyperpos(&utility_buffer[0], &solvent_positions[threadIdx.x]);
-		force += computeLJForces(&solvent_positions[threadIdx.x], n_particles, utility_buffer, data_ptr, &potE_sum);
+		//LIMAENG::applyHyperpos(&utility_buffer[0], &solvent_positions[threadIdx.x]);
+		//force += computeLJForces(&solvent_positions[threadIdx.x], n_particles, utility_buffer, data_ptr, &potE_sum);
+		force += computeCompoundToSolventLJForces(&solvent.pos, box->compounds[0].n_particles, utility_buffer, data_ptr, &potE_sum);
 
 	}
 	// ----------------------------------------------------------------------------------------------------------------------------------------------------- //
@@ -835,7 +846,8 @@ __global__ void solventForceKernel(Box* box) {
 
 
 	if (threadIdx.x < box->n_solvents) {
-		integratePosition(&solvent.pos, &solvent.pos_tsub1, &force, SOLVENT_MASS, box->dt, &box->thermostat_scalar);
+		int p_index = MAX_COMPOUND_PARTICLES + threadIdx.x;
+		integratePosition(&solvent.pos, &solvent.pos_tsub1, &force, SOLVENT_MASS, box->dt, &box->thermostat_scalar, p_index);
 	}
 
 	if (threadIdx.x < box->n_solvents) {
@@ -852,7 +864,7 @@ __global__ void solventForceKernel(Box* box) {
 		int solvent_index = threadIdx.x;		// Temporary
 		int step_offset = (box->step % STEPS_PER_LOGTRANSFER) * box->total_particles_upperbound;
 
-		box->potE_buffer[compounds_offset + solvent_index + step_offset] = 404; // potE_sum;	//  data_ptr[0];
+		box->potE_buffer[compounds_offset + solvent_index + step_offset] = potE_sum;	//  data_ptr[0];
 		//printf("pot: %f\n", box->potE_buffer[compounds_offset + solvent_index + (box->step) * box->total_particles]);
 		box->traj_buffer[compounds_offset + solvent_index + step_offset] = solvent.pos;
 		

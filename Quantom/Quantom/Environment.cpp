@@ -93,6 +93,11 @@ void Environment::run() {
 void Environment::postRunEvents() {
 	analyzer.analyzeEnergy(simulation);
 
+
+	dumpToFile(simulation->traj_buffer, Int3(simulation->getStep(), simulation->total_particles_upperbound, 1), "traj.csv");
+	dumpToFile(simulation->potE_buffer, Int3(simulation->getStep(), simulation->total_particles_upperbound, 1), "potE.csv");
+
+
 	return;
 
 	printFloat3Matrix(
@@ -136,8 +141,10 @@ bool Environment::handleTermination(Simulation* simulation)
 {
 	if (simulation->finished)
 		return true;
-	if (simulation->getStep() >= simulation->n_steps)
+	if (simulation->getStep() >= simulation->n_steps) {
+		simulation->finished = true;
 		return true;
+	}		
 	if (simulation->box->critical_error_encountered)
 		return true;
 
@@ -198,21 +205,29 @@ void Environment::makeVirtualTrajectory(string trj_path, string waterforce_path)
 
 
 
-void Environment::printOut(double* data, int n_steps) {
-	std::ofstream myfile("D:\\Quantom\\log.csv");
-	for (int i = 0; i < 10; i++) {
-		myfile << "Data" << std::to_string(i+1) << ";";
-	}
-	myfile << "\n";
+void Environment::dumpToFile(double* data, Int3 dim, string file_name) {
+	std::ofstream myfile("D:\\Quantom\\" + file_name);
 
+	for (int i = 0; i < dim.x; i++) {				// step
+		for (int j = 0; j < dim.y; j++) {			// particle
+			myfile << data[j + i * dim.y] << ";";
+		}
+		myfile << "\n";
+	}		
+	myfile.close();
+}
 
-	for (int i = 0; i < n_steps; i++) {
-		for (int j = 0; j < 10; j++) {
-			myfile << data[j + i * 10] << ";";
+void Environment::dumpToFile(Float3* data, Int3 dim, string file_name) {
+	std::ofstream myfile("D:\\Quantom\\" + file_name);
+
+	for (int i = 0; i < dim.x; i++) {				// step
+		for (int j = 0; j < dim.y; j++) {			// particle
+			for (int jj = 0; jj < 3; jj++) {
+				myfile << data[j + i * dim.y].at(jj) << ";";
+			}			
 		}
 		myfile << "\n";
 	}
-		
 	myfile.close();
 }
 

@@ -177,14 +177,14 @@ __global__ void processAtomsKernel(RenderAtom* atoms, RenderBall* balls, int n_a
     atom.atom_type = atom.atom_type == NONE ? RAS_getTypeFromMass(atom.mass) : atom.atom_type;
 
     atom.color = getColor(atom.atom_type);
-    atom.radius = (getRadius(atom.atom_type)) / (1.f+atom.pos.y * 0.001);       // [nm]
+    atom.radius = (getRadius(atom.atom_type)) / (1.f+atom.pos.y * 0.001f);       // [nm]
 
     //atoms[index] = atom;
 
     // Convert units to normalized units for OpenGL
     atom.radius = 0.5 * atom.radius;            // Yeah, i'm just eyeballing this..
     for (int dim = 0; dim < 3; dim++) {
-        *atom.pos.placeAt(dim) = (atom.pos.at(dim) / BOX_LEN - 0.5f) * 1.8;
+        *atom.pos.placeAt(dim) = (atom.pos.at(dim) / (double) BOX_LEN - 0.5l) * 1.8l;
     }
 
 

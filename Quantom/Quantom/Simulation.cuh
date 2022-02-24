@@ -5,7 +5,7 @@
 
 
 
-constexpr double BOX_LEN = 5.f;		// Must be > twice the len of largest compound
+constexpr double BOX_LEN = 7.f;		// Must be > twice the len of largest compound
 
 constexpr double BOX_LEN_HALF = BOX_LEN/2.f;
 constexpr double BOX_BASE = -BOX_LEN_HALF;
@@ -20,6 +20,8 @@ const int STEPS_PER_NLIST_UPDATE = 50;
 const int STEPS_PER_LOGTRANSFER = 100;
 //const int STEPS_PER_TRAJTRANSFER = 100;
 const int STEPS_PER_THERMOSTAT = 200;
+
+const bool APPLY_THERMOSTAT = true;
 
 const int LOGBLOCK = 0;
 const int LOGTHREAD = 0;
@@ -43,7 +45,7 @@ const int LOG_P_ID = 17;
 
 const int MAX_COMPOUNDS = 0xFF;
 const int MAX_SOLVENTS = 0xFFFF;
-constexpr double CUTOFF = 5.0f;	//nm/
+constexpr double CUTOFF = 10.0f;	//nm/
 
 
 
