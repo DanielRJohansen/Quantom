@@ -13,7 +13,7 @@ constexpr double BOX_LEN_HALF = BOX_LEN/2.f;
 const int STEPS_PER_NLIST_UPDATE = 50;
 const int STEPS_PER_LOGTRANSFER = 100;
 //const int STEPS_PER_TRAJTRANSFER = 100;
-const int STEPS_PER_THERMOSTAT = 1000;
+const int STEPS_PER_THERMOSTAT = 100;
 
 const bool APPLY_THERMOSTAT = true;
 
@@ -49,7 +49,7 @@ const int THREADS_PER_COMPOUNDBLOCK = 128; // Must be >= max comp particles
 const int N_LIPID_COPIES = 32;
 
 
-const int SIMULATION_STEPS = 200000;
+const int SIMULATION_STEPS = 200;
 
 //constexpr double SOLVENT_MASS = 18.01528f * 1e-3;	// kg/mol
 constexpr double SOLVENT_MASS = 12.0107 * 1e-3;	// kg/mol
@@ -165,6 +165,7 @@ public:
 	int n_solvents = 0;
 
 	string out_dir = "D:\\Quantom\\LIMANET\\sim_out";
+	
 
 private:
 	int step = 0;

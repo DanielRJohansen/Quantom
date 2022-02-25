@@ -137,23 +137,15 @@ void __global__ monitorSolventEnergyKernel(Box* box, Float3* traj_buffer, double
 
 
 
-void Analyzer::analyzeEnergy(Simulation* simulation) {	// Calculates the avg J/mol // calculate energies separately for compounds and solvents. weigh averages based on amount of each
-	printf("Get step %d\n", simulation->getStep());
+Analyzer::AnalyzedPackage Analyzer::analyzeEnergy(Simulation* simulation) {	// Calculates the avg J/mol // calculate energies separately for compounds and solvents. weigh averages based on amount of each
 	int analysable_steps = simulation->getStep() - 3;
-	if (analysable_steps < 1)
-		return;
-
-	Float3 a(0.4);
-	Float3 b(2.f);
-	//LIMAENG::applyHyperpos(&a, &b);
-	//testspace::testerfn(4);
+	if (analysable_steps < 1) {
+		printf("FATAL ERROR, no steps to analyze");
+		exit(1);
+	}
+		
 
 	Float3* average_energy = new Float3[analysable_steps];
-	
-	for (int i = 0; i < simulation->getStep(); i++) {
-		//printf("Step %d potE %f\n", i, simulation->potE_buffer[i]);
-	}
-	//exit(0);
 
 
 																		// TODO: I think maybe i am missing 1 datapoint here? Something about only loading 99 steps in??
@@ -166,28 +158,17 @@ void Analyzer::analyzeEnergy(Simulation* simulation) {	// Calculates the avg J/m
 	Float3* average_solvent_energy = analyzeSolvateEnergy(simulation, analysable_steps);
 	Float3* average_compound_energy = analyzeCompoundEnergy(simulation, analysable_steps);	//avg energy PER PARTICLE in compound
 
-	cudaFree(traj_buffer_device);
-	cudaFree(potE_buffer_device);
-
-
-	
 	for (int i = 0; i < analysable_steps; i++) {
-		//printf("\n");
-		//average_compound_energy[i].print('c');
-		//average_solvent_energy[i].print('s');
 		average_energy[i] = (average_solvent_energy[i] * simulation->box->n_solvents * 1 + average_compound_energy[i] * simulation->box->compounds[0].n_particles) * (1.f/ (simulation->box->n_solvents + simulation->box->compounds[0].n_particles));
-		//average_energy[i].print('a');
 	}
 	
 
-	printEnergies(average_energy, analysable_steps, simulation);
-
-
-	delete [] average_solvent_energy, average_compound_energy, average_energy;
-
+	cudaFree(traj_buffer_device);
+	cudaFree(potE_buffer_device);
+	delete [] average_solvent_energy, average_compound_energy;
 
 	printf("\n########## Finished analyzing energies ##########\n\n");
-
+	return AnalyzedPackage(average_energy, analysable_steps, simulation->temperature_buffer, simulation->getStep() / STEPS_PER_THERMOSTAT);;
 }
 
 Float3* Analyzer::analyzeSolvateEnergy(Simulation* simulation, int n_steps) {
@@ -256,6 +237,21 @@ Float3* Analyzer::analyzeCompoundEnergy(Simulation* simulation, int n_steps) {
 	return average_compound_energy;
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*
 void Analyzer::printEnergies(Float3* energy_data, int analysable_steps, Simulation* simulation) {
 	string file_path_s = "D:\\Quantom\\energies_steps_" + to_string(analysable_steps) + ".bin";
 	char* file_path;
@@ -280,38 +276,4 @@ void Analyzer::printEnergies(Float3* energy_data, int analysable_steps, Simulati
 
 
 
-
-
-/*
-
-	std::ofstream myfile("D:\\Quantom\\energies_steps_" + to_string(analysable_steps) + ".csv");
-
-
-
-	for (int i = 0; i < analysable_steps; i++) {
-		for (int j = 0; j < 3; j++) {
-			myfile << energy_data[i].at(j) << ';';
-			//myfile << energy_data[j + i * 3] << ";";
-		}
-		myfile << "\n";
-	}
-	myfile.close();
 */
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

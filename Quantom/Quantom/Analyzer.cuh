@@ -23,15 +23,33 @@
 //const int THREADS_PER_MONITORBLOCK = 256;
 //const int N_MONITORBLOCKS_PER_STEP = 256;
 
+
+
 class Analyzer {
 public:
 	Analyzer() {}
 
+	struct AnalyzedPackage {
+		AnalyzedPackage(Float3* e_ptr, int e_cnt, float* t_ptr, int t_cnt) : n_energy_values(e_cnt), n_temperature_values(t_cnt) {
+			energy_data = e_ptr;
+			temperature_data = t_ptr;
+		}
+		Float3* energy_data; // potE, kinE, totalE
+		int n_energy_values;
 
-	void analyzeEnergy(Simulation* simulation); // Prints a file of doubles: [step, molecule, atom, coordinate_dim]
+		float* temperature_data;
+		int n_temperature_values;
+		~AnalyzedPackage() {
+			delete[] energy_data;
+			delete[] temperature_data;
+		}
+	};
+
+	AnalyzedPackage analyzeEnergy(Simulation* simulation); // Prints a file of doubles: [step, molecule, atom, coordinate_dim]
 
 	Float3* analyzeSolvateEnergy(Simulation* simulation, int n_steps);
 	Float3* analyzeCompoundEnergy(Simulation* simulation, int n_steps);
+
 
 
 private:

@@ -6,12 +6,13 @@ Environment::Environment() {
 
 	display = new DisplayV2();
 
-	
 
 	simulation = new Simulation();
 	if (!verifySimulationParameters()) {
 		exit(0);
 	}
+
+
 
 	//engine = new Engine;
 
@@ -70,14 +71,8 @@ void Environment::run() {
 		engine->deviceMaster();		// Device first, otherwise offloading data always needs the last datapoint!
 		engine->hostMaster();
 
-		
-		
-
-
 		handleStatus(simulation);
 		handleDisplay(simulation);
-
-
 
 		if (handleTermination(simulation)) {
 			break;
@@ -91,29 +86,20 @@ void Environment::run() {
 }
 
 void Environment::postRunEvents() {
-	analyzer.analyzeEnergy(simulation);
+	
+	simulation->out_dir += "\\Steps_" + to_string(simulation->getStep());
+	int check = _mkdir(&(simulation->out_dir[0]));
 
-
-//	dumpToFile(simulation->traj_buffer, Int3(simulation->getStep(), simulation->total_particles_upperbound, 1), "traj.csv");
-//	dumpToFile(simulation->potE_buffer, Int3(simulation->getStep(), simulation->total_particles_upperbound, 1), "potE.csv");
+	Analyzer::AnalyzedPackage analyzed_package = analyzer.analyzeEnergy(simulation);
+	dumpToFile(analyzed_package.energy_data, analyzed_package.n_energy_values, simulation->out_dir + "\\energy.bin");
+	dumpToFile(analyzed_package.temperature_data, analyzed_package.n_temperature_values, simulation->out_dir + "\\temperature.bin");
 
 	dumpToFile(simulation->box->data_GAN,
 		simulation->getStep() * MAX_COMPOUND_PARTICLES * 6,
-		simulation->out_dir + "\\particles_" + to_string(70) + "_steps_" + to_string(simulation->getStep()) + ".bin"
+		simulation->out_dir + "\\sim_out.bin"
 	);
 
 
-	/*printFloat3Matrix(
-		simulation->box->data_GAN,
-		Int3(simulation->getStep(), MAX_COMPOUND_PARTICLES, 6),
-		simulation->out_dir + "\\particles_" + to_string(70) + "_steps_" + to_string(simulation->getStep()) + ".csv");
-		*/
-	//printTrajectory(simulation);
-	//printWaterforce(simulation);
-	
-
-	//printOut(simulation->box->outdata, simulation->n_steps);
-	//printDataBuffer(simulation->box);
 }
 
 void Environment::handleStatus(Simulation* simulation) {
@@ -216,33 +202,7 @@ void Environment::dumpToFile(T* data, int n_datapoints, string file_path_s) {
 	fclose(file);
 }
 
-/*
-void Environment::dumpToFile(double* data, Int3 dim, string file_name) {
-	std::ofstream myfile("D:\\Quantom\\" + file_name);
 
-	for (int i = 0; i < dim.x; i++) {				// step
-		for (int j = 0; j < dim.y; j++) {			// particle
-			myfile << data[j + i * dim.y] << ";";
-		}
-		myfile << "\n";
-	}		
-	myfile.close();
-}
-
-void Environment::dumpToFile(Float3* data, Int3 dim, string file_name) {
-	std::ofstream myfile("D:\\Quantom\\" + file_name);
-
-	for (int i = 0; i < dim.x; i++) {				// step
-		for (int j = 0; j < dim.y; j++) {			// particle
-			for (int jj = 0; jj < 3; jj++) {
-				myfile << data[j + i * dim.y].at(jj) << ";";
-			}			
-		}
-		myfile << "\n";
-	}
-	myfile.close();
-}
-*/
 void Environment::printTrajectory(Simulation* simulation) {
 	std::ofstream myfile("D:\\Quantom\\trajectory.csv");
 
@@ -261,78 +221,9 @@ void Environment::printTrajectory(Simulation* simulation) {
 	myfile.close();
 }
 
-void Environment::printWaterforce(Simulation* simulation)
-{
-	std::ofstream myfile("D:\\Quantom\\waterforce.csv");
-
-	for (int i = 0; i < simulation->n_steps; i++) {
-		myfile << simulation->box->outdata[7 + i * 10] << ";";
-		myfile << simulation->box->outdata[8 + i * 10] << ";";
-		myfile << simulation->box->outdata[9 + i * 10] << ";";
-		myfile << "\n";
-	}
-
-	myfile.close();
-}
-
-void Environment::printFloat3Matrix(Float3* data_matrix, Int3 dim, string filename)		// dim: steps, n_particles, f3 per particle
-{
-	printf("Printing data to file \n");
-	cout << filename << endl;
-
-	std::ofstream myfile(filename);
-
-
-	for (int step = 0; step < dim.x; step++) {
-		if (step % 1000 == 999)
-			printf("\rExporting line %d", step+1);
-
-		string line = "";
-		for (int particle = 0; particle < dim.y; particle++) {
-			for (int datapoint = 0; datapoint < dim.z; datapoint++) {
-				int index = step * dim.y * dim.z +particle* dim.z + datapoint;
-				Float3 data = data_matrix[index];
-				for (int i = 0; i < 3; i++) {
-					line = line + to_string(data.at(i)) + ';';
-					//myfile << data.at(i) << ';';
-				}
-
-			}
-		}
-		line = line + '\n';
-		myfile << line;
-		//myfile << "\n";
-	}
-	printf("\n");
-	myfile.close();
-}
 
 
 
 
 
 
-
-
-
-
-/*
-void Environment::printDataBuffer(Box* box) {
-	std::ofstream myfile("D:\\Quantom\\energy.csv");
-
-	double* host_data = engine->getDatabuffer();
-
-	printf("Printing %d columns per step\n", box->n_compounds * 3 * 2);
-
-	for (int i = 0; i < box->step; i++) {
-		for (int j = 0; j < box->n_compounds * 3; j++) {
-			myfile << host_data[0 + j*2 + i * box->n_compounds * 3 * 2] << ';';
-			myfile << host_data[1 + j*2 + i * box->n_compounds * 3 * 2] << ';';
-		}
-		myfile << "\n";
-	}
-	myfile.close();
-
-	delete host_data;
-}
-*/
