@@ -88,14 +88,19 @@ void BoxBuilder::finishBox(Simulation* simulation)
 
 
 
+
+
 	int n_points = simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER;
 	cudaMallocManaged(&simulation->box->potE_buffer, sizeof(double) * simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER);	// Can only log molecules of size 3 for now...
 	simulation->potE_buffer = new double[simulation->total_particles_upperbound * simulation->n_steps];
 
-
-
 	cudaMallocManaged(&simulation->box->traj_buffer, sizeof(Float3) * simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER);
 	simulation->traj_buffer = new Float3[simulation->total_particles_upperbound * simulation->n_steps];
+
+	simulation->temperature_buffer = new float[SIMULATION_STEPS / STEPS_PER_THERMOSTAT + 1];
+
+
+
 
 	printf("Reserving %d MB for logging\n", (int)((sizeof(double) + sizeof(Float3)) * n_points / 1e+6));
 	cudaMallocManaged(&simulation->box->outdata, sizeof(double) * 10 * simulation->n_steps);	// 10 data streams for 10k steps. 1 step at a time.

@@ -180,7 +180,7 @@ void Analyzer::analyzeEnergy(Simulation* simulation) {	// Calculates the avg J/m
 	}
 	
 
-	printEnergies(average_energy, analysable_steps);
+	printEnergies(average_energy, analysable_steps, simulation);
 
 
 	delete [] average_solvent_energy, average_compound_energy, average_energy;
@@ -256,7 +256,7 @@ Float3* Analyzer::analyzeCompoundEnergy(Simulation* simulation, int n_steps) {
 	return average_compound_energy;
 }
 
-void Analyzer::printEnergies(Float3* energy_data, int analysable_steps) {
+void Analyzer::printEnergies(Float3* energy_data, int analysable_steps, Simulation* simulation) {
 	string file_path_s = "D:\\Quantom\\energies_steps_" + to_string(analysable_steps) + ".bin";
 	char* file_path;
 	file_path = &file_path_s[0];
@@ -265,6 +265,16 @@ void Analyzer::printEnergies(Float3* energy_data, int analysable_steps) {
 	FILE* file;
 	fopen_s(&file, file_path, "wb");
 	fwrite(energy_data, sizeof(Float3), analysable_steps, file);
+	fclose(file);
+
+
+
+	file_path_s = "D:\\Quantom\\temperatures_steps_" + to_string(analysable_steps) + ".bin";
+	file_path = &file_path_s[0];
+	cout << "Printing to file " << file_path << endl;
+
+	fopen_s(&file, file_path, "wb");
+	fwrite(simulation->temperature_buffer, sizeof(float), simulation->getStep()/STEPS_PER_THERMOSTAT, file);
 	fclose(file);
 }
 

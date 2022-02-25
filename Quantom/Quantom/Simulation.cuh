@@ -8,27 +8,19 @@
 constexpr double BOX_LEN = 6.f;		// Must be > twice the len of largest compound
 constexpr double BOX_LEN_HALF = BOX_LEN/2.f;
 
-constexpr double FOCUS_LEN = 2;
-constexpr double BLOCK_LEN = FOCUS_LEN * 2;	//nm
-constexpr double FOCUS_LEN_HALF = BLOCK_LEN / 4.f;
-
 
 
 const int STEPS_PER_NLIST_UPDATE = 50;
 const int STEPS_PER_LOGTRANSFER = 100;
 //const int STEPS_PER_TRAJTRANSFER = 100;
-const int STEPS_PER_THERMOSTAT = 200;
+const int STEPS_PER_THERMOSTAT = 1000;
 
 const bool APPLY_THERMOSTAT = true;
 
-const int LOGBLOCK = 0;
-const int LOGTHREAD = 0;
-const int LOGTYPE = 1;	// 0 for solvent, 1 for compound
 
 
 
-
-const int N_SOLVATE_MOLECULES = 200;
+const int N_SOLVATE_MOLECULES = 255;	// Must not be above 255, as that can't be represented as uint8_t
 
 
 //const int PARTICLES_PER_COMPOUND = 3;
@@ -57,7 +49,7 @@ const int THREADS_PER_COMPOUNDBLOCK = 128; // Must be >= max comp particles
 const int N_LIPID_COPIES = 32;
 
 
-const int SIMULATION_STEPS = 100000;
+const int SIMULATION_STEPS = 200000;
 
 //constexpr double SOLVENT_MASS = 18.01528f * 1e-3;	// kg/mol
 constexpr double SOLVENT_MASS = 12.0107 * 1e-3;	// kg/mol
@@ -155,7 +147,7 @@ public:
 
 	double* potE_buffer;	// Not really a buffer yet, just one large array that holds full simulation data
 	Float3* traj_buffer;
-
+	float* temperature_buffer;
 
 	uint32_t total_particles_upperbound = 0;
 

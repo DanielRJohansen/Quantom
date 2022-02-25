@@ -324,6 +324,7 @@ float Engine::getBoxTemperature() {
 
 	double avg_kinE = kinE_sum / (long double)particles_total;
 	float temperature = avg_kinE * 2 / (3 * 8.3145);
+	simulation->temperature_buffer[step / STEPS_PER_THERMOSTAT] = temperature;
 	//printf("\nTemp: %f\n", temperature);
 	return temperature;
 }
@@ -331,6 +332,7 @@ float Engine::getBoxTemperature() {
 void Engine::applyThermostat() {
 	const float max_temp = 300.f;				// [k]
 	float temp = getBoxTemperature();
+	printf("\nTemperature: %f\n", temp);
 	if (temp > max_temp) {
 	//if (temp > 100 && simulation->getStep() > 1000) {
 		simulation->box->thermostat_scalar = max_temp / temp;

@@ -35,7 +35,7 @@ public:
 
 
 private:
-	void printEnergies(Float3* energy_data, int n_steps);
+	void printEnergies(Float3* energy_data, int n_steps, Simulation* simulation);
 	Engine engine;
 
 
