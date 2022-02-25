@@ -1,12 +1,11 @@
 #pragma once
 
-#include <SFML/Graphics.hpp>
 
 
 class Interface
 {
 public:
-	Interface(sf::RenderWindow* window);
+	Interface();
 	void handleEvents();
 
 
@@ -14,6 +13,5 @@ public:
 
 
 private:
-	sf::RenderWindow* window;
 };
 

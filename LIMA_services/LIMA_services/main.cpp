@@ -400,32 +400,28 @@ void shuffle(selfcenteredDatapoint* data, int n_datapoints) {
 
 
 
-int main(void) {
-/*
-	int y = 100000;
-	int x = 70 * 6 * 3;
-
-	float* ddata = new float[x * y];
-	for (int i = 0; i < x * y; i++) ddata[i] = 3.14f;
+int main(int argc, char** argv) {
 
 
+	//cout << argv[0] << endl << argv[1] << endl << argv[2] << endl << "DONE" << endl;
+	printf("argc %d\n", argc);
+	for (int i = 0; i < argc; i++) {
+		cout << ":" << argv[i] << ":" << endl;
+	}
 
-
-	printf("Writing\n");
-	 //std::fstream("file.binary", std::ios::out | std::ios::binary);
-	int bytes = sizeof(float) * x * y;
-	auto myfile = fstream("D:\\Quantom\\LIMANET\\sim_out\\test.bin", ios::out, ios::binary);
-	myfile.write((char*)&ddata[0], bytes);
-	myfile.close();
-	printf("Done\n");
-
-	
-	
-	exit(1);
-
-*/
-
+	string workdir = "D:\\Quantom\LIMANET\sim_out";
 	bool shuffle_time_dim = false;
+	int N_STEPS = 100000;	// Determines file to read
+
+	printf("argc %d\n", argc);
+	if (argc > 0) {
+		workdir = argv[1];
+		N_STEPS = stoi(argv[2]);
+		shuffle_time_dim = stoi(argv[3]);
+	}
+		
+
+
 
 	printf("Allocating %.01f GB of RAM\n", ((double)sizeof(Row) * MAX_ROW + (double) sizeof(selfcenteredDatapoint) * MAX_ROW)/ 1000000000.f);
 	Row* rows = new Row[MAX_ROW + 1];
@@ -434,15 +430,13 @@ int main(void) {
 	int query_atom = 0;
 	
 
-	int N_STEPS = 100000;	// Determines file to read
 
 
 	printf("Processing data\n");
 
 
 
-
-	string path_in = "D:\\Quantom\\LIMANET\\sim_out\\particles_70_steps_" + to_string(N_STEPS) + ".bin";
+	string path_in = workdir + "\\sim_out.bin";
 	readDataBIN(rows, path_in, N_STEPS);
 	for (int row = ROW_START; row < N_STEPS; row += 2) {
 		data[n_datapoints++] = makeDatapoint(rows, query_atom, row);
@@ -455,7 +449,8 @@ int main(void) {
 	int n_ignored_datapoints = discardVolatileDatapoints(data, n_datapoints, 5000.f);
 
 
-	string path_out = "D:\\Quantom\\LIMANET\\sim_out\\atom" + to_string(query_atom) + "_lines" + to_string(n_datapoints - n_ignored_datapoints);
+	//string path_out = "D:\\Quantom\\LIMANET\\sim_out\\atom" + to_string(query_atom) + "_lines" + to_string(n_datapoints - n_ignored_datapoints);
+	string path_out = workdir + "\\traindata";
 	if (shuffle_time_dim) {
 		shuffle(data, n_datapoints);
 		path_out = path_out + "_shuffled";
@@ -466,8 +461,6 @@ int main(void) {
 
 	delete[] rows;
 	delete[] data;
-	
-
 
 	return 0;
 }

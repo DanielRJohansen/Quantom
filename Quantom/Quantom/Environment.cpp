@@ -99,7 +99,13 @@ void Environment::postRunEvents() {
 		simulation->out_dir + "\\sim_out.bin"
 	);
 
+	string data_processing_command = "C:\\Users\\Daniel\\git_repo\\Quantom\\LIMA_services\\x64\\Debug\\LIMA_services.exe "
+		+ simulation->out_dir + " "
+		+ to_string(simulation->getStep())
+		+ " 0";											// do_shuffle
 
+	cout << data_processing_command << "\n\n";
+	system(&data_processing_command[0]);							
 }
 
 void Environment::handleStatus(Simulation* simulation) {
