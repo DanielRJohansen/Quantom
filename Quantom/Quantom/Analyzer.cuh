@@ -2,7 +2,8 @@
 
 #include <iostream>
 #include <chrono>
-
+#include <cstring>
+#include <string>
 //#include "Bodies.cuh"
 #include "Simulation.cuh"
 //#include "BoxBuilder.cuh"

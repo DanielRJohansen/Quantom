@@ -94,11 +94,14 @@ void Environment::postRunEvents() {
 	analyzer.analyzeEnergy(simulation);
 
 
-	dumpToFile(simulation->traj_buffer, Int3(simulation->getStep(), simulation->total_particles_upperbound, 1), "traj.csv");
-	dumpToFile(simulation->potE_buffer, Int3(simulation->getStep(), simulation->total_particles_upperbound, 1), "potE.csv");
+//	dumpToFile(simulation->traj_buffer, Int3(simulation->getStep(), simulation->total_particles_upperbound, 1), "traj.csv");
+//	dumpToFile(simulation->potE_buffer, Int3(simulation->getStep(), simulation->total_particles_upperbound, 1), "potE.csv");
 
+	dumpToFile(simulation->box->data_GAN,
+		simulation->getStep() * MAX_COMPOUND_PARTICLES * 6,
+		simulation->out_dir + "\\particles_" + to_string(70) + "_steps_" + to_string(simulation->getStep()) + ".bin"
+	);
 
-	return;
 
 	printFloat3Matrix(
 		simulation->box->data_GAN,
@@ -201,10 +204,19 @@ void Environment::makeVirtualTrajectory(string trj_path, string waterforce_path)
 
 
 
+template <typename T>
+void Environment::dumpToFile(T* data, int n_datapoints, string file_path_s) {	
+	char* file_path;
+	file_path = &file_path_s[0];
+	cout << "Printing to file " << file_path << endl;
 
+	FILE* file;
+	fopen_s(&file, file_path, "wb");
+	fwrite(data, sizeof(Float3), n_datapoints, file);
+	fclose(file);
+}
 
-
-
+/*
 void Environment::dumpToFile(double* data, Int3 dim, string file_name) {
 	std::ofstream myfile("D:\\Quantom\\" + file_name);
 
@@ -230,7 +242,7 @@ void Environment::dumpToFile(Float3* data, Int3 dim, string file_name) {
 	}
 	myfile.close();
 }
-
+*/
 void Environment::printTrajectory(Simulation* simulation) {
 	std::ofstream myfile("D:\\Quantom\\trajectory.csv");
 

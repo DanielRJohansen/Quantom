@@ -239,86 +239,95 @@ Row parseRow(string* raw_data) {
 	return row;
 }
 
-int readData(Row* rows, string path) {
-	fstream file;
-	file.open(path);
 
-	int inputline_cnt = 0;	// Refers to the current line count in the file
-	int dataline_cnt = 0;	// Refers to the current row in the "rows" array
+void readDataBIN(Row* rows, string path, int N_STEPS) {
+	char* file_path;
+	file_path = &path[0];
+	cout << "Reading from file " << file_path << endl;
 
-	
-	int entries_per_atom = 3 * FLOAT3_PER_ATOM;	// 6 Float3
+	FILE* file;
+	fopen_s(&file, file_path, "rb");
+
+	int particles = 128;
+	int f3_per_particle = 6;
+	int n_f3s = N_STEPS * particles * f3_per_particle;
+	Float3* buffer = new Float3[n_f3s];
+	fread(buffer, sizeof(Float3), n_f3s, file);
+	fclose(file);
 
 
-
-	int end_column = ATOMS_PER_ROW * 3 * FLOAT3_PER_ATOM + 10;
-	string* raw_input = new string[end_column]();	
-	for (int i = 0; i < end_column; i++) raw_input[i] = "";
-
-	string line;
-	while (getline(file, line)) {
-		int column_index = 0;
-		if (inputline_cnt < ROW_START) {
-			inputline_cnt++;
-			continue;
+	for (int i = 0; i < N_STEPS; i++) {
+		for (int j = 0; j < particles; j++) {
+			if (j >= 70)
+				continue;
+			int buffer_index = j * f3_per_particle + i * particles * f3_per_particle;
+			rows[i].atoms[j].pos = buffer[buffer_index + 0];
+			rows[i].atoms[j].LJ_force = buffer[buffer_index + 3];
+			rows[i].atoms[j].id = j;
 		}
-		if (inputline_cnt == MAX_ROW)
-			break;
-
-
-
-
-		stringstream ss(line);
-		string word;
-		while (getline(ss, word, ';')) {
-			raw_input[column_index++] = word;
-			if (column_index == end_column)
-				break;
-		}
-		if ((inputline_cnt % 100) == 99)
-			printf("Reading row: %d\r", inputline_cnt +1);
-
-		rows[dataline_cnt++] = parseRow(raw_input);
-		inputline_cnt++;
-		//printf("%d %f\n", dataline_cnt-1, rows[dataline_cnt - 1].atoms[0].LJ_force.len());
-		
-
-
 	}
-	printf("\n");
-	file.close();
-	printf("%d datalines read \n", dataline_cnt);
-	return dataline_cnt;
 }
 
-void exportData(selfcenteredDatapoint* data, Int3 dim, string filename) {	
+void exportDataCSV(selfcenteredDatapoint* data, Int3 dim, string filename) {
 	std::ofstream myfile(filename);
-	printf("Exporting to file \n");
+	printf("\nExporting to file: \t");
 	cout << filename << endl;
 
-	
+
 
 	for (int i = 0; i < dim.x; i++) {								// Step
 		if ((i % 100) == 99)
-			printf("\rWriting row: %d", i+1);
+			printf("\rWriting row: %d", i + 1);
 
 		selfcenteredDatapoint scdp = data[i];
 		if (scdp.ignore)
 			continue;
+
 		//scdp.atoms_relative[0].LJ_force.print('f');
 		scdp.atoms_relative[0].LJ_force.printToFile(&myfile);				// First print label				3xfloat
 		scdp.atoms_relative_prev[0].LJ_force.printToFile(&myfile);			// Then print prev self force		3xfloat
-			
-		for (int ii = 1; ii < dim.y; ii++) {						
+
+		for (int ii = 1; ii < dim.y; ii++) {
 			scdp.atoms_relative[ii].pos.printToFile(&myfile);				// Print other atoms pos			69x3xfloat
 			//scdp.atoms_relative[ii].LJ_force.printToFile(&myfile);
 			//scdp.atoms_relative_prev[ii].pos.printToFile(&myfile);
 			scdp.atoms_relative_prev[ii].LJ_force.printToFile(&myfile);		// Print other atoms prev force		69x3xfloat
 		}
-		if (! (i+1 == dim.x))	// Otherwise it adds an empty line at the bottom, breaking in python loading shit
+		if (!(i + 1 == dim.x))	// Otherwise it adds an empty line at the bottom, breaking in python loading shit
 			myfile << "\n";
 	}
 	myfile.close();
+}
+
+void exportData(selfcenteredDatapoint* data, Int3 dim, string path) {				// 	exportData(data, Int3(n_datapoints, ATOMS_PER_ROW, 1), path_out);
+	char* file_path;
+	file_path = &path[0];
+	cout << "Writing to file " << file_path << endl;
+
+	int lines_to_print = 0;	
+	Float3* buffer = new Float3[dim.x * dim.y * 10];	// Times 10 just to be safe
+	uint32_t buffer_ptr = 0;
+
+	for (int i = 0; i < dim.x; i++) {								// Step
+		selfcenteredDatapoint scdp = data[i];
+		if (scdp.ignore)
+			continue;
+
+
+		//scdp.atoms_relative[0].LJ_force.print('f');
+		buffer[buffer_ptr++] = scdp.atoms_relative[0].LJ_force;				// First print label				3xfloat
+		buffer[buffer_ptr++] = scdp.atoms_relative_prev[0].LJ_force;			// Then print prev self force		3xfloat
+			
+		for (int ii = 1; ii < dim.y; ii++) {						
+			buffer[buffer_ptr++] = scdp.atoms_relative[ii].pos;				// Print other atoms pos			69x3xfloat
+			buffer[buffer_ptr++] = scdp.atoms_relative_prev[ii].LJ_force;		// Print other atoms prev force		69x3xfloat
+		}
+	}
+	
+	FILE* file;
+	fopen_s(&file, file_path, "wb");
+	fwrite(buffer, sizeof(Float3), buffer_ptr, file);
+	fclose(file);
 }
 
 void makeForceChangePlot(selfcenteredDatapoint* data, int n_datapoints) {
@@ -349,13 +358,13 @@ void makeForceChangePlot(selfcenteredDatapoint* data, int n_datapoints) {
 		}
 			
 	}
-	printf("%d zeroes in dataset\n", zeroes);
+	printf("\n%d zeroes in dataset\n", zeroes);
 
 	printf("x=categorical([");
 	for (int i = 0; i < 32; i++) printf("%u ", (int) pow(2, i));
 	printf("]);\ny=[");
 	for (int i = 0; i < 32; i++) printf("%d ", bins[i]);
-	printf("];\n");
+	printf("];\n\n\n");
 }
 
 int discardVolatileDatapoints(selfcenteredDatapoint* data, int n_datapoints, double cuttoff_value) {	// Removes datapoints where the change in force is too large for the NN to handle..
@@ -367,7 +376,7 @@ int discardVolatileDatapoints(selfcenteredDatapoint* data, int n_datapoints, dou
 			n_ignored++;
 		}
 	}
-	printf("%d datapoints cuttoff due to force change magnitude\n", n_ignored);
+	printf("\n%d datapoints cuttoff due to force change magnitude\n", n_ignored);
 	return n_ignored;
 }
 
@@ -419,33 +428,37 @@ int main(void) {
 	printf("Allocating %.01f GB of RAM\n", ((double)sizeof(Row) * MAX_ROW + (double) sizeof(selfcenteredDatapoint) * MAX_ROW)/ 1000000000.f);
 	Row* rows = new Row[MAX_ROW + 1];
 	selfcenteredDatapoint* data = new selfcenteredDatapoint[MAX_ROW + 1];
-
-	
-	string path_in = "D:\\Quantom\\LIMANET\\sim_out\\particles_70_steps_60000.csv";
-	//string path_in = "D:\\Quantom\\LIMANET\\sim_out\\particles_70_steps_300.csv";
-
-	int lines_read = readData(rows, path_in);
-	
 	int n_datapoints = 0;
 	int query_atom = 0;
+	
+
+	int N_STEPS = 500;	// Determines file to read
+
+
 	printf("Processing data\n");
-	for (int row = 1; row < lines_read; row += 2) {
+
+
+
+
+	string path_in = "D:\\Quantom\\LIMANET\\sim_out\\particles_70_steps_" + to_string(N_STEPS) + ".bin";
+	readDataBIN(rows, path_in, N_STEPS);
+	for (int row = ROW_START; row < N_STEPS; row += 2) {
 		data[n_datapoints++] = makeDatapoint(rows, query_atom, row);
 	}
+
+
+
+
 	makeForceChangePlot(data, n_datapoints);
 	int n_ignored_datapoints = discardVolatileDatapoints(data, n_datapoints, 5000.f);
 
 
 	string path_out = "D:\\Quantom\\LIMANET\\sim_out\\atom" + to_string(query_atom) + "_lines" + to_string(n_datapoints - n_ignored_datapoints);
 	if (shuffle_time_dim) {
-		//random_shuffle(data, data + sizeof(selfcenteredDatapoint) * n_datapoints);
 		shuffle(data, n_datapoints);
 		path_out = path_out + "_shuffled";
 	}
-	path_out = path_out + ".csv";
-	
-	
-	exportData(data, Int3(n_datapoints, ATOMS_PER_ROW, 1), path_out);
+	exportData(data, Int3(n_datapoints, ATOMS_PER_ROW, 1), path_out + ".bin");
 
 
 

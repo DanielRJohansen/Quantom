@@ -256,9 +256,26 @@ Float3* Analyzer::analyzeCompoundEnergy(Simulation* simulation, int n_steps) {
 	return average_compound_energy;
 }
 
-
 void Analyzer::printEnergies(Float3* energy_data, int analysable_steps) {
+	string file_path_s = "D:\\Quantom\\energies_steps_" + to_string(analysable_steps) + ".bin";
+	char* file_path;
+	file_path = &file_path_s[0];
+	cout << "Printing to file " << file_path << endl;
+
+	FILE* file;
+	fopen_s(&file, file_path, "wb");
+	fwrite(energy_data, sizeof(Float3), analysable_steps, file);
+	fclose(file);
+}
+
+
+
+
+
+/*
+
 	std::ofstream myfile("D:\\Quantom\\energies_steps_" + to_string(analysable_steps) + ".csv");
+
 
 
 	for (int i = 0; i < analysable_steps; i++) {
@@ -269,13 +286,7 @@ void Analyzer::printEnergies(Float3* energy_data, int analysable_steps) {
 		myfile << "\n";
 	}
 	myfile.close();
-}
-
-
-
-
-
-
+*/
 
 
 

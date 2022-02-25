@@ -54,8 +54,10 @@ private:
 
 	// These should be in interface maybe?
 	//void printOut(double* data, int n_steps);
-	void dumpToFile(double* data, Int3 dim, string file_name);
-	void dumpToFile(Float3* data, Int3 dim, string file_name);
+	template <typename T>
+	void dumpToFile(T* data, int n_datapoints, string file_path);
+	//void dumpToFile(double* data, Int3 dim, string file_name);
+	//void dumpToFile(Float3* data, Int3 dim, string file_name);
 	//void printDataBuffer(Box* box);
 	void printTrajectory(Simulation* simulation);
 	void printWaterforce(Simulation* simulation);
