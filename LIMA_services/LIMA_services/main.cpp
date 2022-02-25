@@ -315,7 +315,7 @@ void exportData(selfcenteredDatapoint* data, Int3 dim, string path) {				// 	exp
 
 
 		//scdp.atoms_relative[0].LJ_force.print('f');
-		buffer[buffer_ptr++] = scdp.atoms_relative[0].LJ_force;				// First print label				3xfloat
+		buffer[buffer_ptr++] = scdp.atoms_relative[0].LJ_force;					// First print label				3xfloat
 		buffer[buffer_ptr++] = scdp.atoms_relative_prev[0].LJ_force;			// Then print prev self force		3xfloat
 			
 		for (int ii = 1; ii < dim.y; ii++) {						
@@ -324,6 +324,8 @@ void exportData(selfcenteredDatapoint* data, Int3 dim, string path) {				// 	exp
 		}
 	}
 	
+	printf("Ptr val: %u\n", buffer_ptr);
+
 	FILE* file;
 	fopen_s(&file, file_path, "wb");
 	fwrite(buffer, sizeof(Float3), buffer_ptr, file);
@@ -423,7 +425,7 @@ int main(void) {
 
 */
 
-	bool shuffle_time_dim = true;
+	bool shuffle_time_dim = false;
 
 	printf("Allocating %.01f GB of RAM\n", ((double)sizeof(Row) * MAX_ROW + (double) sizeof(selfcenteredDatapoint) * MAX_ROW)/ 1000000000.f);
 	Row* rows = new Row[MAX_ROW + 1];
@@ -432,7 +434,7 @@ int main(void) {
 	int query_atom = 0;
 	
 
-	int N_STEPS = 500;	// Determines file to read
+	int N_STEPS = 100000;	// Determines file to read
 
 
 	printf("Processing data\n");

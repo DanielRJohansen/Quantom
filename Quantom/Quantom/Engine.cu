@@ -332,6 +332,7 @@ void Engine::applyThermostat() {
 	const float max_temp = 300.f;				// [k]
 	float temp = getBoxTemperature();
 	if (temp > max_temp) {
+	//if (temp > 100 && simulation->getStep() > 1000) {
 		simulation->box->thermostat_scalar = max_temp / temp;
 		//printf("Scalar: %f\n", simulation->box->thermostat_scalar);
 	}

@@ -19,7 +19,7 @@ Environment::Environment() {
 	//Compound mol_dpc = compoundbuilder.buildMolecule("D:\\Quantom\\m40.pdb", "D:\\Quantom\\dpc.itp", 1);
 	//Compound mol_4pcw10 = compoundbuilder.buildMolecule("D:\\Quantom\\filaggrin\\4pcw_first10.pdb", "D:\\Quantom\\filaggrin\\topol.top", 7);
 	//Compound mol_4pcw10 = compoundbuilder.buildMolecule("D:\\Quantom\\filaggrin\\conf.gro", "D:\\Quantom\\filaggrin\\topol.top", 4);
-	Compound mol_6lzm_10 = compoundbuilder.buildMolecule("D:\\Quantom\\t4lys\\conf.gro", "D:\\Quantom\\t4lys\\topol.top", 10);
+	Compound mol_6lzm_10 = compoundbuilder.buildMolecule("D:\\Quantom\\t4lys\\conf.gro", "D:\\Quantom\\t4lys\\topol.top", 5);
 
 	boxbuilder.buildBox(simulation);
 	boxbuilder.addSingleMolecule(simulation, &mol_6lzm_10);
@@ -103,11 +103,11 @@ void Environment::postRunEvents() {
 	);
 
 
-	printFloat3Matrix(
+	/*printFloat3Matrix(
 		simulation->box->data_GAN,
 		Int3(simulation->getStep(), MAX_COMPOUND_PARTICLES, 6),
 		simulation->out_dir + "\\particles_" + to_string(70) + "_steps_" + to_string(simulation->getStep()) + ".csv");
-
+		*/
 	//printTrajectory(simulation);
 	//printWaterforce(simulation);
 	

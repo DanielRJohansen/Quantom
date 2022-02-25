@@ -5,10 +5,8 @@
 
 
 
-constexpr double BOX_LEN = 7.f;		// Must be > twice the len of largest compound
-
+constexpr double BOX_LEN = 6.f;		// Must be > twice the len of largest compound
 constexpr double BOX_LEN_HALF = BOX_LEN/2.f;
-constexpr double BOX_BASE = -BOX_LEN_HALF;
 
 constexpr double FOCUS_LEN = 2;
 constexpr double BLOCK_LEN = FOCUS_LEN * 2;	//nm
@@ -59,7 +57,7 @@ const int THREADS_PER_COMPOUNDBLOCK = 128; // Must be >= max comp particles
 const int N_LIPID_COPIES = 32;
 
 
-const int SIMULATION_STEPS = 500;
+const int SIMULATION_STEPS = 100000;
 
 //constexpr double SOLVENT_MASS = 18.01528f * 1e-3;	// kg/mol
 constexpr double SOLVENT_MASS = 12.0107 * 1e-3;	// kg/mol
