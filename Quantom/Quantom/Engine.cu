@@ -332,11 +332,14 @@ float Engine::getBoxTemperature() {
 void Engine::applyThermostat() {
 	const float max_temp = 300.f;				// [k]
 	float temp = getBoxTemperature();
-	printf("\nTemperature: %f\n", temp);
-	if (temp > max_temp) {
-	//if (temp > 100 && simulation->getStep() > 1000) {
+	printf("\n %d Temperature: %f\n", (simulation->getStep()-1) / STEPS_PER_THERMOSTAT, temp);
+	if (temp > 50) {
 		simulation->box->thermostat_scalar = max_temp / temp;
 		//printf("Scalar: %f\n", simulation->box->thermostat_scalar);
+	}
+	else {
+		printf("Critically low temperature encountered\n");
+		simulation->box->critical_error_encountered = true;
 	}
 }
 

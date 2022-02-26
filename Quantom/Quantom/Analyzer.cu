@@ -167,6 +167,7 @@ Analyzer::AnalyzedPackage Analyzer::analyzeEnergy(Simulation* simulation) {	// C
 	cudaFree(potE_buffer_device);
 	delete [] average_solvent_energy, average_compound_energy;
 
+
 	printf("\n########## Finished analyzing energies ##########\n\n");
 	return AnalyzedPackage(average_energy, analysable_steps, simulation->temperature_buffer, simulation->getStep() / STEPS_PER_THERMOSTAT);;
 }

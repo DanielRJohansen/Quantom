@@ -5,15 +5,15 @@
 
 
 
-constexpr double BOX_LEN = 6.f;		// Must be > twice the len of largest compound
+constexpr double BOX_LEN = 5.f;		// Must be > twice the len of largest compound
 constexpr double BOX_LEN_HALF = BOX_LEN/2.f;
 
 
 
 const int STEPS_PER_NLIST_UPDATE = 50;
-const int STEPS_PER_LOGTRANSFER = 100;
+const int STEPS_PER_LOGTRANSFER = 10;
 //const int STEPS_PER_TRAJTRANSFER = 100;
-const int STEPS_PER_THERMOSTAT = 100;
+const int STEPS_PER_THERMOSTAT = 200;
 
 const bool APPLY_THERMOSTAT = true;
 
@@ -49,7 +49,7 @@ const int THREADS_PER_COMPOUNDBLOCK = 128; // Must be >= max comp particles
 const int N_LIPID_COPIES = 32;
 
 
-const int SIMULATION_STEPS = 10000;
+const int SIMULATION_STEPS = 100000;
 
 //constexpr double SOLVENT_MASS = 18.01528f * 1e-3;	// kg/mol
 constexpr double SOLVENT_MASS = 12.0107 * 1e-3;	// kg/mol
