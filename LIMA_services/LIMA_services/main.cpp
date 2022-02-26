@@ -10,7 +10,6 @@ using namespace std;
 const int ATOMS_PER_ROW = 70;	// How many we are interested in loading. This loading is BEFORE we sort by distance
 const int FLOAT3_PER_ATOM = 6;
 const int ROW_START = 100;
-const int MAX_ROW = 1e+5;
 //const int MAX_ROW = 1e+3;
 
 
@@ -414,18 +413,22 @@ int main(int argc, char** argv) {
 	int N_STEPS = 100000;	// Determines file to read
 
 	printf("argc %d\n", argc);
-	if (argc > 0) {
+	if (argc > 3) {
 		workdir = argv[1];
 		N_STEPS = stoi(argv[2]);
 		shuffle_time_dim = stoi(argv[3]);
+	}
+	else {
+		printf("Not enough input arguments for preprocessing\n");
+		exit(1);
 	}
 		
 
 
 
-	printf("Allocating %.01f GB of RAM\n", ((double)sizeof(Row) * MAX_ROW + (double) sizeof(selfcenteredDatapoint) * MAX_ROW)/ 1000000000.f);
-	Row* rows = new Row[MAX_ROW + 1];
-	selfcenteredDatapoint* data = new selfcenteredDatapoint[MAX_ROW + 1];
+	printf("Allocating %.01f GB of RAM\n", ((double)sizeof(Row) * N_STEPS + (double) sizeof(selfcenteredDatapoint) * N_STEPS)/ 1000000000.f);
+	Row* rows = new Row[N_STEPS];
+	selfcenteredDatapoint* data = new selfcenteredDatapoint[N_STEPS];
 	int n_datapoints = 0;
 	int query_atom = 0;
 	

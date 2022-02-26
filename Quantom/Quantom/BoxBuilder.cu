@@ -67,8 +67,9 @@ void BoxBuilder::addScatteredMolecules(Simulation* simulation, Compound* molecul
 
 void BoxBuilder::finishBox(Simulation* simulation)
 {
-	printf("%d Compounds in box\n", simulation->box->n_compounds);
+	printf("%d Compounds in box\n\n", simulation->box->n_compounds);
 	solvateBox(simulation);	// Always do after placing compounds
+
 
 
 	// Need this variable both on host and device
@@ -87,6 +88,7 @@ void BoxBuilder::finishBox(Simulation* simulation)
 
 
 
+	
 
 
 
@@ -100,15 +102,20 @@ void BoxBuilder::finishBox(Simulation* simulation)
 	simulation->temperature_buffer = new float[SIMULATION_STEPS / STEPS_PER_THERMOSTAT + 1];
 
 
+	long double total_bytes = sizeof(double) * 10 * simulation->n_steps
+		+ sizeof(Float3) * 6 * MAX_COMPOUND_PARTICLES * simulation->n_steps;
 
+	printf("bytes %lf\n", total_bytes);
 
-	printf("Reserving %d MB for logging\n", (int)((sizeof(double) + sizeof(Float3)) * n_points / 1e+6));
+	printf("Reserving %.2lf GB for logging\n", (total_bytes) * 1e-9);
 	cudaMallocManaged(&simulation->box->outdata, sizeof(double) * 10 * simulation->n_steps);	// 10 data streams for 10k steps. 1 step at a time.
-
 	cudaMallocManaged(&simulation->box->data_GAN, sizeof(Float3) * 6 * MAX_COMPOUND_PARTICLES * simulation->n_steps);
-	// 
-	// 
-	//cudaMalloc(&simulation->box->trajectory, sizeof(Float3) * simulation->box->n_compounds * 3 * simulation->n_steps);
+	cudaDeviceSynchronize();
+	if (cudaGetLastError() != cudaSuccess) {
+		fprintf(stderr, "Error during log-data allocation\n");
+		exit(1);
+	}
+
 
 	simulation->copyBoxVariables();
 	simulation->box->moveToDevice();

@@ -11,7 +11,7 @@
 
 Engine::Engine() {}
 Engine::Engine(Simulation* simulation) {
-	genericErrorCheck("Error before engine initialization.\n");
+	LIMAENG::genericErrorCheck("Error before engine initialization.\n");
 
 	this->simulation = simulation;
 
@@ -33,7 +33,7 @@ Engine::Engine(Simulation* simulation) {
 
 
 void Engine::deviceMaster() {
-	genericErrorCheck("Error before step!");
+	LIMAENG::genericErrorCheck("Error before step!");
 	step();
 }
 
@@ -332,7 +332,7 @@ float Engine::getBoxTemperature() {
 void Engine::applyThermostat() {
 	const float max_temp = 300.f;				// [k]
 	float temp = getBoxTemperature();
-	printf("\n %d Temperature: %f\n", (simulation->getStep()-1) / STEPS_PER_THERMOSTAT, temp);
+	//printf("\n %d Temperature: %f\n", (simulation->getStep()-1) / STEPS_PER_THERMOSTAT, temp);
 	if (temp > 50) {
 		simulation->box->thermostat_scalar = max_temp / temp;
 		//printf("Scalar: %f\n", simulation->box->thermostat_scalar);
@@ -609,8 +609,7 @@ __device__ void integratePosition(Float3* pos, Float3* pos_tsub1, Float3* force,
 	Float3 delta_pos = *pos - *pos_tsub1;
 	*pos = *pos_tsub1 + delta_pos * *thermostat_scalar;
 	if (force->len() > 200e+6) {
-		printf("\nP_index %d Thread %d blockId %d\tForce %f \tFrom %f %f %f\tTo %f %f %f\n", p_index, threadIdx.x, blockIdx.x, force->len(), pos_tsub1->x, pos_tsub1->y, pos_tsub1->z, pos->x, pos->y, pos->z);
-		
+		printf("\nP_index %d Thread %d blockId %d\tForce %f \tFrom %f %f %f\tTo %f %f %f\n", p_index, threadIdx.x, blockIdx.x, force->len(), pos_tsub1->x, pos_tsub1->y, pos_tsub1->z, pos->x, pos->y, pos->z);		
 	}
 	//printf("force: %f\n", force->len());
 }

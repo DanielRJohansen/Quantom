@@ -49,7 +49,7 @@ const int THREADS_PER_COMPOUNDBLOCK = 128; // Must be >= max comp particles
 const int N_LIPID_COPIES = 32;
 
 
-const int SIMULATION_STEPS = 100000;
+const int SIMULATION_STEPS = 500000;
 
 //constexpr double SOLVENT_MASS = 18.01528f * 1e-3;	// kg/mol
 constexpr double SOLVENT_MASS = 12.0107 * 1e-3;	// kg/mol
@@ -80,13 +80,14 @@ public:
 
 
 
-	double* outdata;			// Temp, for longging values to whatever
 	uint32_t step = 0;
 	double dt;
 	bool critical_error_encountered = 0;
 
 	double* potE_buffer;		// For total energy summation
 	Float3* traj_buffer;
+
+	double* outdata;			// Temp, for longging values to whatever
 	Float3* data_GAN;			// Only works if theres 1 compounds right now.
 
 
@@ -94,6 +95,13 @@ public:
 
 
 	void moveToDevice() {	// Loses pointer to RAM location!
+
+		int bytes_total = sizeof(Compound) * n_compounds
+			+ sizeof(Solvent) * MAX_SOLVENTS * 2
+			+ sizeof(CompoundState) * MAX_COMPOUNDS * 2
+			+ sizeof(NeighborList) * (MAX_SOLVENTS + MAX_COMPOUNDS);
+		printf("Moving %.2f GB to device\n", (float)bytes_total * 1e-9);
+
 		compounds = genericMoveToDevice(compounds, n_compounds);
 		solvents = genericMoveToDevice(solvents, MAX_SOLVENTS);
 		compound_state_array = genericMoveToDevice(compound_state_array, MAX_COMPOUNDS);

@@ -42,7 +42,13 @@ public:
 		float kinE = 0.5 * mass * vel * vel;
 		return kinE;
 	}
-
+	static void __host__ genericErrorCheck(const char* text) {
+		cudaError_t cuda_status = cudaGetLastError();
+		if (cuda_status != cudaSuccess) {
+			fprintf(stderr, text);
+			exit(1);
+		}
+	}
 };
 
 
@@ -144,13 +150,7 @@ private:
 
 	// -------------------------------------- HELPERS -------------------------------------- //
 
-	void genericErrorCheck(const char* text) {
-		cudaError_t cuda_status = cudaGetLastError();
-		if (cuda_status != cudaSuccess) {
-			fprintf(stderr, text);
-			exit(1);
-		}
-	}
+
 
 
 
