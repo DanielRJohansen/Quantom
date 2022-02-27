@@ -228,7 +228,12 @@ void Environment::dumpToFile(T* data, int n_datapoints, string file_path_s) {
 	cout << "Printing to file " << file_path << endl;
 
 	FILE* file;
+#ifndef __linux__
 	fopen_s(&file, file_path, "wb");
+#else
+	file = fopen(file_path, "wb");
+#endif
+
 	fwrite(data, sizeof(T), n_datapoints, file);
 	fclose(file);
 }

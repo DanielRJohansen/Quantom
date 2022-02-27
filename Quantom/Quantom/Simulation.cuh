@@ -23,8 +23,8 @@ const bool APPLY_THERMOSTAT = true;
 const string MOL_FOLDER = "D:\\Quantom\\t4lys\\";
 const string OUT_DIR = "D:\\Quantom\\LIMANET\\sim_out";
 #else
-const string MOL_FOLDER = "..\\Compounds\\t4lys\\";
-const string OUT_DIR = "~/Desktop/LIMA/"
+const string MOL_FOLDER = "../Compounds/t4lys/";
+const string OUT_DIR = "/home/lima/Desktop/LIMA";
 #endif
 
 const int N_SOLVATE_MOLECULES = 255;	// Must not be above 255, as that can't be represented as uint8_t
