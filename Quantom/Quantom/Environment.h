@@ -28,7 +28,6 @@
 
 #ifndef __linux__
 #include <direct.h>
-#else
 #define USE_CHRONO
 #endif
 

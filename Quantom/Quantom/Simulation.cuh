@@ -19,8 +19,11 @@ const int STEPS_PER_TRAINDATATRANSFER = 500;
 
 const bool APPLY_THERMOSTAT = true;
 
-
-
+#ifndef __linux__
+const string MOL_FOLDER = "D:\\Quantom\\t4lys\\";
+#else
+const string MOL_FOLDER = "..\\Compounds\\t4lys\\";
+#endif
 
 const int N_SOLVATE_MOLECULES = 255;	// Must not be above 255, as that can't be represented as uint8_t
 

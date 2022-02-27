@@ -7,6 +7,7 @@ DisplayV2::DisplayV2() {
 
 
 void DisplayV2::drawFilledCircle(GLfloat x, GLfloat y, GLfloat radius, Int3 color) {
+#ifndef __linux__
     float light = 0.5;
     Int3 shaded_color = color * light;
     glColor3ub((uint8_t)shaded_color.x, (uint8_t)shaded_color.y, (uint8_t)shaded_color.z);
@@ -27,28 +28,9 @@ void DisplayV2::drawFilledCircle(GLfloat x, GLfloat y, GLfloat radius, Int3 colo
         );
     }
     glEnd();
+#endif
 }
 
-void drawTwoSquares() {
-    glClear(GL_COLOR_BUFFER_BIT);
-
-    glColor3f(1.0, 0.25, 1.0);
-    glBegin(GL_POLYGON);
-    glVertex3f(-0.5, -0.50, 0.0);
-    glVertex3f(0.75, 0.25, .50);
-    glVertex3f(0.75, 0.75, .50);
-    glVertex3f(0.25, 0.75, .50);
-    glEnd();
-
-
-    glColor3f(.0, 0.25, 1.0);
-    glBegin(GL_POLYGON);
-    glVertex3f(0.1, 0.1, 0.40);
-    glVertex3f(0.5, 0.1, 0.40);
-    glVertex3f(0.5, 0.5, 0.40);
-    glVertex3f(0.1, 0.5, 0.40);
-    glEnd();
-}
 
 void DisplayV2::drawBalls(RenderBall* balls, int n_balls) {
     for (int i = 0; i < n_balls; i++) {
@@ -59,6 +41,7 @@ void DisplayV2::drawBalls(RenderBall* balls, int n_balls) {
 }
 
 void DisplayV2::render(Simulation* simulation) {
+#ifndef __linux__
     auto start = std::chrono::high_resolution_clock::now();
 
     RenderBall* balls = rasterizer.render(simulation);
@@ -73,21 +56,23 @@ void DisplayV2::render(Simulation* simulation) {
     auto stop = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
     printf("\tRender time: %4d ys  ", duration.count());
-
+#endif
 }
 
 bool DisplayV2::checkWindowStatus() {
+#ifndef __linux__
     glfwPollEvents();
     if (glfwWindowShouldClose(window)) {
         glfwTerminate();
 
         return false;
     }
-        
+#endif
     return true;
 }
 
 bool DisplayV2::initGLFW() {
+#ifndef __linux__
     /* Initialize the library */
     if (!glfwInit())
         return -1;
@@ -102,4 +87,6 @@ bool DisplayV2::initGLFW() {
 
     /* Make the window's context current */
     glfwMakeContextCurrent(window);
+#endif
+    return 1;
 }
