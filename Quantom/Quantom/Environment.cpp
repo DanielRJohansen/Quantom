@@ -67,8 +67,10 @@ bool Environment::verifySimulationParameters() {	// Not yet implemented
 
 void Environment::run() {
 	printf("Simulation started\n\n");
-	time0 = std::chrono::high_resolution_clock::now();
 
+#ifdef USE_CHRONO
+	time0 = std::chrono::high_resolution_clock::now();
+#endif
 
 	//while (display->window->isOpen()) {
 	while (display->checkWindowStatus()) {
@@ -119,6 +121,7 @@ void Environment::postRunEvents() {
 }
 
 void Environment::handleStatus(Simulation* simulation) {
+#ifdef USE_CHRONO
 	if (!(simulation->getStep() % simulation->steps_per_render)) {
 		printf("\r\tStep #%06d", simulation->box->step);
 		double duration = (double)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - time0).count();
@@ -126,8 +129,15 @@ void Environment::handleStatus(Simulation* simulation) {
 		printf("\tAvg. step time: %.1fms (%05d/%05d/%05d) \tRemaining: %04d min", duration / simulation->steps_per_render, engine->timings.x / simulation->steps_per_render, engine->timings.y / simulation->steps_per_render, engine->timings.z/simulation->steps_per_render, remaining_minutes);
 		engine->timings = Int3(0, 0, 0);
 
+
 		time0 = std::chrono::high_resolution_clock::now();
+
 	}
+#else
+	if (!(simulation->getStep() % simulation->steps_per_render)) {
+		printf("\r\tStep #%06d", simulation->box->step);
+	}
+#endif
 }
 
 void Environment::handleDisplay(Simulation* simulation) {
@@ -218,21 +228,3 @@ void Environment::dumpToFile(T* data, int n_datapoints, string file_path_s) {
 	fclose(file);
 }
 
-
-void Environment::printTrajectory(Simulation* simulation) {
-	std::ofstream myfile("D:\\Quantom\\trajectory.csv");
-
-	int n_points = simulation->total_particles_upperbound * simulation->n_steps;
-	Float3* traj_host = new Float3[n_points];
-	cudaMemcpy(traj_host, simulation->box->traj_buffer, sizeof(Float3) * n_points, cudaMemcpyDeviceToHost);
-
-	for (int i = 0; i < simulation->box->step; i++) {
-		for (int j = 0; j < simulation->total_particles_upperbound; j++) {
-			for (int k = 0; k < 3; k++) {
-				myfile << traj_host[j + i * simulation->total_particles_upperbound].at(k) << ";";
-			}			
-		}
-		myfile << "\n";
-	}
-	myfile.close();
-}

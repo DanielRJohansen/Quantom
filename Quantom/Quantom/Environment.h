@@ -18,9 +18,26 @@
 #include <assert.h>  
 
 
-#include <direct.h>
+
+
 #include <stdlib.h>
 #include <stdio.h>
+
+
+
+
+#ifndef __linux__
+#include <direct.h>
+#else
+#define USE_CHRONO
+#endif
+
+
+
+
+
+
+
 
 class Environment
 {

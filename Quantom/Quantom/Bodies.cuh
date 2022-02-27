@@ -99,7 +99,11 @@ constexpr double BODY_RADIUS = 0.2;		// CRITICAL VALUE!
 constexpr unsigned char UNUSED_BODY = 255;
 struct CompactParticle {	// Contains information only needed by the Ownerkernel
 	CompactParticle() {}	
-	CompactParticle(double mass, Float3 pos_sub1) : mass(mass), pos_tsub1(pos_sub1)  {}
+	//CompactParticle(double mass, Float3 pos_sub1) : mass(mass), pos_tsub1(pos_sub1)  {}	// This breaks on linux??
+	CompactParticle(double mass, Float3 pos_sub1) {
+		this->mass = mass;
+		this->pos_tsub1 = pos_sub1;
+	}	
 	//Float3 force_prev;				// For velocity verlet stormer integration
 	Float3 pos_tsub1;				// Must be initiated!
 	double mass;								// g/mol
