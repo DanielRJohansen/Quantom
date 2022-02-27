@@ -21,8 +21,10 @@ const bool APPLY_THERMOSTAT = true;
 
 #ifndef __linux__
 const string MOL_FOLDER = "D:\\Quantom\\t4lys\\";
+const string OUT_DIR = "D:\\Quantom\\LIMANET\\sim_out";
 #else
 const string MOL_FOLDER = "..\\Compounds\\t4lys\\";
+const string OUT_DIR = "~/Desktop/LIMA/"
 #endif
 
 const int N_SOLVATE_MOLECULES = 255;	// Must not be above 255, as that can't be represented as uint8_t
@@ -54,7 +56,7 @@ const int THREADS_PER_COMPOUNDBLOCK = 128; // Must be >= max comp particles
 const int N_LIPID_COPIES = 32;
 
 
-const int SIMULATION_STEPS = 500000;
+const int SIMULATION_STEPS = 10000;
 
 //constexpr double SOLVENT_MASS = 18.01528f * 1e-3;	// kg/mol
 constexpr double SOLVENT_MASS = 12.0107 * 1e-3;	// kg/mol
@@ -179,7 +181,7 @@ public:
 	int n_compounds = 0;
 	int n_solvents = 0;
 
-	string out_dir = "D:\\Quantom\\LIMANET\\sim_out";
+	string out_dir = OUT_DIR;
 	
 
 private:

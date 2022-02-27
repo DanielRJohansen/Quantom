@@ -117,7 +117,11 @@ void Environment::postRunEvents() {
 		+ " 0";											// do_shuffle
 
 	cout << data_processing_command << "\n\n";
-	system(&data_processing_command[0]);							
+	system(&data_processing_command[0]);		
+#else
+	Analyzer::AnalyzedPackage analyzed_package = analyzer.analyzeEnergy(simulation);
+	dumpToFile(analyzed_package.energy_data, analyzed_package.n_energy_values, simulation->out_dir + "\\energy.bin");
+	dumpToFile(analyzed_package.temperature_data, analyzed_package.n_temperature_values, simulation->out_dir + "\\temperature.bin");
 #endif
 }
 
@@ -216,7 +220,7 @@ void Environment::makeVirtualTrajectory(string trj_path, string waterforce_path)
 
 
 
-#ifndef __linux__
+
 template <typename T>
 void Environment::dumpToFile(T* data, int n_datapoints, string file_path_s) {	
 	char* file_path;
@@ -228,4 +232,4 @@ void Environment::dumpToFile(T* data, int n_datapoints, string file_path_s) {
 	fwrite(data, sizeof(T), n_datapoints, file);
 	fclose(file);
 }
-#endif
+
