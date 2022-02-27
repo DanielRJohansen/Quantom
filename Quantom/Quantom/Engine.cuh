@@ -2,21 +2,14 @@
 
 #include <iostream>
 #include <chrono>
-
-//#include "Bodies.cuh"
-#include "Simulation.cuh"
-//#include "BoxBuilder.cuh"
-
-#include <cuda.h>
-#include "cuda_runtime.h"
-#include "device_launch_parameters.h"
-#include <device_functions.h>
-#include <cuda_runtime_api.h>
-
-	
 #include <thread>
 
-#include <fstream>	// TEMP
+#include "Simulation.cuh"
+
+
+
+	
+
 
 
 __global__ void forceKernel(Box* box);
@@ -43,6 +36,7 @@ public:
 		return kinE;
 	}
 	static void __host__ genericErrorCheck(const char* text) {
+		cudaDeviceSynchronize();
 		cudaError_t cuda_status = cudaGetLastError();
 		if (cuda_status != cudaSuccess) {
 			fprintf(stderr, text);
@@ -139,7 +133,7 @@ private:
 	// streams every n steps
 	void offloadLoggingData();
 	void offloadPositionData();
-
+	void offloadTrainData();
 
 	float getBoxTemperature();
 	void applyThermostat();

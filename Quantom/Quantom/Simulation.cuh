@@ -14,6 +14,8 @@ const int STEPS_PER_NLIST_UPDATE = 50;
 const int STEPS_PER_LOGTRANSFER = 10;
 //const int STEPS_PER_TRAJTRANSFER = 100;
 const int STEPS_PER_THERMOSTAT = 200;
+const int STEPS_PER_TRAINDATATRANSFER = 500;
+
 
 const bool APPLY_THERMOSTAT = true;
 
@@ -156,6 +158,8 @@ public:
 	double* potE_buffer;	// Not really a buffer yet, just one large array that holds full simulation data
 	Float3* traj_buffer;
 	float* temperature_buffer;
+	Float3* traindata_buffer;
+
 
 	uint32_t total_particles_upperbound = 0;
 
@@ -163,7 +167,7 @@ public:
 	int n_steps = SIMULATION_STEPS;
 
 	const double dt = 1 * 1e-6;		// ns, so first val corresponds to fs
-	int steps_per_render = 50;
+	int steps_per_render = 20;
 	//int n_bodies = N_BODIES_START;
 	Box* box;
 

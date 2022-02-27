@@ -102,14 +102,17 @@ void BoxBuilder::finishBox(Simulation* simulation)
 	simulation->temperature_buffer = new float[SIMULATION_STEPS / STEPS_PER_THERMOSTAT + 1];
 
 
+
+
+
 	long double total_bytes = sizeof(double) * 10 * simulation->n_steps
-		+ sizeof(Float3) * 6 * MAX_COMPOUND_PARTICLES * simulation->n_steps;
-
-	printf("bytes %lf\n", total_bytes);
-
-	printf("Reserving %.2lf GB for logging\n", (total_bytes) * 1e-9);
+		+ sizeof(Float3) * 6 * MAX_COMPOUND_PARTICLES * STEPS_PER_TRAINDATATRANSFER;
+	printf("Reserving %.2lf GB device mem for logging\n", (total_bytes) * 1e-9);
 	cudaMallocManaged(&simulation->box->outdata, sizeof(double) * 10 * simulation->n_steps);	// 10 data streams for 10k steps. 1 step at a time.
-	cudaMallocManaged(&simulation->box->data_GAN, sizeof(Float3) * 6 * MAX_COMPOUND_PARTICLES * simulation->n_steps);
+	//cudaMallocManaged(&simulation->box->data_GAN, sizeof(Float3) * 6 * MAX_COMPOUND_PARTICLES * simulation->n_steps);
+	cudaMallocManaged(&simulation->box->data_GAN, sizeof(Float3) * 6 * MAX_COMPOUND_PARTICLES * STEPS_PER_TRAINDATATRANSFER);
+	simulation->traindata_buffer = new Float3[6 * MAX_COMPOUND_PARTICLES * simulation->n_steps];
+
 	cudaDeviceSynchronize();
 	if (cudaGetLastError() != cudaSuccess) {
 		fprintf(stderr, "Error during log-data allocation\n");

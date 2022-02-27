@@ -37,7 +37,7 @@ void Engine::deviceMaster() {
 	step();
 }
 
-void Engine::hostMaster() {
+void Engine::hostMaster() {						// This is and MUST ALWAYS be called after the deviceMaster, and AFTER intStep()!
 	auto t0 = std::chrono::high_resolution_clock::now();
 	if ((simulation->getStep() % STEPS_PER_LOGTRANSFER) == 0) {
 		offloadLoggingData();
@@ -45,6 +45,9 @@ void Engine::hostMaster() {
 		if ((simulation->getStep() % STEPS_PER_THERMOSTAT) == 0 && APPLY_THERMOSTAT) {
 			applyThermostat();
 		}
+	}
+	if ((simulation->getStep() % STEPS_PER_TRAINDATATRANSFER) == 0) {
+		offloadTrainData();
 	}
 
 	
@@ -288,6 +291,11 @@ void Engine::offloadPositionData() {
 	cudaMemcpy(&simulation->traj_buffer[step_offset], simulation->box->traj_buffer, sizeof(Float3) * simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER, cudaMemcpyDeviceToHost);
 }
 
+void Engine::offloadTrainData() {
+	const int step_offset = (simulation->getStep() - STEPS_PER_TRAINDATATRANSFER) * MAX_COMPOUND_PARTICLES * 6;	// fix max_compound to the actual count save LOTS of space!. Might need a file in simout that specifies cnt for loading in other programs...
+	cudaMemcpy(&simulation->traindata_buffer[step_offset], simulation->box->data_GAN, sizeof(Float3) * MAX_COMPOUND_PARTICLES * 6 * STEPS_PER_TRAINDATATRANSFER, cudaMemcpyDeviceToHost);
+	LIMAENG::genericErrorCheck("Cuda error during traindata offloading\n");
+}
 
 
 
@@ -344,6 +352,7 @@ void Engine::applyThermostat() {
 }
 
 
+
 //--------------------------------------------------------------------------	SIMULATION BEGINS HERE --------------------------------------------------------------//
 
 
@@ -371,6 +380,7 @@ void Engine::step() {
 	
 	//cudaMemcpy(simulation->box->solvents, simulation->box->solvents_next, sizeof(Solvent) * MAX_SOLVENTS, cudaMemcpyDeviceToDevice);
 	cudaDeviceSynchronize();
+	LIMAENG::genericErrorCheck("Error during step or state_transfer\n");		// Temp, we want to do host stuff while waiting for async GPU operations...
 	auto t2 = std::chrono::high_resolution_clock::now();
 
 
@@ -450,7 +460,7 @@ __device__ Float3 calcLJForce(Float3* pos0, Float3* pos1, double* data_ptr, doub
 			printf("Force: %f\n", force);
 			force_unit_vector.print('u');
 		}
-		if (dist < 0.1f || abs(force) > 100e+6) {
+		if (dist < 0.1f || abs(force) > 200e+6) {
 			printf("\nThread %d Block %d step %d dist %f force %f\n", threadIdx.x, blockIdx.x, (int)data_ptr[3], (*pos0 - *pos1).len(), force);
 		}
 	}
@@ -771,11 +781,11 @@ __global__ void forceKernel(Box* box) {
 			box->outdata[6 + box->step * 10] = data_ptr[1];// force.len();
 		}
 */
-
-		box->data_GAN[0 + threadIdx.x * 6 + box->step * MAX_COMPOUND_PARTICLES * 6] = compound_state.positions[threadIdx.x];
-		box->data_GAN[1 + threadIdx.x * 6 + box->step * MAX_COMPOUND_PARTICLES * 6] = force_bond + force_angle;
-		box->data_GAN[2 + threadIdx.x * 6 + box->step * MAX_COMPOUND_PARTICLES * 6] = force_LJ_com;
-		box->data_GAN[3 + threadIdx.x * 6 + box->step * MAX_COMPOUND_PARTICLES * 6] = force_LJ_sol;
+		int step_offset = (box->step % STEPS_PER_TRAINDATATRANSFER) * MAX_COMPOUND_PARTICLES * 6;
+		box->data_GAN[0 + threadIdx.x * 6 + step_offset] = compound_state.positions[threadIdx.x];
+		box->data_GAN[1 + threadIdx.x * 6 + step_offset] = force_bond + force_angle;
+		box->data_GAN[2 + threadIdx.x * 6 + step_offset] = force_LJ_com;
+		box->data_GAN[3 + threadIdx.x * 6 + step_offset] = force_LJ_sol;
 		if (threadIdx.x == 0) {
 			//printf("Neighbors: %d\n", neighborlist.n_solvent_neighbors);
 			//force_LJ_sol.print('s');

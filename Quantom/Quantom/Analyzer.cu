@@ -198,6 +198,7 @@ Float3* Analyzer::analyzeSolvateEnergy(Simulation* simulation, int n_steps) {
 
 	cudaFree(data_out);
 	//delete[] host_data;
+	LIMAENG::genericErrorCheck("Cuda error during analyzeSolvateEnergy\n");
 
 	return average_solvent_energy;
 }
@@ -234,6 +235,7 @@ Float3* Analyzer::analyzeCompoundEnergy(Simulation* simulation, int n_steps) {
 
 	cudaFree(data_out);
 	delete[] host_data;
+	LIMAENG::genericErrorCheck("Cuda error during analyzeCompoundEnergy\n");
 
 	return average_compound_energy;
 }

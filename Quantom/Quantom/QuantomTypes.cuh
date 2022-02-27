@@ -3,9 +3,7 @@
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
 
-#include <cuda.h>
-#include <device_atomic_functions.h>
-#include <device_functions.h>
+
 
 #include "math.h"
 #include <iostream>

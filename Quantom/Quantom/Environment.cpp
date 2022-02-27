@@ -50,9 +50,13 @@ bool Environment::verifySimulationParameters() {	// Not yet implemented
 	assert(BOX_LEN > 3.f);
 	//assert(BOX_LEN >= CUTOFF + 0.5f);
 	assert(simulation->n_compounds <= 1);	// Otherwise data_GAN goes haywire
+
 	assert(simulation->n_steps % STEPS_PER_LOGTRANSFER == 0);
-	assert(STEPS_PER_LOGTRANSFER % STEPS_PER_LOGTRANSFER == 0);		// Change to trajtransfer later
-	assert(STEPS_PER_THERMOSTAT >= STEPS_PER_LOGTRANSFER);
+	assert(simulation->n_steps % STEPS_PER_THERMOSTAT == 0);
+	assert(simulation->n_steps % STEPS_PER_TRAINDATATRANSFER == 0);
+
+	assert(STEPS_PER_THERMOSTAT % STEPS_PER_LOGTRANSFER == 0);		// Change to trajtransfer later
+	//assert(STEPS_PER_THERMOSTAT >= STEPS_PER_LOGTRANSFER);
 	return true;
 }
 
@@ -95,10 +99,15 @@ void Environment::postRunEvents() {
 	dumpToFile(analyzed_package.energy_data, analyzed_package.n_energy_values, simulation->out_dir + "\\energy.bin");
 	dumpToFile(analyzed_package.temperature_data, analyzed_package.n_temperature_values, simulation->out_dir + "\\temperature.bin");
 
-	dumpToFile(simulation->box->data_GAN,
+
+	dumpToFile(simulation->traindata_buffer,
+		simulation->getStep() * 6 * MAX_COMPOUND_PARTICLES,
+		simulation->out_dir + "\\sim_out.bin");
+
+	/*dumpToFile(simulation->box->data_GAN,
 		simulation->getStep() * MAX_COMPOUND_PARTICLES * 6,
 		simulation->out_dir + "\\sim_out.bin"
-	);
+	);*/
 
 	string data_processing_command = "C:\\Users\\Daniel\\git_repo\\Quantom\\LIMA_services\\x64\\Debug\\LIMA_services.exe "
 		+ simulation->out_dir + " "
@@ -227,10 +236,3 @@ void Environment::printTrajectory(Simulation* simulation) {
 	}
 	myfile.close();
 }
-
-
-
-
-
-
-
