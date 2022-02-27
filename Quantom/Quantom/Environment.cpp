@@ -93,7 +93,7 @@ void Environment::run() {
 }
 
 void Environment::postRunEvents() {
-	
+#ifndef __linux__
 	simulation->out_dir += "\\Steps_" + to_string(simulation->getStep());
 	int check = _mkdir(&(simulation->out_dir[0]));
 
@@ -118,6 +118,7 @@ void Environment::postRunEvents() {
 
 	cout << data_processing_command << "\n\n";
 	system(&data_processing_command[0]);							
+#endif
 }
 
 void Environment::handleStatus(Simulation* simulation) {
@@ -215,7 +216,7 @@ void Environment::makeVirtualTrajectory(string trj_path, string waterforce_path)
 
 
 
-
+#ifndef __linux__
 template <typename T>
 void Environment::dumpToFile(T* data, int n_datapoints, string file_path_s) {	
 	char* file_path;
@@ -227,4 +228,4 @@ void Environment::dumpToFile(T* data, int n_datapoints, string file_path_s) {
 	fwrite(data, sizeof(T), n_datapoints, file);
 	fclose(file);
 }
-
+#endif
