@@ -2,10 +2,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 class Trainer():
-    def __init__(self, net, working_folder):
+    def __init__(self, net, working_folder, n_neighbors):
         self.net = net
         self.working_folder = working_folder
-
+        self.n_neighbors = n_neighbors
 
 
     def train(self, n_epochs):
@@ -39,10 +39,12 @@ class Trainer():
         plt.xlabel("Epoch")
         plt.ylabel("Accuracy/Loss")
         plt.legend(["train loss", "validation loss", "validation accuracy"])
-        plt.title("Training - " + str(self.net.total_params) + " parameters")
+        plt.title("Training - " + str(self.n_neighbors) + " neighbors - "
+                  + str(self.net.total_params) + " parameters")
         plt.grid()
+        plt.ylim(0,5)
 
-        plt.savefig(self.working_folder + "\\training.png")
+        plt.savefig(self.working_folder + "\\train_plot_"+str(self.n_neighbors)+"N.png")
         plt.show()
         
         
