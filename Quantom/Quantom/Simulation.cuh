@@ -5,7 +5,7 @@
 
 
 
-constexpr double BOX_LEN = 5.f;		// Must be > twice the len of largest compound
+constexpr double BOX_LEN = 6.f;		// Must be > twice the len of largest compound
 constexpr double BOX_LEN_HALF = BOX_LEN/2.f;
 
 
@@ -20,8 +20,8 @@ const int STEPS_PER_TRAINDATATRANSFER = 500;
 const bool APPLY_THERMOSTAT = true;
 
 #ifndef __linux__
-const string MOL_FOLDER = "D:\\Quantom\\t4lys\\";
-const string OUT_DIR = "D:\\Quantom\\LIMANET\\sim_out";
+const string MOL_FOLDER = "C:\\PROJECTS\\Quantom\\t4lys\\";
+const string OUT_DIR = "C:\\PROJECTS\\Quantom\\LIMANET\\sim_out";
 #else
 const string MOL_FOLDER = "../Compounds/t4lys/";
 const string OUT_DIR = "/home/lima/Desktop/LIMA";
@@ -42,7 +42,7 @@ const int LOG_P_ID = 17;
 
 const int MAX_COMPOUNDS = 0xFF;
 const int MAX_SOLVENTS = 0xFFFF;
-constexpr double CUTOFF = 10.0f;	//nm/
+constexpr double CUTOFF = 2.f;	//nm/
 
 
 

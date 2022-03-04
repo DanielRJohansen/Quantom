@@ -2,12 +2,11 @@
 
 
 DisplayV2::DisplayV2() {
-    bool success = initGLFW();
+    int success = initGLFW();
 }
 
 
 void DisplayV2::drawFilledCircle(GLfloat x, GLfloat y, GLfloat radius, Int3 color) {
-#ifndef __linux__
     float light = 0.5;
     Int3 shaded_color = color * light;
     glColor3ub((uint8_t)shaded_color.x, (uint8_t)shaded_color.y, (uint8_t)shaded_color.z);
@@ -28,7 +27,6 @@ void DisplayV2::drawFilledCircle(GLfloat x, GLfloat y, GLfloat radius, Int3 colo
         );
     }
     glEnd();
-#endif
 }
 
 
@@ -41,7 +39,6 @@ void DisplayV2::drawBalls(RenderBall* balls, int n_balls) {
 }
 
 void DisplayV2::render(Simulation* simulation) {
-#ifndef __linux__
     auto start = std::chrono::high_resolution_clock::now();
 
     RenderBall* balls = rasterizer.render(simulation);
@@ -56,23 +53,19 @@ void DisplayV2::render(Simulation* simulation) {
     auto stop = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
     printf("\tRender time: %4d ys  ", duration.count());
-#endif
 }
 
 bool DisplayV2::checkWindowStatus() {
-#ifndef __linux__
     glfwPollEvents();
     if (glfwWindowShouldClose(window)) {
         glfwTerminate();
 
         return false;
     }
-#endif
     return true;
 }
 
 bool DisplayV2::initGLFW() {
-#ifndef __linux__
     /* Initialize the library */
     if (!glfwInit())
         return -1;
@@ -87,6 +80,5 @@ bool DisplayV2::initGLFW() {
 
     /* Make the window's context current */
     glfwMakeContextCurrent(window);
-#endif
     return 1;
 }

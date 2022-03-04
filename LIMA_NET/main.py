@@ -17,7 +17,7 @@ import torch
 if __name__ == '__main__':
     n_neighbors = 0
 
-    workdir = "D:\\Quantom\\LIMANET\\sim_out\\Steps_10000"
+    workdir = "C:\\PROJECTS\\Quantom\\LIMANET\\sim_out\\Steps_10000"
     data_filepath = workdir + "\\traindata.bin"
 
     dataloader = WaterforceDataloader(data_filepath, batch_size=32, nearest_n_atoms=n_neighbors)
@@ -29,5 +29,5 @@ if __name__ == '__main__':
 
     trainer = Trainer(net, workdir, n_neighbors=n_neighbors)
 
-    trainer.train(300)
+    trainer.train(100)
     #net.train(5000)

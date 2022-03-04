@@ -52,7 +52,6 @@ void Engine::hostMaster() {						// This is and MUST ALWAYS be called after the 
 
 	
 
-	/*
 	if (updated_neighborlists_ready) {
 		cudaMemcpy(simulation->box->compound_neighborlists, nlist_data_collection->compound_neighborlists, sizeof(NeighborList) * simulation->n_compounds, cudaMemcpyHostToDevice);
 		cudaMemcpy(simulation->box->solvent_neighborlists, nlist_data_collection->solvent_neighborlists, sizeof(NeighborList) * simulation->n_solvents, cudaMemcpyHostToDevice);
@@ -61,7 +60,7 @@ void Engine::hostMaster() {						// This is and MUST ALWAYS be called after the 
 
 
 	if (simulation->getStep() - prev_nlist_update_step >= STEPS_PER_NLIST_UPDATE) {
-		offLoadPositionData(simulation);
+		offloadPositionDataNLIST(simulation);
 		// Lots of waiting time here...
 		cudaDeviceSynchronize();
 
@@ -71,7 +70,7 @@ void Engine::hostMaster() {						// This is and MUST ALWAYS be called after the 
 
 		prev_nlist_update_step = simulation->getStep();
 	}
-	*/
+
 	if ((simulation->getStep() % STEPS_PER_THERMOSTAT) == 1) {	// So this runs 1 step AFTER applyThermostat
 		simulation->box->thermostat_scalar = 1.f;
 	}
@@ -109,24 +108,29 @@ void Engine::offloadPositionData(Simulation* simulation) {
 }
 */
 
-//(void __device__ __host__ applyHyperpos(Float3* static_particle, Float3* movable_particle);
+
+
+bool Engine::neighborWithinCutoff(Float3* pos_a, Float3* pos_b) {
+	LIMAENG::applyHyperpos(pos_a, pos_b);
+	double dist = (*pos_a - *pos_b).len();
+	return (dist < CUTOFF);
+}
+
+
+
+
 void Engine::cullDistantNeighbors(NListDataCollection* nlist_data_collection) {	// Calling with nlist avoids writing function for both solvent and compound
-	for (int i = 0; i < nlist_data_collection->n_compounds; i++) {
-		int id_self = i;
-		NeighborList* nlist_self = &nlist_data_collection->compound_neighborlists[i];
-		Float3 pos_self = nlist_data_collection->compound_key_positions[i];
+	for (int id_self = 0; id_self < nlist_data_collection->n_compounds; id_self++) {
+		NeighborList* nlist_self = &nlist_data_collection->compound_neighborlists[id_self];
 
 		for (int j = 0; j < nlist_self->n_compound_neighbors; j++) {		// Cull compound-compound
 			int id_neighbor = nlist_self->neighborcompound_ids[j];
+			NeighborList* nlist_neighbor = &nlist_data_collection->compound_neighborlists[id_neighbor];
 
 			if (id_self < id_neighbor) {
-				Float3 pos_neighbor = nlist_data_collection->compound_key_positions[id_neighbor];
-				NeighborList* nlist_neighbor = &nlist_data_collection->compound_neighborlists[id_neighbor];
-				LIMAENG::applyHyperpos(&pos_self, &pos_neighbor);
-				double dist = (pos_neighbor - pos_self).len();
-				if (dist > CUTOFF) {
+				if (!neighborWithinCutoff(&nlist_data_collection->compound_key_positions[id_self], &nlist_data_collection->compound_key_positions[id_neighbor])) {
 					nlist_self->removeId(id_neighbor, NeighborList::NEIGHBOR_TYPE::COMPOUND);
-					nlist_neighbor->removeId(id_self, NeighborList::NEIGHBOR_TYPE::COMPOUND);
+					nlist_neighbor->removeId(id_self, NeighborList::NEIGHBOR_TYPE::COMPOUND);				
 					j--;	// Decrement, as the removeId puts the last element at the current and now vacant spot.
 				}
 			}
@@ -135,14 +139,10 @@ void Engine::cullDistantNeighbors(NListDataCollection* nlist_data_collection) {	
 
 		for (int j = 0; j < nlist_self->n_solvent_neighbors; j++) {			// Cull compound-solvent
 			int id_neighbor = nlist_self->neighborsolvent_ids[j];
-
-
-			Float3 pos_neighbor = nlist_data_collection->solvent_positions[id_neighbor];
 			NeighborList* nlist_neighbor = &nlist_data_collection->solvent_neighborlists[id_neighbor];
 
-			LIMAENG::applyHyperpos(&pos_self, &pos_neighbor);
-			double dist = (pos_neighbor - pos_self).len();
-			if (dist > CUTOFF) {
+			//printf("Dist: %f\n", (nlist_data_collection->compound_key_positions[id_self] - nlist_data_collection->solvent_positions[id_neighbor]).len());
+			if (!neighborWithinCutoff(&nlist_data_collection->compound_key_positions[id_self], &nlist_data_collection->solvent_positions[id_neighbor])) {
 				nlist_self->removeId(id_neighbor, NeighborList::NEIGHBOR_TYPE::SOLVENT);
 				nlist_neighbor->removeId(id_self, NeighborList::NEIGHBOR_TYPE::COMPOUND);
 				j--;	// Decrement, as the removeId puts the last element at the current and now vacant spot.
@@ -150,22 +150,16 @@ void Engine::cullDistantNeighbors(NListDataCollection* nlist_data_collection) {	
 		}
 	}
 
-	for (int i = 0; i < nlist_data_collection->n_solvents; i++) {																// Cull solvent-solvent
-		int id_self = i;
-		NeighborList* nlist_self = &nlist_data_collection->solvent_neighborlists[i];
-		Float3 pos_self = nlist_data_collection->solvent_positions[i];
 
+	for (int id_self = 0; id_self < nlist_data_collection->n_solvents; id_self++) {																// Cull solvent-solvent
+		NeighborList* nlist_self = &nlist_data_collection->solvent_neighborlists[id_self];
 
 		for (int j = 0; j < nlist_self->n_compound_neighbors; j++) {			/// NOT FINISHED HERE
 			int id_neighbor = nlist_self->neighborsolvent_ids[j];
+			NeighborList* nlist_neighbor = &nlist_data_collection->solvent_neighborlists[id_neighbor];
 
 			if (id_self < id_neighbor) {
-				Float3 pos_neighbor = nlist_data_collection->solvent_positions[id_neighbor];
-				NeighborList* nlist_neighbor = &nlist_data_collection->solvent_neighborlists[id_neighbor];
-
-				LIMAENG::applyHyperpos(&pos_self, &pos_neighbor);
-				double dist = (pos_neighbor - pos_self).len();
-				if (dist > CUTOFF) {
+				if (!neighborWithinCutoff(&nlist_data_collection->solvent_positions[id_self], &nlist_data_collection->solvent_positions[id_neighbor])) {
 					nlist_self->removeId(id_neighbor, NeighborList::NEIGHBOR_TYPE::SOLVENT);
 					nlist_neighbor->removeId(id_self, NeighborList::NEIGHBOR_TYPE::SOLVENT);
 					j--;	// Decrement, as the removeId puts the last element at the current and now vacant spot.
@@ -177,8 +171,8 @@ void Engine::cullDistantNeighbors(NListDataCollection* nlist_data_collection) {	
 
 void Engine::updateNeighborLists(Simulation* simulation, NListDataCollection* nlist_data_collection, volatile bool* finished, int* timing) {	// This is a thread worker-function, so it can't own the object, thus i pass a ref to the engine object..
 	auto t0 = std::chrono::high_resolution_clock::now();
-
-	nlist_data_collection->compressPositionData();
+	Int3 before(nlist_data_collection->compound_neighborlists[0].n_compound_neighbors, nlist_data_collection->compound_neighborlists[0].n_solvent_neighbors, 0);
+	nlist_data_collection->preparePositionData();		// Makes key positions addressable in arrays: compound_key_positions and solvent_positions
 
 	// First do culling of neighbors that has left CUTOFF
 	cullDistantNeighbors(nlist_data_collection);
@@ -190,21 +184,18 @@ void Engine::updateNeighborLists(Simulation* simulation, NListDataCollection* nl
 		NeighborList* nlist_self = &nlist_data_collection->compound_neighborlists[id_self];
 		HashTable hashtable_compoundneighbors(nlist_self->neighborcompound_ids, (int)nlist_self->n_compound_neighbors, NEIGHBORLIST_MAX_COMPOUNDS * 2);
 		HashTable hashtable_solventneighbors(nlist_self->neighborsolvent_ids, (int)nlist_self->n_solvent_neighbors, NEIGHBORLIST_MAX_SOLVENTS * 2);
-		Float3 pos_self = nlist_data_collection->compound_key_positions[id_self];
 
 
 
-		for (int i = 0; i < nlist_self->n_compound_neighbors; i++) {											// Use neighbor compounds to find new solvents
-			NeighborList* nlist_neighbor = &nlist_data_collection->compound_neighborlists[nlist_self->neighborcompound_ids[i]];
+		for (int i = 0; i < nlist_self->n_solvent_neighbors; i++) {											// Use neighbor SOLVENTS to find new solvents. (Cant use compounds, as some solvents might be lost then :/
+			int neighbor_id = nlist_self->neighborsolvent_ids[i];
+			NeighborList* nlist_neighbor = &nlist_data_collection->solvent_neighborlists[neighbor_id];
 
 			for (int j = 0; j < nlist_neighbor->n_solvent_neighbors; j++) {
 				int id_candidate = nlist_neighbor->neighborsolvent_ids[j];
-				Float3 pos_candidate = nlist_data_collection->solvent_positions[id_candidate];
-				LIMAENG::applyHyperpos(&pos_self, &pos_candidate);
-				double dist = (pos_self - pos_candidate).len();
-				if (dist < CUTOFF) {
-					NeighborList* nlist_candidate = &nlist_data_collection->solvent_neighborlists[id_candidate];
+				NeighborList* nlist_candidate = &nlist_data_collection->solvent_neighborlists[id_candidate];
 
+				if (neighborWithinCutoff(&nlist_data_collection->compound_key_positions[id_self], &nlist_data_collection->solvent_positions[id_candidate])) {
 					if (hashtable_solventneighbors.insert(id_candidate)) {
 						nlist_self->addId(id_candidate, NeighborList::NEIGHBOR_TYPE::SOLVENT);
 						nlist_candidate->addId(id_self, NeighborList::NEIGHBOR_TYPE::COMPOUND);
@@ -214,12 +205,10 @@ void Engine::updateNeighborLists(Simulation* simulation, NListDataCollection* nl
 		}
 
 
-		for (int id_candidate = id_self + 1; id_candidate < simulation->n_compounds; id_candidate++) {	// For finding new nearby compounds, it is faster and simpler to just check all compounds, since there is so few
-			Float3 pos_candidate = nlist_data_collection->compound_key_positions[id_candidate];
-			LIMAENG::applyHyperpos(&pos_self, &pos_candidate);
-			double dist = (pos_self, pos_candidate).len();			
-			if (dist < CUTOFF) {
-				NeighborList* nlist_candidate = &nlist_data_collection->compound_neighborlists[id_candidate];
+		for (int id_candidate = id_self + 1; id_candidate < simulation->n_compounds; id_candidate++) {	// For finding new nearby compounds, it is faster and simpler to just check all compounds, since there are so few
+			NeighborList* nlist_candidate = &nlist_data_collection->compound_neighborlists[id_candidate];
+
+			if (neighborWithinCutoff(&nlist_data_collection->compound_key_positions[id_self], &nlist_data_collection->compound_key_positions[id_candidate])) {				
 				if (hashtable_compoundneighbors.insert(id_candidate)) {
 					nlist_self->addId(id_candidate, NeighborList::NEIGHBOR_TYPE::COMPOUND);
 					nlist_candidate->addId(id_self, NeighborList::NEIGHBOR_TYPE::COMPOUND);
@@ -232,58 +221,41 @@ void Engine::updateNeighborLists(Simulation* simulation, NListDataCollection* nl
 	for (int id_self = 0; id_self < simulation->n_solvents; id_self++) {
 		NeighborList* nlist_self = &nlist_data_collection->solvent_neighborlists[id_self];
 		HashTable hashtable_solventneighbors(nlist_self->neighborsolvent_ids, (int)nlist_self->n_solvent_neighbors, NEIGHBORLIST_MAX_SOLVENTS * 2);
-		Float3 pos_self = nlist_data_collection->solvent_positions[id_self];
 
 		for (int i = 0; i < nlist_self->n_compound_neighbors; i++) {											// Use neighbor compounds to find new solvents
-			NeighborList* nlist_neighbor = &nlist_data_collection->compound_neighborlists[nlist_self->neighborcompound_ids[i]];
+			int id_neighbor = nlist_self->neighborcompound_ids[i];
+			NeighborList* nlist_neighbor = &nlist_data_collection->compound_neighborlists[id_neighbor];
+
 
 			for (int j = 0; j < nlist_neighbor->n_solvent_neighbors; j++) {
 				int id_candidate = nlist_neighbor->neighborsolvent_ids[j];
-				if (id_candidate <= id_self) {
-					continue;
-				}
+				NeighborList* nlist_candidate = &nlist_data_collection->solvent_neighborlists[id_candidate];
 
-
-				Float3 pos_candidate = nlist_data_collection->solvent_positions[id_candidate];
-				LIMAENG::applyHyperpos(&pos_self, &pos_candidate);
-				double dist = (pos_self - pos_candidate).len();
-				if (dist < CUTOFF) {
-					NeighborList* nlist_candidate = &nlist_data_collection->solvent_neighborlists[id_candidate];
-
-					if (hashtable_solventneighbors.insert(id_candidate)) {
-						nlist_self->addId(id_candidate, NeighborList::NEIGHBOR_TYPE::SOLVENT);
-						nlist_candidate->addId(id_self, NeighborList::NEIGHBOR_TYPE::SOLVENT);
+				if (id_candidate > id_self) {
+					if (neighborWithinCutoff(&nlist_data_collection->solvent_positions[id_self], &nlist_data_collection->solvent_positions[id_candidate])) {
+						if (hashtable_solventneighbors.insert(id_candidate)) {
+							nlist_self->addId(id_candidate, NeighborList::NEIGHBOR_TYPE::SOLVENT);
+							nlist_candidate->addId(id_self, NeighborList::NEIGHBOR_TYPE::SOLVENT);
+						}
 					}
-				}
+				}				
 			}
 		}
 	}
 
-
-
+	Int3 after(nlist_data_collection->compound_neighborlists[0].n_compound_neighbors, nlist_data_collection->compound_neighborlists[0].n_solvent_neighbors, 0);
+	printf("\nCompound 0 went from %d %d neighbors to %d %d\n", before.x, before.y, after.x, after.y);
 
 	auto t1 = std::chrono::high_resolution_clock::now();
 	*timing = (int) std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
 
-	*finished = 1;
+	*finished = 1;		// Thread terminates here!
 }
 
 
 void Engine::offloadLoggingData() {
 	const int step_offset = (simulation->getStep() - STEPS_PER_LOGTRANSFER) * simulation->total_particles_upperbound;	// Tongue in cheek here, i think this is correct...
-	//printf("Offloading data to position %d %d\n", simulation->getStep() - STEPS_PER_LOGTRANSFER, step_offset);
-
 	cudaMemcpy(&simulation->potE_buffer[step_offset], simulation->box->potE_buffer, sizeof(double) * simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER, cudaMemcpyDeviceToHost);
-	//cudaMemcpy(&simulation->traj_buffer[step_offset], simulation->box->traj_buffer, sizeof(Float3) * simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER, cudaMemcpyDeviceToHost);
-
-	/*printf("Step %d\n", simulation->getStep());
-	for (int i = 0; i < 10; i++) {
-		//printf("potE: %f\n", simulation->potE_buffer[step_offset + 0 + i * simulation->total_particles_upperbound]);
-		
-		//printf("INdex %d\n", step_offset + 0 + i * simulation->total_particles_upperbound);
-		//simulation->box->trajectory[0 + i * simulation->total_particles_upperbound].print('D');
-		//simulation->traj_buffer[step_offset + 0 + i * simulation->total_particles_upperbound].print('H');
-	}*/
 }
 
 void Engine::offloadPositionData() {
@@ -433,7 +405,7 @@ __device__ void applyPBC(Float3* current_position) {	// Only changes position if
 
 
 
-constexpr double sigma = 0.3923f;										//nm, point at which d/dE or force is 0.
+constexpr double sigma = 0.3923f;										// nm, point at which d/dE or force is 0.
 constexpr double epsilon = 0.5986 * 1'000.f;							// J/mol
 __device__ Float3 calcLJForce(Float3* pos0, Float3* pos1, double* data_ptr, double* potE) {	
 	// Calculates LJ force on p0	//

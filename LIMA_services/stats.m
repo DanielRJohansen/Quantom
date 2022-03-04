@@ -46,7 +46,7 @@ clc
 %data = readmatrix("D:\\Quantom\\energies_steps_99997.csv");
 %data = readmatrix("D:\\Quantom\\energies_steps_81476.csv");
 %a = data(1:5,1:2:end)
-workdir = "D:\\Quantom\\LIMANET\\sim_out\\Steps_500000";
+workdir = "C:\\PROJECTS\\Quantom\\LIMANET\\sim_out\\Steps_10000";
 file = fopen(strcat(workdir, "\\energy.bin"), "rb");
 data = fread(file,'double');
 fclose(file);
@@ -97,9 +97,12 @@ hold off
 
 
 nexttile
-plot(temp_data)
+t = (1:length(temp_data)).*200;
+plot(t, temp_data)
 ylim([0 inf])
-
+title("Temperature")
+ylabel("Temperature [k]")
+xlabel("time [fs]")
 %% Waterforce
 clear 
 clc

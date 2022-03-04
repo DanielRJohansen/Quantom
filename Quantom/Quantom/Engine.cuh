@@ -60,11 +60,11 @@ struct NListDataCollection {
 		cudaMemcpy(compound_neighborlists, simulation->box->compound_neighborlists, sizeof(NeighborList) * n_compounds, cudaMemcpyDeviceToHost);
 		cudaMemcpy(solvent_neighborlists, simulation->box->solvent_neighborlists, sizeof(NeighborList) * n_solvents, cudaMemcpyDeviceToHost);
 	}
-	void compressPositionData() {
+	void preparePositionData() {
 		for (int i = 0; i < n_compounds; i++) {
 			compound_key_positions[i] = compoundstates[i].positions[0];
 		}
-		for (int i = 0; i < n_compounds; i++) {
+		for (int i = 0; i < n_solvents; i++) {
 			solvent_positions[i] = solvents[i].pos;
 		}
 	}
@@ -127,6 +127,9 @@ private:
 	void onloadNeighborlists();
 	static void updateNeighborLists(Simulation* simulation, NListDataCollection* nlist_data_collection, 
 		volatile bool* finished, int* timing);	// thread worker, can't own engine object, thus pass ref
+	static bool neighborWithinCutoff(Float3* pos_a, Float3* pos_b);
+	/*static bool removeFromNeighborlists(NeighborList* nlist_self, NeighborList* nlist_neighbor,
+		NeighborList::NEIGHBOR_TYPE type_self, NeighborList::NEIGHBOR_TYPE type_other);*/
 	static void cullDistantNeighbors(NListDataCollection* nlist_data_collection);
 	NListDataCollection* nlist_data_collection;
 

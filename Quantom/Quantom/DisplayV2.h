@@ -1,7 +1,13 @@
 #pragma once
 
 #include "Simulation.cuh"
+#ifndef __linux__
 #include <glfw3.h>
+#else
+#include <GLFW/glfw3.h>
+#endif // !__linux__
+
+
 #include "Rasterizer.cuh"
 #include "QuantomTypes.cuh"
 
