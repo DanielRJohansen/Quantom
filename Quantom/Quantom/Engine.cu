@@ -507,6 +507,17 @@ __device__ Float3 computeSolventToSolventLJForces(Float3* self_pos, int self_ind
 	}
 	return force;
 }
+
+__device__ Float3 computeSolventToSolventLJForces(Float3* self_pos, NeighborList* nlist, Solvent* solvents, double* data_ptr, double* potE_sum) {	// Specific to solvent kernel
+	Float3 force(0, 0, 0);
+	for (int i = 0; i < nlist->n_solvent_neighbors; i++) {
+		Solvent neighbor = solvents[nlist->neighborsolvent_ids[i]];
+		LIMAENG::applyHyperpos(&neighbor.pos, self_pos);
+		force += calcLJForce(self_pos, &neighbor.pos, data_ptr, potE_sum);
+	}
+	return force;
+}
+/*
 __device__ Float3 computeCompoundToSolventLJForces(Float3* self_pos, int n_particles, Float3* positions, double* data_ptr, double* potE_sum) {	// Specific to solvent kernel
 	Float3 force(0, 0, 0);
 	for (int i = 0; i < n_particles; i++) {
@@ -516,7 +527,7 @@ __device__ Float3 computeCompoundToSolventLJForces(Float3* self_pos, int n_parti
 	}
 	return force;
 }
-
+*/
 __device__ Float3 computePairbondForces(Compound* compound, CompoundState* compound_state, Float3* utility_buffer, double* potE) {	// only works if n threads >= n bonds
 	utility_buffer[threadIdx.x] = Float3(0, 0, 0);
 	for (int i = 0; (i * blockDim.x) < compound->n_pairbonds; i++) {					
@@ -785,7 +796,9 @@ __global__ void forceKernel(Box* box) {
 
 
 __global__ void solventForceKernel(Box* box) {
-	__shared__ Float3 solvent_positions[THREADS_PER_SOLVENTBLOCK];
+#define solvent_index (blockIdx.x * blockDim.x + threadIdx.x)
+#define thread_active (solvent_index < box->n_solvents)
+	//__shared__ Float3 solvent_positions[THREADS_PER_SOLVENTBLOCK];
 	__shared__ Float3 utility_buffer[MAX_COMPOUND_PARTICLES];
 
 
@@ -798,46 +811,57 @@ __global__ void solventForceKernel(Box* box) {
 	Float3 force(0,0,0);
 
 
-	Solvent solvent = box->solvents[threadIdx.x];
-	solvent_positions[threadIdx.x] = solvent.pos;
+	Solvent solvent;
+	Float3 solvent_pos;
+	if (thread_active) {
+		solvent = box->solvents[solvent_index];
+		solvent_pos = solvent.pos;									// Use this when applying hyperpos, NOT SOLVENT.POS as others acess this concurrently on other kernels!
+	}
+	
 
 
-
-
-	// For compound LJ forces, maybe apply hyperpos to solvent, based on particle0 ? No that wont work, compound may be on both sides of box...
-	//force += computeLJForces(box, &solvent.pos, &box->compound_neighborlist_array[MAX_COMPOUNDS + solvent_index], &box->solvent_neighborlist_array[MAX_COMPOUNDS + solvent_index], data_ptr, utility_buffer);
-
+	
 	// --------------------------------------------------------------- Molecule Interactions --------------------------------------------------------------- //
 	for (int i = 0; i < box->n_compounds; i++) {
-		int n_particles = box->compound_state_array[i].n_particles;
+		int n_compound_particles = box->compound_state_array[i].n_particles;
 
 		// First all threads help loading the molecule
-		if (threadIdx.x < n_particles) {
+		if (threadIdx.x < n_compound_particles) {
 			utility_buffer[threadIdx.x] = box->compound_state_array[i].positions[threadIdx.x];
 		}
 		__syncthreads();
 
-		//Only do if mol is neighbor to the particular solvent
-		//LIMAENG::applyHyperpos(&utility_buffer[0], &solvent_positions[threadIdx.x]);
+		//Only do if mol is neighbor to the particular solvent, to save time?
+		//LIMAENG::applyHyperpos(&solvent_positions[threadIdx.x], &utility_buffer[0]);									// Move own particle in relation to compound-key-position
 		//force += computeLJForces(&solvent_positions[threadIdx.x], n_particles, utility_buffer, data_ptr, &potE_sum);
-		force += computeCompoundToSolventLJForces(&solvent.pos, box->compounds[0].n_particles, utility_buffer, data_ptr, &potE_sum);
+
+		if (thread_active) {
+			LIMAENG::applyHyperpos(&solvent_pos, &utility_buffer[0]);									// Move own particle in relation to compound-key-position
+			force += computeLJForces(&solvent_pos, n_compound_particles, utility_buffer, data_ptr, &potE_sum);
+		}
+		
+
+		// BEFORE:
+		//force += computeCompoundToSolventLJForces(&solvent.pos, box->compounds[0].n_particles, utility_buffer, data_ptr, &potE_sum);	// wrong, i think?
+		//force += computeCompoundToSolventLJForces(&solvent.pos, n_particles, utility_buffer, data_ptr, &potE_sum);					// right, i think??
 
 	}
 	// ----------------------------------------------------------------------------------------------------------------------------------------------------- //
-	if (threadIdx.x < box->n_solvents) {
-		//applyHyperpos
-		force += computeSolventToSolventLJForces(&solvent.pos, threadIdx.x, box->n_solvents, solvent_positions, data_ptr, &potE_sum);
+	
+	if (thread_active) {
+		//force += computeSolventToSolventLJForces(&solvent.pos, threadIdx.x, box->n_solvents, solvent_positions, data_ptr, &potE_sum);
+		force += computeSolventToSolventLJForces(&solvent_pos, &box->solvent_neighborlists[solvent_index], box->solvents, data_ptr, &potE_sum);
 	}
 	
 
 
 
-	if (threadIdx.x < box->n_solvents) {
-		int p_index = MAX_COMPOUND_PARTICLES + threadIdx.x;
+	if (thread_active) {
+		int p_index = MAX_COMPOUND_PARTICLES + solvent_index;
 		integratePosition(&solvent.pos, &solvent.pos_tsub1, &force, SOLVENT_MASS, box->dt, &box->thermostat_scalar, p_index);
 	}
 
-	if (threadIdx.x < box->n_solvents) {
+	if (thread_active) {
 		applyPBC(&solvent.pos);	// forcePositionToInsideBox	// This break the integration, as that doesn't accound for PBC in the vel conservation
 	}
 
@@ -846,30 +870,20 @@ __global__ void solventForceKernel(Box* box) {
 
 
 	// ------------------------------------ DATA LOG ------------------------------- //
-	{
+	if (thread_active) {
 		int compounds_offset = box->n_compounds * MAX_COMPOUND_PARTICLES;
-		int solvent_index = threadIdx.x;		// Temporary
+		//int solvent_index = threadIdx.x;		// Temporary
 		int step_offset = (box->step % STEPS_PER_LOGTRANSFER) * box->total_particles_upperbound;
 
 		box->potE_buffer[compounds_offset + solvent_index + step_offset] = potE_sum;	//  data_ptr[0];
 		//printf("pot: %f\n", box->potE_buffer[compounds_offset + solvent_index + (box->step) * box->total_particles]);
 		box->traj_buffer[compounds_offset + solvent_index + step_offset] = solvent.pos;
-		
-		/*
-		if (solvent_index == LOGTHREAD && LOGTYPE == 0) {
-			//printf("\nindex: %d\n", compounds_offset + solvent_index + (box->step) * box->total_particles);			
-			//solvent.pos.print('p');
-			box->outdata[3 + box->step * 10] = data_ptr[0];	// LJ pot
-			box->outdata[4 + box->step * 10] = (solvent.pos-solvent.pos_tsub1).len()/box->dt;	// approx. vel
-			box->outdata[5 + box->step * 10] = data_ptr[2];	// closest particle	
-			//printf("%f\n", data_ptr[2]);
-		}*/
 	}
 
 	// ----------------------------------------------------------------------------- //
 
 
-	if (threadIdx.x < box->n_solvents) {
+	if (thread_active) {
 		box->solvents_next[threadIdx.x] = solvent;
 	}
 }

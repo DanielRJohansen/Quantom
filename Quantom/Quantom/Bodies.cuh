@@ -113,8 +113,8 @@ struct CompactParticle {	// Contains information only needed by the Ownerkernel
 
 
 struct Solvent {
-	Solvent() {}
-	Solvent(Float3 pos, Float3 pos_tsub1) : pos(pos), pos_tsub1(pos_tsub1) {}
+	__host__ __device__ Solvent() {}
+	__host__ Solvent(Float3 pos, Float3 pos_tsub1) : pos(pos), pos_tsub1(pos_tsub1) {}
 
 	Float3 pos;
 	Float3 pos_tsub1;

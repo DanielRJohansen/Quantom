@@ -42,13 +42,12 @@ const int LOG_P_ID = 17;
 
 const int MAX_COMPOUNDS = 0xFF;
 const int MAX_SOLVENTS = 0xFFFF;
-constexpr double CUTOFF = 2.f;	//nm/
+constexpr double CUTOFF = 3.f;	//nm/
 
 
 
-
-const int BLOCKS_PER_SOLVENTKERNEL = 1;
 const int THREADS_PER_SOLVENTBLOCK = 256;	// Must be >= N_SOLVATE_MOLECULES
+const int BLOCKS_PER_SOLVENTKERNEL = ceil((float)N_SOLVATE_MOLECULES/(float)THREADS_PER_SOLVENTBLOCK);
 
 
 const int THREADS_PER_COMPOUNDBLOCK = 128; // Must be >= max comp particles
