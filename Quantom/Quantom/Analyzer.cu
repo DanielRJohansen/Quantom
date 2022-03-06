@@ -156,7 +156,7 @@ Analyzer::AnalyzedPackage Analyzer::analyzeEnergy(Simulation* simulation) {	// C
 
 	for (int i = 0; i < analysable_steps; i++) {
 		average_energy[i] = (average_solvent_energy[i] * simulation->box->n_solvents * 1 + average_compound_energy[i] * simulation->box->compounds[0].n_particles) * (1.f/ (simulation->box->n_solvents + simulation->box->compounds[0].n_particles));
-		average_energy[i].print('E');
+		//average_energy[i].print('E');
 	}
 	
 

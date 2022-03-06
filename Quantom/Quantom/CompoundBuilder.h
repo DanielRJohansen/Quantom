@@ -41,6 +41,7 @@ private:
 
 	void loadParticles(Compound* compound, vector<Record_ATOM>* pdb_data, int max_monomer_id = INT32_MAX, bool ignore_protons =false);
 	void loadTopology(Compound* compound, vector<vector<string>>* itp_data, int* particle_id_map);
+	void calcParticleSphere(Compound* compound);
 
 
 	enum TopologyMode { INACTIVE, BOND, ANGLE, DIHEDRAL };
@@ -50,6 +51,8 @@ private:
 	void addAngle(Compound* compound, vector<string>* record);
 	void addDihedral(Compound* compound, vector<string>* record);
 
+
+	Float3 calcCOM(Compound* compound);
 
 	int* particle_id_map;
 

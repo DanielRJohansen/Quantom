@@ -31,13 +31,15 @@ Compound CompoundBuilder::buildMolecule(string pdb_path, string itp_path, int ma
 	vector<vector<string>> top_data = parseTOP(itp_path);
 
 
-	Compound compound;
+	Compound compound;													// position of particles stored in compund.particles.pos_tsub1
 
 	loadParticles(&compound, &atom_data, max_residue_id, true);
 	printf("%d particles added\n", compound.n_particles);
 	loadTopology(&compound, &top_data, particle_id_map);
 	printf("%d pairbonds added\n", compound.n_pairbonds);
 	printf("%d anglebonds added\n", compound.n_anglebonds);
+
+	calcParticleSphere(&compound);
 
 
 
@@ -106,6 +108,27 @@ void CompoundBuilder::loadTopology(Compound* compound, vector<vector<string>>* t
 	}
 }
 
+void CompoundBuilder::calcParticleSphere(Compound* compound) {
+	Float3 com = calcCOM(compound);
+
+	float furthest = LONG_MIN;
+	float closest = LONG_MAX;
+	int closest_index = 0;
+
+	for (int i = 0; i < compound->n_particles; i++) {
+		float dist = (compound->particles[i].pos_tsub1 - com).len();
+
+		if (dist < closest) {
+			closest = dist;
+			closest_index = i;
+		}
+		furthest = max(furthest, dist);
+	}
+
+	compound->key_particle_index = closest_index;
+	compound->confining_particle_sphere = furthest;
+}
+
 CompoundBuilder::TopologyMode CompoundBuilder::setMode(string entry)
 {
 	if (entry == "bonds")
@@ -169,6 +192,14 @@ void CompoundBuilder::addAngle(Compound* compound, vector<string>* record)
 
 void CompoundBuilder::addDihedral(Compound* compound, vector<string>* record)
 {
+}
+
+Float3 CompoundBuilder::calcCOM(Compound* compound) {
+	Float3 com(0.f);
+	for (int i = 0; i < compound->n_particles; i++) {
+		com += compound->particles[i].pos_tsub1;
+	}
+	return com * (1.f / (float) compound->n_particles);
 }
 
 vector<vector<string>> CompoundBuilder::parseTOP(string path)		// Naive file segmentation, DANGEROUS!

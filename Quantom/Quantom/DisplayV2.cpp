@@ -50,6 +50,8 @@ void DisplayV2::render(Simulation* simulation) {
     /* Swap front and back buffers */
     glfwSwapBuffers(window);
 
+    delete[] balls;
+
     auto stop = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
     printf("\tRender time: %4d ys  ", duration.count());

@@ -117,6 +117,12 @@ bool Engine::neighborWithinCutoff(Float3* pos_a, Float3* pos_b) {
 	return (dist < CUTOFF);
 }
 
+bool Engine::neighborWithinCutoff(Float3* pos_a, Float3* pos_b, float cutoff_offset) {		// This is used for compounds with a confining_particle_sphere from key_particle BEFORE CUTOFF begins
+	Float3 pos_b_temp = *pos_b;
+	LIMAENG::applyHyperpos(pos_a, &pos_b_temp);
+	double dist = (*pos_a - pos_b_temp).len();
+	return (dist < (CUTOFF + cutoff_offset));
+}
 
 
 
@@ -174,21 +180,20 @@ void Engine::updateNeighborLists(Simulation* simulation, NListDataCollection* nl
 	auto t0 = std::chrono::high_resolution_clock::now();
 	//Int3 before(nlist_data_collection->compound_neighborlists[0].n_compound_neighbors, nlist_data_collection->compound_neighborlists[0].n_solvent_neighbors, 0);
 	Int3 before(nlist_data_collection->solvent_neighborlists[193].n_compound_neighbors, nlist_data_collection->solvent_neighborlists[193].n_solvent_neighbors, 0);
-
-	nlist_data_collection->preparePositionData();		// Makes key positions addressable in arrays: compound_key_positions and solvent_positions
+	//nlist_data_collection->preparePositionData();
+	nlist_data_collection->preparePositionData(simulation->compounds_host);		// Makes key positions addressable in arrays: compound_key_positions and solvent_positions
 
 	// First do culling of neighbors that has left CUTOFF
 	cullDistantNeighbors(nlist_data_collection);
 
 
-
+	
 	// First add compound->solvent, compound->compound
 	for (int id_self = 0; id_self < simulation->n_compounds; id_self++) {										
 		NeighborList* nlist_self = &nlist_data_collection->compound_neighborlists[id_self];
 		HashTable hashtable_compoundneighbors(nlist_self->neighborcompound_ids, (int)nlist_self->n_compound_neighbors, NEIGHBORLIST_MAX_COMPOUNDS * 2);
 		HashTable hashtable_solventneighbors(nlist_self->neighborsolvent_ids, (int)nlist_self->n_solvent_neighbors, NEIGHBORLIST_MAX_SOLVENTS * 2);
-
-
+		float cutoff_offset = simulation->compounds_host[id_self].confining_particle_sphere;
 
 		for (int i = 0; i < nlist_self->n_solvent_neighbors; i++) {											// Use neighbor SOLVENTS to find new solvents. (Cant use compounds, as some solvents might be lost then :/
 			int neighbor_id = nlist_self->neighborsolvent_ids[i];
@@ -198,7 +203,7 @@ void Engine::updateNeighborLists(Simulation* simulation, NListDataCollection* nl
 				int id_candidate = nlist_neighbor->neighborsolvent_ids[j];
 				NeighborList* nlist_candidate = &nlist_data_collection->solvent_neighborlists[id_candidate];
 
-				if (neighborWithinCutoff(&nlist_data_collection->compound_key_positions[id_self], &nlist_data_collection->solvent_positions[id_candidate])) {
+				if (neighborWithinCutoff(&nlist_data_collection->compound_key_positions[id_self], &nlist_data_collection->solvent_positions[id_candidate]), cutoff_offset) {
 					if (hashtable_solventneighbors.insert(id_candidate)) {
 						nlist_self->addId(id_candidate, NeighborList::NEIGHBOR_TYPE::SOLVENT);
 						nlist_candidate->addId(id_self, NeighborList::NEIGHBOR_TYPE::COMPOUND);
@@ -211,7 +216,7 @@ void Engine::updateNeighborLists(Simulation* simulation, NListDataCollection* nl
 		for (int id_candidate = id_self + 1; id_candidate < simulation->n_compounds; id_candidate++) {	// For finding new nearby compounds, it is faster and simpler to just check all compounds, since there are so few
 			NeighborList* nlist_candidate = &nlist_data_collection->compound_neighborlists[id_candidate];
 
-			if (neighborWithinCutoff(&nlist_data_collection->compound_key_positions[id_self], &nlist_data_collection->compound_key_positions[id_candidate])) {				
+			if (neighborWithinCutoff(&nlist_data_collection->compound_key_positions[id_self], &nlist_data_collection->compound_key_positions[id_candidate]), cutoff_offset) {
 				if (hashtable_compoundneighbors.insert(id_candidate)) {
 					nlist_self->addId(id_candidate, NeighborList::NEIGHBOR_TYPE::COMPOUND);
 					nlist_candidate->addId(id_self, NeighborList::NEIGHBOR_TYPE::COMPOUND);
@@ -245,50 +250,18 @@ void Engine::updateNeighborLists(Simulation* simulation, NListDataCollection* nl
 			}
 			
 		}
-
-		/*
-		for (int i = 0; i < nlist_self->n_compound_neighbors; i++) {											// Use neighbor compounds to find new solvents
-			int id_neighbor = nlist_self->neighborcompound_ids[i];
-			NeighborList* nlist_neighbor = &nlist_data_collection->compound_neighborlists[id_neighbor];
-
-
-			for (int j = 0; j < nlist_neighbor->n_solvent_neighbors; j++) {
-				int id_candidate = nlist_neighbor->neighborsolvent_ids[j];
-				NeighborList* nlist_candidate = &nlist_data_collection->solvent_neighborlists[id_candidate];
-
-
-				if (id_self == 193 && id_candidate == 244) {
-					Float3 t = nlist_data_collection->solvent_positions[id_candidate];
-					Float3 s = nlist_data_collection->solvent_positions[id_self];
-					LIMAENG::applyHyperpos(&s, &t);
-					printf("Dist to 244: %f\n", (t - s).len());
-				}
-
-				if (id_candidate > id_self) {
-					if (neighborWithinCutoff(&nlist_data_collection->solvent_positions[id_self], &nlist_data_collection->solvent_positions[id_candidate])) {
-						if (hashtable_solventneighbors.insert(id_candidate)) {
-							nlist_self->addId(id_candidate, NeighborList::NEIGHBOR_TYPE::SOLVENT);
-							nlist_candidate->addId(id_self, NeighborList::NEIGHBOR_TYPE::SOLVENT);
-							if (id_self == 193) {
-								//printf("Adding id %d with dist %f\n", id_candidate, (nlist_data_collection->solvent_positions[id_self] - nlist_data_collection->solvent_positions[id_candidate]).len());
-							}
-						}
-					}
-				}				
-			}
-		}
-		*/
 	}
 
 	//Int3 after(nlist_data_collection->compound_neighborlists[0].n_compound_neighbors, nlist_data_collection->compound_neighborlists[0].n_solvent_neighbors, 0);
 	Int3 after(nlist_data_collection->solvent_neighborlists[193].n_compound_neighbors, nlist_data_collection->solvent_neighborlists[193].n_solvent_neighbors, 0);
 
-	printf("\nEntity went from %d %d neighbors to %d %d\n", before.x, before.y, after.x, after.y);
-
+	//printf("\nEntity went from %d %d neighbors to %d %d\n", before.x, before.y, after.x, after.y);
+	
 	auto t1 = std::chrono::high_resolution_clock::now();
 	*timing = (int) std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
 
 	*finished = 1;		// Thread terminates here!
+	
 }
 
 

@@ -333,6 +333,9 @@ public:
 			return insert(key, offset << 1);
 		}
 	}
+	~HashTable() {
+		delete[] table;
+	}
 private:
 
 	int getHash(uint16_t key) {

@@ -351,6 +351,10 @@ struct Compound {
 
 	uint16_t n_anglebonds = 0;
 	AngleBond anglebonds[MAX_ANGLEBONDS];
+
+
+	int key_particle_index = 404;		// particle which started at center. Used for PBC, applyhyperpos, and neighborlist search.
+	float confining_particle_sphere = 0;		// All particles in compound are PROBABLY within this radius
 };
 
 
