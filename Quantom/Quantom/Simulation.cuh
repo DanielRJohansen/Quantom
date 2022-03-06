@@ -10,7 +10,7 @@ constexpr double BOX_LEN_HALF = BOX_LEN/2.f;
 
 
 
-const int STEPS_PER_NLIST_UPDATE = 50;
+const int STEPS_PER_NLIST_UPDATE = 10;
 const int STEPS_PER_LOGTRANSFER = 10;
 //const int STEPS_PER_TRAJTRANSFER = 100;
 const int STEPS_PER_THERMOSTAT = 200;
@@ -27,13 +27,10 @@ const string MOL_FOLDER = "../Compounds/t4lys/";
 const string OUT_DIR = "/home/lima/Desktop/LIMA";
 #endif
 
-const int N_SOLVATE_MOLECULES = 255;	// Must not be above 255, as that can't be represented as uint8_t
+const int N_SOLVATE_MOLECULES = 800;	// Must not be above 255, as that can't be represented as uint8_t5
 
 
-//const int PARTICLES_PER_COMPOUND = 3;
-const int BLOCKS_PER_SM = 512;
-//const int GRIDBLOCKS_PER_BODY = 16;
-//const int THREADS_PER_GRIDBLOCK = MAX_BLOCK_BODIES / GRIDBLOCKS_PER_BODY;
+
 
 
 constexpr double WARN_FORCE = 80'000;
@@ -42,7 +39,7 @@ const int LOG_P_ID = 17;
 
 const int MAX_COMPOUNDS = 0xFF;
 const int MAX_SOLVENTS = 0xFFFF;
-constexpr double CUTOFF = 3.f;	//nm/
+constexpr double CUTOFF = 2.5f;	//nm/
 
 
 
@@ -55,7 +52,7 @@ const int THREADS_PER_COMPOUNDBLOCK = 128; // Must be >= max comp particles
 const int N_LIPID_COPIES = 32;
 
 
-const int SIMULATION_STEPS = 10000;
+const int SIMULATION_STEPS = 2000;
 
 //constexpr double SOLVENT_MASS = 18.01528f * 1e-3;	// kg/mol
 constexpr double SOLVENT_MASS = 12.0107 * 1e-3;	// kg/mol
@@ -171,7 +168,7 @@ public:
 	int n_steps = SIMULATION_STEPS;
 
 	const double dt = 1 * 1e-6;		// ns, so first val corresponds to fs
-	int steps_per_render = 20;
+	int steps_per_render = 50;
 	//int n_bodies = N_BODIES_START;
 	Box* box;
 

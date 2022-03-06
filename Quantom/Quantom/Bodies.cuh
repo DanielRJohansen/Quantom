@@ -158,7 +158,7 @@ struct AngleBond {
 
 // ------------------------------------------------- COMPOUNDS ------------------------------------------------- //
 const int NEIGHBORLIST_MAX_COMPOUNDS = 64;
-const int NEIGHBORLIST_MAX_SOLVENTS = 256;
+const int NEIGHBORLIST_MAX_SOLVENTS = 512;
 
 class NeighborList {
 public:
@@ -189,15 +189,15 @@ public:
 			}
 			break;
 		default:
-			exit(0);
 			break;
 		}
-		printf("Failed!\n");
+		printf("Failed to insert new neighbor!\n");
+		exit(1);
 		return false;
 	}
 	__host__ void removeId(uint16_t neighbor_id, NEIGHBOR_TYPE nt) {
 		uint16_t* ids;
-		uint8_t* n;
+		uint16_t* n;
 		switch (nt)
 		{
 		case NeighborList::COMPOUND:
@@ -235,9 +235,9 @@ public:
 
 
 	uint16_t neighborcompound_ids[NEIGHBORLIST_MAX_COMPOUNDS];
-	uint8_t n_compound_neighbors = 0;
+	uint16_t n_compound_neighbors = 0;
 	uint16_t neighborsolvent_ids[NEIGHBORLIST_MAX_SOLVENTS];
-	uint8_t n_solvent_neighbors = 0;
+	uint16_t n_solvent_neighbors = 0;
 };
 
 

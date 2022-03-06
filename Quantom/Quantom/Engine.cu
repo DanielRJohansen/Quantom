@@ -111,8 +111,9 @@ void Engine::offloadPositionData(Simulation* simulation) {
 
 
 bool Engine::neighborWithinCutoff(Float3* pos_a, Float3* pos_b) {
-	LIMAENG::applyHyperpos(pos_a, pos_b);
-	double dist = (*pos_a - *pos_b).len();
+	Float3 pos_b_temp = *pos_b;
+	LIMAENG::applyHyperpos(pos_a, &pos_b_temp);
+	double dist = (*pos_a - pos_b_temp).len();
 	return (dist < CUTOFF);
 }
 
@@ -171,7 +172,9 @@ void Engine::cullDistantNeighbors(NListDataCollection* nlist_data_collection) {	
 
 void Engine::updateNeighborLists(Simulation* simulation, NListDataCollection* nlist_data_collection, volatile bool* finished, int* timing) {	// This is a thread worker-function, so it can't own the object, thus i pass a ref to the engine object..
 	auto t0 = std::chrono::high_resolution_clock::now();
-	Int3 before(nlist_data_collection->compound_neighborlists[0].n_compound_neighbors, nlist_data_collection->compound_neighborlists[0].n_solvent_neighbors, 0);
+	//Int3 before(nlist_data_collection->compound_neighborlists[0].n_compound_neighbors, nlist_data_collection->compound_neighborlists[0].n_solvent_neighbors, 0);
+	Int3 before(nlist_data_collection->solvent_neighborlists[193].n_compound_neighbors, nlist_data_collection->solvent_neighborlists[193].n_solvent_neighbors, 0);
+
 	nlist_data_collection->preparePositionData();		// Makes key positions addressable in arrays: compound_key_positions and solvent_positions
 
 	// First do culling of neighbors that has left CUTOFF
@@ -222,6 +225,28 @@ void Engine::updateNeighborLists(Simulation* simulation, NListDataCollection* nl
 		NeighborList* nlist_self = &nlist_data_collection->solvent_neighborlists[id_self];
 		HashTable hashtable_solventneighbors(nlist_self->neighborsolvent_ids, (int)nlist_self->n_solvent_neighbors, NEIGHBORLIST_MAX_SOLVENTS * 2);
 
+
+
+
+		for (int id_candidate = id_self + 1; id_candidate < simulation->n_solvents; id_candidate++) {
+			NeighborList* nlist_candidate = &nlist_data_collection->solvent_neighborlists[id_candidate];
+
+
+
+
+			if (neighborWithinCutoff(&nlist_data_collection->solvent_positions[id_self], &nlist_data_collection->solvent_positions[id_candidate])) {
+				if (hashtable_solventneighbors.insert(id_candidate)) {
+					nlist_self->addId(id_candidate, NeighborList::NEIGHBOR_TYPE::SOLVENT);
+					nlist_candidate->addId(id_self, NeighborList::NEIGHBOR_TYPE::SOLVENT);
+					if (id_self == 193) {
+						//printf("Adding id %d with dist %f\n", id_candidate, (nlist_data_collection->solvent_positions[id_self] - nlist_data_collection->solvent_positions[id_candidate]).len());
+					}
+				}
+			}
+			
+		}
+
+		/*
 		for (int i = 0; i < nlist_self->n_compound_neighbors; i++) {											// Use neighbor compounds to find new solvents
 			int id_neighbor = nlist_self->neighborcompound_ids[i];
 			NeighborList* nlist_neighbor = &nlist_data_collection->compound_neighborlists[id_neighbor];
@@ -231,20 +256,34 @@ void Engine::updateNeighborLists(Simulation* simulation, NListDataCollection* nl
 				int id_candidate = nlist_neighbor->neighborsolvent_ids[j];
 				NeighborList* nlist_candidate = &nlist_data_collection->solvent_neighborlists[id_candidate];
 
+
+				if (id_self == 193 && id_candidate == 244) {
+					Float3 t = nlist_data_collection->solvent_positions[id_candidate];
+					Float3 s = nlist_data_collection->solvent_positions[id_self];
+					LIMAENG::applyHyperpos(&s, &t);
+					printf("Dist to 244: %f\n", (t - s).len());
+				}
+
 				if (id_candidate > id_self) {
 					if (neighborWithinCutoff(&nlist_data_collection->solvent_positions[id_self], &nlist_data_collection->solvent_positions[id_candidate])) {
 						if (hashtable_solventneighbors.insert(id_candidate)) {
 							nlist_self->addId(id_candidate, NeighborList::NEIGHBOR_TYPE::SOLVENT);
 							nlist_candidate->addId(id_self, NeighborList::NEIGHBOR_TYPE::SOLVENT);
+							if (id_self == 193) {
+								//printf("Adding id %d with dist %f\n", id_candidate, (nlist_data_collection->solvent_positions[id_self] - nlist_data_collection->solvent_positions[id_candidate]).len());
+							}
 						}
 					}
 				}				
 			}
 		}
+		*/
 	}
 
-	Int3 after(nlist_data_collection->compound_neighborlists[0].n_compound_neighbors, nlist_data_collection->compound_neighborlists[0].n_solvent_neighbors, 0);
-	printf("\nCompound 0 went from %d %d neighbors to %d %d\n", before.x, before.y, after.x, after.y);
+	//Int3 after(nlist_data_collection->compound_neighborlists[0].n_compound_neighbors, nlist_data_collection->compound_neighborlists[0].n_solvent_neighbors, 0);
+	Int3 after(nlist_data_collection->solvent_neighborlists[193].n_compound_neighbors, nlist_data_collection->solvent_neighborlists[193].n_solvent_neighbors, 0);
+
+	printf("\nEntity went from %d %d neighbors to %d %d\n", before.x, before.y, after.x, after.y);
 
 	auto t1 = std::chrono::high_resolution_clock::now();
 	*timing = (int) std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
@@ -313,7 +352,7 @@ void Engine::applyThermostat() {
 	const float max_temp = 300.f;				// [k]
 	float temp = getBoxTemperature();
 	//printf("\n %d Temperature: %f\n", (simulation->getStep()-1) / STEPS_PER_THERMOSTAT, temp);
-	if (temp > 50) {
+	if (temp > 10) {
 		simulation->box->thermostat_scalar = max_temp / temp;
 		//printf("Scalar: %f\n", simulation->box->thermostat_scalar);
 	}
@@ -342,9 +381,11 @@ void Engine::step() {
 	simulation->box->compound_state_array = simulation->box->compound_state_array_next;
 	simulation->box->compound_state_array_next = temp;
 	
+	
 	Solvent* temp_s = simulation->box->solvents;
 	simulation->box->solvents = simulation->box->solvents_next;
 	simulation->box->solvents_next = temp_s;
+	
 
 	//cudaMemcpy(simulation->box->compound_state_array, simulation->box->compound_state_array_next, sizeof(CompoundState) * MAX_COMPOUNDS, cudaMemcpyDeviceToDevice);	// Update all positions, after all forces have been calculated
 	
@@ -369,18 +410,6 @@ void Engine::step() {
 
 
 // ------------------------------------------------------------------------------------------- DEVICE FUNCTIONS -------------------------------------------------------------------------------------------//
-
-__device__ double cudaMax(double a, double b) {
-	if (a > b)
-		return a;
-	return b;
-}
-__device__ double cudaMin(double a, double b) {
-	if (a < b)
-		return a;
-	return b;
-}
-
 
 
 /*
@@ -424,16 +453,24 @@ __device__ Float3 calcLJForce(Float3* pos0, Float3* pos1, double* data_ptr, doub
 
 	*potE += LJ_pot * 0.5;												// Log this value for energy monitoring purposes
 
+	if (threadIdx.x == 59 && blockIdx.x == 0) {
+		//printf("Thread %d Block %d self %f %f %f other %f %f %f\n", threadIdx.x, blockIdx.x, pos0->x, pos0->y, pos0->z, pos1->x, pos1->y, pos1->z);
+	}
+
 	{	
-		data_ptr[1] += force;
-		data_ptr[2] = cudaMin(data_ptr[2], dist);
+		//data_ptr[1] += force;
+		//data_ptr[2] = cudaMin(data_ptr[2], dist);
+		//data_ptr[2] = min(data_ptr[2], dist);
 		Float3 force_vec = force_unit_vector * force;
 		if (force_vec.x != force_vec.x) {
-			printf("Force: %f\n", force);
-			force_unit_vector.print('u');
+			//printf("Force: %f\n", force);
+			//force_unit_vector.print('u');
+			printf("Thread %d Block %d self %f %f %f other %f %f %f\n", threadIdx.x, blockIdx.x, pos0->x, pos0->y, pos0->z, pos1->x, pos1->y, pos1->z);
+			
 		}
-		if (dist < 0.1f || abs(force) > 200e+6) {
+		if (dist < 0.1f) {
 			printf("\nThread %d Block %d step %d dist %f force %f\n", threadIdx.x, blockIdx.x, (int)data_ptr[3], (*pos0 - *pos1).len(), force);
+			printf("Self %f %f %f -> %f %f %f\n", data_ptr[0], data_ptr[1], data_ptr[2], pos0->x, pos0->y, pos0->z);
 		}
 	}
 
@@ -509,11 +546,15 @@ __device__ Float3 computeSolventToSolventLJForces(Float3* self_pos, int self_ind
 }
 
 __device__ Float3 computeSolventToSolventLJForces(Float3* self_pos, NeighborList* nlist, Solvent* solvents, double* data_ptr, double* potE_sum) {	// Specific to solvent kernel
-	Float3 force(0, 0, 0);
+	Float3 force(0.f);
 	for (int i = 0; i < nlist->n_solvent_neighbors; i++) {
-		Solvent neighbor = solvents[nlist->neighborsolvent_ids[i]];
+		Solvent neighbor = solvents[nlist->neighborsolvent_ids[i]];			
 		LIMAENG::applyHyperpos(&neighbor.pos, self_pos);
 		force += calcLJForce(self_pos, &neighbor.pos, data_ptr, potE_sum);
+		/*if (abs(force.len()) > 1000000) {
+			(*self_pos - neighbor.pos).print('d');
+			printf("F %f %f %f n %d  solvent_id %d neighbor_id %d\n", force.x, force.y, force.z, nlist->n_solvent_neighbors, threadIdx.x + blockIdx.x*blockDim.x, nlist->neighborsolvent_ids[i]);
+		}*/
 	}
 	return force;
 }
@@ -620,7 +661,7 @@ __global__ void forceKernel(Box* box) {
 	__shared__ Compound compound;
 	__shared__ CompoundState compound_state;
 	__shared__ NeighborList neighborlist;
-	__shared__ Float3 utility_buffer[NEIGHBORLIST_MAX_SOLVENTS];							// waaaaay to biggg
+	__shared__ Float3 utility_buffer[NEIGHBORLIST_MAX_SOLVENTS];							// waaaaay too biggg
 	
 
 
@@ -801,14 +842,14 @@ __global__ void solventForceKernel(Box* box) {
 	//__shared__ Float3 solvent_positions[THREADS_PER_SOLVENTBLOCK];
 	__shared__ Float3 utility_buffer[MAX_COMPOUND_PARTICLES];
 
-
-
 	double potE_sum = 0;
 	double data_ptr[4];	// Pot, force, closest particle, ?
 	for (int i = 0; i < 4; i++)
 		data_ptr[i] = 0;
 	data_ptr[2] = 9999.f;
 	Float3 force(0,0,0);
+
+
 
 
 	Solvent solvent;
@@ -818,6 +859,9 @@ __global__ void solventForceKernel(Box* box) {
 		solvent_pos = solvent.pos;									// Use this when applying hyperpos, NOT SOLVENT.POS as others acess this concurrently on other kernels!
 	}
 	
+	data_ptr[0] = solvent.pos_tsub1.x;
+	data_ptr[1] = solvent.pos_tsub1.y;
+	data_ptr[2] = solvent.pos_tsub1.z;
 
 
 	
@@ -836,10 +880,10 @@ __global__ void solventForceKernel(Box* box) {
 		//force += computeLJForces(&solvent_positions[threadIdx.x], n_particles, utility_buffer, data_ptr, &potE_sum);
 
 		if (thread_active) {
-			LIMAENG::applyHyperpos(&solvent_pos, &utility_buffer[0]);									// Move own particle in relation to compound-key-position
+			LIMAENG::applyHyperpos(&utility_buffer[0], &solvent_pos);									// Move own particle in relation to compound-key-position
 			force += computeLJForces(&solvent_pos, n_compound_particles, utility_buffer, data_ptr, &potE_sum);
 		}
-		
+		__syncthreads();
 
 		// BEFORE:
 		//force += computeCompoundToSolventLJForces(&solvent.pos, box->compounds[0].n_particles, utility_buffer, data_ptr, &potE_sum);	// wrong, i think?
@@ -847,26 +891,22 @@ __global__ void solventForceKernel(Box* box) {
 
 	}
 	// ----------------------------------------------------------------------------------------------------------------------------------------------------- //
-	
+
 	if (thread_active) {
 		//force += computeSolventToSolventLJForces(&solvent.pos, threadIdx.x, box->n_solvents, solvent_positions, data_ptr, &potE_sum);
 		force += computeSolventToSolventLJForces(&solvent_pos, &box->solvent_neighborlists[solvent_index], box->solvents, data_ptr, &potE_sum);
 	}
-	
+
+
 
 
 
 	if (thread_active) {
 		int p_index = MAX_COMPOUND_PARTICLES + solvent_index;
 		integratePosition(&solvent.pos, &solvent.pos_tsub1, &force, SOLVENT_MASS, box->dt, &box->thermostat_scalar, p_index);
-	}
-
-	if (thread_active) {
 		applyPBC(&solvent.pos);	// forcePositionToInsideBox	// This break the integration, as that doesn't accound for PBC in the vel conservation
+
 	}
-
-
-
 
 
 	// ------------------------------------ DATA LOG ------------------------------- //
@@ -884,8 +924,12 @@ __global__ void solventForceKernel(Box* box) {
 
 
 	if (thread_active) {
-		box->solvents_next[threadIdx.x] = solvent;
+		box->solvents_next[solvent_index] = solvent;
 	}
+
+
+#undef solvent_index
+#undef thread_active
 }
 
 

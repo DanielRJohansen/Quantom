@@ -25,12 +25,6 @@ void BoxBuilder::buildBox(Simulation* simulation) {
 
 
 
-	if (N_SOLVATE_MOLECULES > 256) {			// Oh fuck, i forgot
-		printf("Critical indexing failure\n");
-		exit(1);
-	}
-
-
 	Molecule water;
 	for (int i = 0; i < water.n_atoms; i++) {
 		simulation->box->rendermolecule.radii[i] = water.atoms[i].radius;
@@ -78,7 +72,7 @@ void BoxBuilder::finishBox(Simulation* simulation)
 
 
 	cudaMemcpy(simulation->box->compound_state_array_next, simulation->box->compound_state_array, sizeof(CompoundState) * MAX_COMPOUNDS, cudaMemcpyHostToDevice);	// Just make sure they have the same n_particles info...
-
+	cudaMemcpy(simulation->box->solvents_next, simulation->box->solvents, sizeof(Solvent) * MAX_SOLVENTS, cudaMemcpyHostToDevice);
 
 
 
@@ -250,10 +244,10 @@ void BoxBuilder::solvateLinker(Simulation* simulation)
 {
 	for (int i = 0; i < simulation->box->n_solvents; i++) {
 		Solvent* self = &simulation->box->solvents[i];
-		for (int j = i; j < simulation->box->n_solvents; j++) {
+		for (int j = i; j < simulation->box->n_solvents; j++) {														// +1 here!
 			Solvent* other = &simulation->box->solvents[j];
 			if (i != j) {
-				if ((self->pos - other->pos).len() < (CUTOFF*1.5)) {
+				if ((self->pos - other->pos).len() < (CUTOFF)) {
 					simulation->box->solvent_neighborlists[i].addId(j, NeighborList::NEIGHBOR_TYPE::SOLVENT);
 					simulation->box->solvent_neighborlists[j].addId(i, NeighborList::NEIGHBOR_TYPE::SOLVENT);
 				}

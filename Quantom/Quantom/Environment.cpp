@@ -46,7 +46,7 @@ Environment::Environment() {
 
 bool Environment::verifySimulationParameters() {	// Not yet implemented
 	assert(THREADS_PER_COMPOUNDBLOCK >= MAX_COMPOUND_PARTICLES);
-	assert(THREADS_PER_SOLVENTBLOCK >= N_SOLVATE_MOLECULES);
+	//assert(THREADS_PER_SOLVENTBLOCK >= N_SOLVATE_MOLECULES);
 	assert(BOX_LEN > 3.f);
 	//assert(BOX_LEN >= CUTOFF + 0.5f);
 	assert(simulation->n_compounds <= 1);	// Otherwise data_GAN goes haywire

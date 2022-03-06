@@ -89,10 +89,11 @@ void __global__ monitorCompoundEnergyKernel(Box* box, Float3* traj_buffer, doubl
 
 
 void __global__ monitorSolventEnergyKernel(Box* box, Float3* traj_buffer, double* potE_buffer, Float3* data_out) {
-	__shared__ Float3 energy[256];
+	__shared__ Float3 energy[THREADS_PER_SOLVENTBLOCK];
 
-	//int solvent_index = threadIdx.x + blockIdx.y * THREADS_PER_MONITORBLOCK;
-	int solvent_index = threadIdx.x;
+
+
+	int solvent_index = threadIdx.x + blockIdx.y * THREADS_PER_SOLVENTBLOCK;
 	int step = blockIdx.x + 1;
 	int compounds_offset = box->n_compounds * MAX_COMPOUND_PARTICLES;
 
@@ -121,18 +122,13 @@ void __global__ monitorSolventEnergyKernel(Box* box, Float3* traj_buffer, double
 	double totalE = potE + kinE;
 
 	energy[threadIdx.x] = Float3(potE, kinE, totalE);
+
 	__syncthreads();
 
-
-		
-
-	distributedSummation(energy, 256);
+	distributedSummation(energy, THREADS_PER_SOLVENTBLOCK);
 	if (threadIdx.x == 0) {
-		//energy[0].print('b');
-		data_out[step-1] = energy[0];
-		//data_out[blockIdx.y + (step - 1) * 256] = Float3(1,2,3);
-		//data_out[blockIdx.y + step * 256].print('g');
-	}	
+		data_out[(step-1) * gridDim.y + blockIdx.y] = energy[0];
+	}
 }
 
 
@@ -174,31 +170,30 @@ Analyzer::AnalyzedPackage Analyzer::analyzeEnergy(Simulation* simulation) {	// C
 }
 
 Float3* Analyzer::analyzeSolvateEnergy(Simulation* simulation, int n_steps) {
-	dim3 block_dim(n_steps, 1, 1);
+	dim3 block_dim(n_steps, BLOCKS_PER_SOLVENTKERNEL, 1);
 	Float3* average_solvent_energy = new Float3[n_steps];
-	//Float3* host_data = new Float3[1 * n_steps];
+	Float3* average_solvent_energy_blocked = new Float3[n_steps * BLOCKS_PER_SOLVENTKERNEL];
 	Float3* data_out;
-	cudaMalloc(&data_out, sizeof(Float3) * 1 * n_steps);
+	cudaMalloc(&data_out, sizeof(Float3) * BLOCKS_PER_SOLVENTKERNEL * n_steps);
 
 
-	//monitorSolventEnergyKernel <<< block_dim, simulation->n_solvents >>> (simulation->box, traj_buffer_device, potE_buffer_device, data_out);
-	monitorSolventEnergyKernel << < block_dim, 256 >> > (simulation->box, traj_buffer_device, potE_buffer_device, data_out);
+	//printf("Fix this to do analyzing >256\n");
+	//exit(1);
+	monitorSolventEnergyKernel << < block_dim, THREADS_PER_SOLVENTBLOCK >> > (simulation->box, traj_buffer_device, potE_buffer_device, data_out);
 	cudaDeviceSynchronize();
-	//cudaMemcpy(host_data, device_data, sizeof(Float3) * 1 * (n_steps), cudaMemcpyDeviceToHost);
-	cudaMemcpy(average_solvent_energy, data_out, sizeof(Float3) * 1 * (n_steps), cudaMemcpyDeviceToHost);
+	cudaMemcpy(average_solvent_energy_blocked, data_out, sizeof(Float3) * BLOCKS_PER_SOLVENTKERNEL * (n_steps), cudaMemcpyDeviceToHost);
 
 	for (int step = 0; step < n_steps; step++) {
-		/*for (int i = 0; i < 256; i++) {
-			if (host_data[i + step * 256].x > 10000)
-				printf("Block: %d energy: %f\n", i, host_data[i + step * 256].x);
-			average_solvent_energy[step] += host_data[i + step * 256];
-		}*/
+		average_solvent_energy[step] = Float3(0.f);
+		for (int block = 0; block < BLOCKS_PER_SOLVENTKERNEL; block++) {
+			average_solvent_energy[step] += average_solvent_energy_blocked[block + step * BLOCKS_PER_SOLVENTKERNEL];
+		}
 		average_solvent_energy[step] *= (1.f / simulation->n_solvents);
 	}
 
 
 	cudaFree(data_out);
-	//delete[] host_data;
+	delete[] average_solvent_energy_blocked;
 	LIMAENG::genericErrorCheck("Cuda error during analyzeSolvateEnergy\n");
 
 	return average_solvent_energy;
