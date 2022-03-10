@@ -44,6 +44,8 @@ const int LOG_P_ID = 17;
 const int MAX_COMPOUNDS = 0xFF;
 const int MAX_SOLVENTS = 0xFFFF;
 constexpr float CUTOFF = 0.8f;	//nm/
+const int MAX_ATOM_TYPES = 16;
+
 
 
 
@@ -56,7 +58,7 @@ const int THREADS_PER_COMPOUNDBLOCK = 128; // Must be >= max comp particles
 const int N_LIPID_COPIES = 32;
 
 
-const int SIMULATION_STEPS = 200000;
+const int SIMULATION_STEPS = 2000;
 
 //constexpr double SOLVENT_MASS = 18.01528f * 1e-3;	// kg/mol
 constexpr double SOLVENT_MASS = 12.0107 * 1e-3;	// kg/mol

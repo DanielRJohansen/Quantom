@@ -6,6 +6,8 @@
 #include <fstream>
 #include <vector>
 
+#include "Forcefield.cuh"
+
 
 using namespace std;
 
@@ -36,9 +38,10 @@ public:
 
 
 private:
+	ForceFieldMaker FFM;
+
+
 	struct Record_ATOM;
-
-
 	void loadParticles(Compound* compound, vector<Record_ATOM>* pdb_data, int max_monomer_id = INT32_MAX, bool ignore_protons =false);
 	void loadTopology(Compound* compound, vector<vector<string>>* itp_data, int* particle_id_map);
 	void calcParticleSphere(Compound* compound);

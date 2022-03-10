@@ -5,7 +5,7 @@
 #include <thread>
 
 #include "Simulation.cuh"
-
+#include "Forcefield.cuh"
 
 
 	
@@ -39,6 +39,7 @@ public:
 		cudaDeviceSynchronize();
 		cudaError_t cuda_status = cudaGetLastError();
 		if (cuda_status != cudaSuccess) {
+			cout << cuda_status;
 			fprintf(stderr, text);
 			exit(1);
 		}
@@ -125,7 +126,7 @@ public:
 	}
 private:
 	Simulation* simulation;
-
+	ForceFieldMaker FFM;
 
 	// -------------------------------------- GPU LOAD -------------------------------------- //
 	void step();

@@ -3,10 +3,14 @@
 //using namespace LIMAENG;
 
 
+//__constant__ ForceField forcefield_device;
+__constant__ float numbers[10];
+__constant__ float number;
+//__constant__ ParticleParameters forcefield_device;
+//__constant__ float arr[109];
+//__constant__ float a[12];
 
-
-
-
+//__constant__ 
 
 
 Engine::Engine() {}
@@ -24,6 +28,17 @@ Engine::Engine(Simulation* simulation) {
 	int kernel_shared_mem = sizeof(Compound) + sizeof(CompoundState) + sizeof(NeighborList) + sizeof(Float3) * NEIGHBORLIST_MAX_SOLVENTS;
 	printf("Forcekernel shared mem. size: %d B\n", kernel_shared_mem);
 
+	ForceField forcefield_host = FFM.getForcefield();
+	//cudaMemcpyToSymbol(&forcefield_device, &forcefield_host, sizeof(ForceField), 0, cudaMemcpyHostToDevice);
+	float ass[10];
+	for (int i = 0; i < 10; i++)
+		ass[i] = i;
+	//cudaMemcpyToSymbol(&numbers, &ass, sizeof(float) * 10, 0, cudaMemcpyHostToDevice);
+	const float f = 3;
+	//cudaMemcpyToSymbol(&numbers, &ass, sizeof(float), 0, cudaMemcpyHostToDevice);
+	cudaMemcpyToSymbol(&number, &f, sizeof(float), 0, cudaMemcpyHostToDevice);
+	printf("Forcefield size: %d bytes\n", sizeof(ForceField));
+	LIMAENG::genericErrorCheck("Error while moving forcefield to device\n");
 
 	printf("Engine ready\n");
 }

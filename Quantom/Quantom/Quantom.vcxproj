@@ -103,6 +103,7 @@
     <ClInclude Include="DisplayV2.h" />
     <ClInclude Include="Engine.cuh" />
     <ClInclude Include="Environment.h" />
+    <ClInclude Include="Forcefield.cuh" />
     <ClInclude Include="Interface.h" />
     <ClInclude Include="QuantomTypes.cuh" />
     <ClInclude Include="Rasterizer.cuh" />

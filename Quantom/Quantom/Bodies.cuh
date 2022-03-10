@@ -112,6 +112,9 @@ struct CompactParticle {	// Contains information only needed by the Ownerkernel
 
 
 
+
+
+
 struct Solvent {
 	__host__ __device__ Solvent() {}
 	__host__ Solvent(Float3 pos, Float3 pos_tsub1) : pos(pos), pos_tsub1(pos_tsub1) {}
@@ -342,6 +345,7 @@ struct Compound {
 
 	uint8_t n_particles = 0;					// MAX 256 particles!!!!0
 	CompactParticle particles[MAX_COMPOUND_PARTICLES];
+	uint8_t atom_types[MAX_COMPOUND_PARTICLES];
 
 	Float3 center_of_mass = Float3(0, 0, 0);
 	double radius = 0;

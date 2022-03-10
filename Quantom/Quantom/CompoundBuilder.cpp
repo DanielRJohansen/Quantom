@@ -85,6 +85,7 @@ void CompoundBuilder::loadParticles(Compound* compound, vector<CompoundBuilder::
 			//particle_id_map[particle_id] = compound->n_particles;
 			float mass = massFromAtom(record.atom_name[0]) / 1000.f;							// kg/mol;
 
+			compound->atom_types[compound->n_particles] = FFM.atomTypeToIndex(record.atom_name[0]);
 			compound->particles[compound->n_particles] = CompactParticle(mass, record.coordinate);
 			compound->n_particles++;
 	}
@@ -259,16 +260,7 @@ vector<CompoundBuilder::Record_ATOM> CompoundBuilder::parsePDB(string path)
 		if (row_type != "ATOM")
 			continue;
 
-
-
-
 		vector<string> data_buffer;
-		//cout << line << endl;
-
-
-
-
-
 
 
 		int ptr = 0;
@@ -367,3 +359,4 @@ bool CompoundBuilder::isAsciiNumber(char c)
 {
 	return (c > 47 && c < 58);
 }
+
