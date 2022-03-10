@@ -34,9 +34,6 @@ Environment::Environment() {
 	engine = new Engine(simulation);
 
 
-
-	//display = new Display(simulation);
-	//interface = new Interface(display->window);
 	if (cudaGetLastError() != cudaSuccess) {
 		fprintf(stderr, "Error during Display Initiation\n");
 		exit(1);

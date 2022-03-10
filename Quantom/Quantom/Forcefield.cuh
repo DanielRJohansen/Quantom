@@ -1,89 +1,90 @@
 #pragma once
 
-#include "Bodies.cuh"
-#include "Simulation.cuh"
+//#include "Bodies.cuh"
+//#include "Simulation.cuh"
+
+const int MAX_ATOM_TYPES = 16;
 
 
+#define ATOMTYPE_SOL 0
+#define ATOMTYPE_C 1
+#define ATOMTYPE_O 2
+#define ATOMTYPE_N 3
+#define ATOMTYPE_H 4
 
-#define ATOMTYPE_C 0
-#define ATOMTYPE_O 1
-#define ATOMTYPE_N 2
-#define ATOMTYPE_H 3
 
 
 struct ParticleParameters {
-	const float mass = -1;
+	//ParticleParameters() {}
+	//ParticleParameters(char atom, float m, float s, float e) : mass(m), sigma(s), epsilon(e) {}
+
+	float mass = -1;
 
 	//Nonbonded
-	const float sigma = -1;
-	const 	float epsilon = -1;
+	float sigma = -1;
+	float epsilon = -1;
 
 	// Bonded
-	const float b0 = -1;		// ref_dist
-	const float kb = -1;
+	float b0 = -1;		// ref_dist
+	float kb = -1;
 
 	// Angles
-	const float theta_0 = -1;
-	const float ktheta = -1;
+	float theta_0 = -1;
+	float ktheta = -1;
 	//const float ub_0;		// ???
 	//const float kub;		// ???
 
 	// Dihedrals
-	const float phi_0 = -1;		// Ref torsion. Is always 0 or 180, could be a binary
-	const float k_phi = -1;		// 
+	float phi_0 = -1;		// Ref torsion. Is always 0 or 180, could be a binary
+	float k_phi = -1;		// 
 };
-
-struct PPMaker {
-	PPMaker() {}
-	PPMaker(char atom, float m, float s, float e) : mass(m), sigma(s), epsilon(e) {}
-	PPMaker(char atom, float m, float s, float e, float b0, float kb, float t0, float kt, float p0, float kp) : mass(m), sigma(s), epsilon(e),
-		b0(b0), kb(kb), theta_0(t0), ktheta(kt), phi_0(p0), k_phi(kp) {}
-	//uint8_t id;
-	const float mass = -1;
-
-	//Nonbonded
-	const float sigma = -1;
-	const float epsilon = -1;
-
-	// Bonded
-	const float b0 = -1;		// ref_dist
-	const float kb = -1;
-
-	// Angles
-	const float theta_0 = -1;
-	const float ktheta = -1;
-	//const float ub_0;		// ???
-	//const float kub;		// ???
-
-	// Dihedrals
-	const float phi_0 = -1;		// Ref torsion. Is always 0 or 180, could be a binary
-	const float k_phi = -1;		// 
-};
-
-
 
 
 struct ForceField {
-	const ParticleParameters particle_parameters[MAX_ATOM_TYPES];
+	ParticleParameters particle_parameters[MAX_ATOM_TYPES];
 };
+
+
+
+
+// Doens't work :/
+//extern const __constant__ ForceField forcefield_device;	// Make available in both Engine, Rasterizer (temp) and Analyzer
+
+
+
+
+
+
+
+
 
 class ForceFieldMaker {
 public:
 	ForceFieldMaker() {
-		make('C' , 0, 12.011f, 0.356359487256f, 0.46024f);
+		make('W', 0, 15.999000 + 2 * 1.008000, 0.302905564168 + 2 * 0.040001352445, 0.50208f + 2 * 0.19246);
+		make('C', 1, 12.011f, 0.356359487256f, 0.46024f);
+		make('O', 2, 15.999000, 0.302905564168f, 0.50208f);
+		make('N', 3, 14.007000, 0.329632525712, 0.83680);
+		make('H', 4, 1.008000, 0.040001352445, 0.19246);
 		/*forcefield.particle_parameters[0] = ParticleParameters('C', 12.011f, 0.356359487256f, 0.46024f);
 		forcefield.particle_parameters[1] = ParticleParameters('O', 12.011f, 0.356359487256f, 0.46024f);
 		forcefield.particle_parameters[2] = ParticleParameters('N', 12.011f, 0.356359487256f, 0.46024f);
 		forcefield.particle_parameters[3] = ParticleParameters('H', 12.011f, 0.356359487256f, 0.46024f);
 		*/
+		for (int i = 0; i < MAX_ATOM_TYPES; i++) {
+			forcefield.particle_parameters[i].mass /= 1000.f;		// Convert g/mo to kg/mol
+			forcefield.particle_parameters[i].epsilon *= 1000.f;		// convert kJ/mo to J/mol
+		}
+			
+		printf("Forcefield size: %d bytes\n", sizeof(ForceField));
 	}
 
-	void make(char atom, int index, float mass, float s, float e) {
-		//forcefield.particle_parameters[index].mass = mass;
-		//forcefield.particle_parameters[index].sigma = s;
-		//forcefield.particle_parameters[index].epsilon = e;
-
+	void make(char atom, int index, float m, float s, float e) {
+		forcefield.particle_parameters[index].mass = m;
+		forcefield.particle_parameters[index].sigma = s;
+		forcefield.particle_parameters[index].epsilon = e;
 	}
+
 
 	ForceField getForcefield() {
 		return forcefield;

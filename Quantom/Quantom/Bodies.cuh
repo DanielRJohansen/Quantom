@@ -100,13 +100,12 @@ constexpr unsigned char UNUSED_BODY = 255;
 struct CompactParticle {	// Contains information only needed by the Ownerkernel
 	CompactParticle() {}	
 	//CompactParticle(double mass, Float3 pos_sub1) : mass(mass), pos_tsub1(pos_sub1)  {}	// This breaks on linux??
-	CompactParticle(double mass, Float3 pos_sub1) {
-		this->mass = mass;
+	CompactParticle(Float3 pos_sub1) {
 		this->pos_tsub1 = pos_sub1;
 	}	
 	//Float3 force_prev;				// For velocity verlet stormer integration
 	Float3 pos_tsub1;				// Must be initiated!
-	double mass;								// g/mol
+	//double mass;								// kg/mol
 };
 
 
@@ -326,6 +325,7 @@ struct Compound {
 	__device__ void loadData(Compound* compound) {
 		if (threadIdx.x < n_particles) {
 			particles[threadIdx.x] = compound->particles[threadIdx.x];
+			atom_types[threadIdx.x] = compound->atom_types[threadIdx.x];
 		}
 		for (int i = 0; (i * blockDim.x) < n_pairbonds; i++) {
 			int index = i * blockDim.x + threadIdx.x;

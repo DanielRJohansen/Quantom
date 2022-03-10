@@ -86,7 +86,7 @@ void CompoundBuilder::loadParticles(Compound* compound, vector<CompoundBuilder::
 			float mass = massFromAtom(record.atom_name[0]) / 1000.f;							// kg/mol;
 
 			compound->atom_types[compound->n_particles] = FFM.atomTypeToIndex(record.atom_name[0]);
-			compound->particles[compound->n_particles] = CompactParticle(mass, record.coordinate);
+			compound->particles[compound->n_particles] = CompactParticle(record.coordinate);
 			compound->n_particles++;
 	}
 }

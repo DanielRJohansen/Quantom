@@ -3,7 +3,7 @@
 #include "QuantomTypes.cuh"
 #include "cuda_runtime.h"
 #include "Simulation.cuh"
-
+//#include "Forcefield.cuh"
 
 const int RAS_THREADS_PER_BLOCK = 64;
 

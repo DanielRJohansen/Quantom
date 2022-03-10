@@ -21,7 +21,7 @@ const int STEPS_PER_TRAINDATATRANSFER = 40;
 const int STEPS_PER_RENDER = 50;
 
 
-const bool APPLY_THERMOSTAT = true;
+const bool APPLY_THERMOSTAT = false;
 
 #ifndef __linux__
 const string MOL_FOLDER = "C:\\PROJECTS\\Quantom\\t4lys\\";
@@ -31,7 +31,7 @@ const string MOL_FOLDER = "../Compounds/t4lys/";
 const string OUT_DIR = "/home/lima/Desktop/LIMA";
 #endif
 
-const int N_SOLVATE_MOLECULES = 800;	// Must not be above 255, as that can't be represented as uint8_t5
+const int N_SOLVATE_MOLECULES = 300;	// Must not be above 255, as that can't be represented as uint8_t5
 
 
 
@@ -44,7 +44,7 @@ const int LOG_P_ID = 17;
 const int MAX_COMPOUNDS = 0xFF;
 const int MAX_SOLVENTS = 0xFFFF;
 constexpr float CUTOFF = 0.8f;	//nm/
-const int MAX_ATOM_TYPES = 16;
+//const int MAX_ATOM_TYPES = 16;
 
 
 
@@ -58,7 +58,7 @@ const int THREADS_PER_COMPOUNDBLOCK = 128; // Must be >= max comp particles
 const int N_LIPID_COPIES = 32;
 
 
-const int SIMULATION_STEPS = 2000;
+const int SIMULATION_STEPS = 20000;
 
 //constexpr double SOLVENT_MASS = 18.01528f * 1e-3;	// kg/mol
 constexpr double SOLVENT_MASS = 12.0107 * 1e-3;	// kg/mol

@@ -85,7 +85,23 @@ RenderBall* Rasterizer::processAtoms(RenderAtom* atoms) {
 
 
 
-
+__device__ ATOM_TYPE RAS_getTypeFromIndex(int atom_index) {
+    switch (atom_index)
+    {
+    case 0:
+        return ATOM_TYPE::SOL;
+    case 1:
+        return ATOM_TYPE::C;
+    case 2:
+        return ATOM_TYPE::O;
+    case 3:
+        return ATOM_TYPE::N;
+    case 4:
+        return ATOM_TYPE::H;
+    default:
+        return ATOM_TYPE::NONE;
+    }
+}
 
 __device__ ATOM_TYPE RAS_getTypeFromMass(double mass) {
     mass *= 1000.f;   //convert to g
@@ -101,6 +117,8 @@ __device__ ATOM_TYPE RAS_getTypeFromMass(double mass) {
         return ATOM_TYPE::P;
     return ATOM_TYPE::NONE;
 }
+
+
 
 __device__ Int3 getColor(ATOM_TYPE atom_type) {
     switch (atom_type)
@@ -155,9 +173,12 @@ __device__ float getRadius(ATOM_TYPE atom_type) {
 
 
 
-__global__ void loadCompoundatomsKernel(Box * box, RenderAtom * atoms) {
+__global__ void loadCompoundatomsKernel(Box * box, RenderAtom * atoms) {                                                            // TODO: CAN ONLY HANDLE ONE COMPOUND!!!
     atoms[threadIdx.x].pos = box->compound_state_array[0].positions[threadIdx.x];
-    atoms[threadIdx.x].mass = box->compounds[0].particles[threadIdx.x].mass;
+    //atoms[threadIdx.x].mass = box->compounds[0].particles[threadIdx.x].mass;
+    atoms[threadIdx.x].mass = SOLVENT_MASS;                                                         // TEMP
+    //atoms[threadIdx.x].mass = forcefield_device.particle_parameters[box->compounds[0].atom_types[threadIdx.x]].mass;
+    atoms[threadIdx.x].atom_type = RAS_getTypeFromIndex(box->compounds[0].atom_types[threadIdx.x]);
 }
 
 __global__ void loadSolventatomsKernel(Box * box, RenderAtom * atoms, int offset) {
@@ -174,6 +195,7 @@ __global__ void processAtomsKernel(RenderAtom* atoms, RenderBall* balls, int n_a
 
     RenderAtom atom = atoms[index];
 
+    //atom.atom_type = atom.atom_type == NONE ? RAS_getTypeFromMass(atom.mass) : atom.atom_type;
     atom.atom_type = atom.atom_type == NONE ? RAS_getTypeFromMass(atom.mass) : atom.atom_type;
 
     atom.color = getColor(atom.atom_type);

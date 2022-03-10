@@ -57,7 +57,9 @@ void __global__ monitorCompoundEnergyKernel(Box* box, Float3* traj_buffer, doubl
 	Float3 pos_tadd1 = traj_buffer[threadIdx.x + compound_index * MAX_COMPOUND_PARTICLES + (step + 1) * box->total_particles_upperbound];
 	//LIMAENG::applyHyperpos(&pos_tadd1, &pos_tsub1);
 	//testspace::testerfn(4);
-	double kinE = calcKineticEnergy(&pos_tadd1, &pos_tsub1, compound.particles[threadIdx.x].mass, box->dt);
+	//double kinE = calcKineticEnergy(&pos_tadd1, &pos_tsub1, compound.particles[threadIdx.x].mass, box->dt);
+	double kinE = calcKineticEnergy(&pos_tadd1, &pos_tsub1, SOLVENT_MASS, box->dt);
+	//double kinE = calcKineticEnergy(&pos_tadd1, &pos_tsub1, forcefield_device, box->dt);
 	/*
 	applyHyperposA(&pos_tadd1, &pos_tsub1);
 	double vel = (pos_tadd1 - pos_tsub1).len() * 0.5f / box->dt;
