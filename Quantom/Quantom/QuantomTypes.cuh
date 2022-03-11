@@ -312,10 +312,12 @@ struct Trajectory {
 
 class HashTable {
 public:
-	HashTable() {}
-	HashTable(uint16_t* keys, int n_keys, int ts) {
-		table_size = ts;
-		table = new int[ts]();
+	HashTable(uint16_t* keys, int n_keys, int ts) : table_size(ts) {
+		table = new int[table_size]();
+		for (int i = 0; i < table_size; i++) {
+			table[i] = -1;
+		}
+
 		for (int i = 0; i < n_keys; i++)
 			insert(keys[i]);
 	}
@@ -325,12 +327,12 @@ public:
 		if (table[hash] == key) {		// Key already exists in table
 			return false;
 		}
-		else if (table[hash] == 0) {	// Key doesn't exist in table
+		else if (table[hash] == -1) {	// Key doesn't exist in table
 			table[hash] = key;
 			return true;
 		} 
 		else {							// Hash already taken, recurse
-			return insert(key, offset << 1);
+			return insert(key, offset * 2);
 		}
 	}
 	~HashTable() {
@@ -339,7 +341,7 @@ public:
 private:
 
 	int getHash(uint16_t key) {
-		return floor(table_size*(fmod((double) key * k, 1.f)));
+		return (int) floor(table_size*(fmod((double) key * k, 1.f)));
 	}
 
 

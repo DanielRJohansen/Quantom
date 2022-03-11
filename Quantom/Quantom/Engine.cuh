@@ -60,7 +60,9 @@ struct NListDataCollection {
 		solvent_neighborlists = new NeighborList[MAX_SOLVENTS];
 		cudaMemcpy(compound_neighborlists, simulation->box->compound_neighborlists, sizeof(NeighborList) * n_compounds, cudaMemcpyDeviceToHost);
 		cudaMemcpy(solvent_neighborlists, simulation->box->solvent_neighborlists, sizeof(NeighborList) * n_solvents, cudaMemcpyDeviceToHost);
+
 	}
+	/*
 	void preparePositionData() {
 		for (int i = 0; i < n_compounds; i++) {
 			compound_key_positions[i] = compoundstates[i].positions[0];
@@ -68,7 +70,7 @@ struct NListDataCollection {
 		for (int i = 0; i < n_solvents; i++) {
 			solvent_positions[i] = solvents[i].pos;
 		}
-	}
+	}*/
 	void preparePositionData(Compound* compounds) {
 		for (int i = 0; i < n_compounds; i++) {
 			compound_key_positions[i] = compoundstates[i].positions[compounds[i].key_particle_index];
@@ -90,6 +92,8 @@ struct NListDataCollection {
 	// These are loaded before simulaiton start. Kept on host, and copied to device each update.
 	NeighborList* compound_neighborlists;
 	NeighborList* solvent_neighborlists;
+
+
 };
 
 
@@ -132,15 +136,16 @@ private:
 	void step();
 
 	// -------------------------------------- CPU LOAD -------------------------------------- //
+	void handleNLISTS(Simulation* simulation, bool async = true, bool force_update=false);
 	void offloadPositionDataNLIST(Simulation* simulation);	// all at once
-	void onloadNeighborlists();
+	void pushNlistsToDevice();
 	static void updateNeighborLists(Simulation* simulation, NListDataCollection* nlist_data_collection, 
 		volatile bool* finished, int* timing);	// thread worker, can't own engine object, thus pass ref
-	static bool neighborWithinCutoff(Float3* pos_a, Float3* pos_b);
+//	static bool neighborWithinCutoff(Float3* pos_a, Float3* pos_b);
 	static bool neighborWithinCutoff(Float3* pos_a, Float3* pos_b, float cutoff_offset);
 	/*static bool removeFromNeighborlists(NeighborList* nlist_self, NeighborList* nlist_neighbor,
 		NeighborList::NEIGHBOR_TYPE type_self, NeighborList::NEIGHBOR_TYPE type_other);*/
-	static void cullDistantNeighbors(NListDataCollection* nlist_data_collection);
+	static void cullDistantNeighbors(Simulation* simulation, NListDataCollection* nlist_data_collection);
 	NListDataCollection* nlist_data_collection;
 
 	// streams every n steps

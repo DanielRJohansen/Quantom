@@ -10,7 +10,7 @@ constexpr double BOX_LEN_HALF = BOX_LEN/2.f;
 
 
 
-const int STEPS_PER_NLIST_UPDATE = 50;
+const int STEPS_PER_NLIST_UPDATE = 100;
 const int STEPS_PER_LOGTRANSFER = 100;
 //const int STEPS_PER_TRAJTRANSFER = 100;
 const int STEPS_PER_THERMOSTAT = 100;
@@ -31,7 +31,7 @@ const string MOL_FOLDER = "../Compounds/t4lys/";
 const string OUT_DIR = "/home/lima/Desktop/LIMA";
 #endif
 
-const int N_SOLVATE_MOLECULES = 300;	// Must not be above 255, as that can't be represented as uint8_t5
+const int N_SOLVATE_MOLECULES = 800;	// Must not be above 255, as that can't be represented as uint8_t5
 
 
 

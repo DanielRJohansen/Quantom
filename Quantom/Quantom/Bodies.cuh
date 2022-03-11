@@ -182,18 +182,20 @@ public:
 				neighborcompound_ids[n_compound_neighbors++] = new_id;
 				return true;
 			}
-			printf("Too many compounds\n");
+			printf("\nFailed to insert compound neighbor id %d!\n", new_id);
 			break;
 		case NeighborList::SOLVENT:
 			if (n_solvent_neighbors < NEIGHBORLIST_MAX_SOLVENTS) {
 				neighborsolvent_ids[n_solvent_neighbors++] = new_id;
 				return true;
 			}
+			printf("\nFailed to insert solvent neighbor id %d!\n", new_id);
+			for (int i = 0; i < n_solvent_neighbors; i++)
+				printf("n: %d\n", neighborsolvent_ids[i]);
 			break;
 		default:
 			break;
 		}
-		printf("Failed to insert new neighbor!\n");
 		exit(1);
 		return false;
 	}
@@ -203,10 +205,25 @@ public:
 		switch (nt)
 		{
 		case NeighborList::COMPOUND:
+			for (int i = 0; i < n_solvent_neighbors; i++) {
+				if (neighborsolvent_ids[i] == neighbor_id) {
+					neighborsolvent_ids[i] = neighborsolvent_ids[n_solvent_neighbors - 1];
+					n_solvent_neighbors--;
+					neighborsolvent_ids[n_solvent_neighbors] = 0;
+					return;
+				}
+			}
 			ids = neighborcompound_ids;
 			n = &n_compound_neighbors;
 			break;
 		case NeighborList::SOLVENT:
+			for (int i = 0; i < n_compound_neighbors; i++) {
+				if (neighborcompound_ids[i] == neighbor_id) {
+					neighborcompound_ids[i] = neighborcompound_ids[n_compound_neighbors - 1];
+					n_compound_neighbors--;
+					return;
+				}
+			}
 			ids = neighborsolvent_ids;
 			n = &n_solvent_neighbors;
 			break;
