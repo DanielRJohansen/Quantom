@@ -3,16 +3,8 @@
 //using namespace LIMAENG;
 
 
-//__constant__ ForceField forcefield_device;
 __constant__ ForceField forcefield_device;
 
-__constant__ float numbers[10];
-__constant__ float number;
-//__constant__ ParticleParameters forcefield_device;
-//__constant__ float arr[109];
-//__constant__ float a[12];
-
-//__constant__ 
 
 
 Engine::Engine() {}

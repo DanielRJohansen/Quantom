@@ -75,11 +75,11 @@ void BoxBuilder::finishBox(Simulation* simulation)
 	cudaMemcpy(simulation->box->solvents_next, simulation->box->solvents, sizeof(Solvent) * MAX_SOLVENTS, cudaMemcpyHostToDevice);
 
 
-
+	/*
 	compoundLinker(simulation);
 	solvateLinker(simulation);
 	solvateCompoundCrosslinker(simulation);
-
+	*/
 
 
 	
@@ -231,6 +231,8 @@ Solvent BoxBuilder::createSolvent(Float3 com, double dt)	// Nodes obv. points to
 
 
 
+
+/*
 void BoxBuilder::compoundLinker(Simulation* simulation) {
 	for (int i = 0; i < simulation->box->n_compounds; i++) {
 		for (int j = i+1; j < simulation->box->n_compounds; j++) {
@@ -270,6 +272,8 @@ void BoxBuilder::solvateCompoundCrosslinker(Simulation* simulation)
 	}
 	printf("Compound n0 solvents: %d\n", simulation->box->compound_neighborlists[0].n_solvent_neighbors);
 }
+
+*/
 
 void BoxBuilder::placeMultipleCompoundsRandomly(Simulation* simulation, Compound* template_compound, int n_copies)
 {
