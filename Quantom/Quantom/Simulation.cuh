@@ -5,7 +5,7 @@
 
 
 
-constexpr double BOX_LEN = 8.f;		// Must be > twice the len of largest compound
+constexpr double BOX_LEN = 7.f;		// Must be > twice the len of largest compound
 constexpr double BOX_LEN_HALF = BOX_LEN/2.f;
 
 
@@ -18,7 +18,7 @@ const int STEPS_PER_TRAINDATATRANSFER = 40;
 
 
 
-const int STEPS_PER_RENDER = 50;
+const int STEPS_PER_RENDER = 80;
 
 
 const bool APPLY_THERMOSTAT = false;
@@ -109,7 +109,7 @@ public:
 			+ sizeof(Solvent) * MAX_SOLVENTS * 2
 			+ sizeof(CompoundState) * MAX_COMPOUNDS * 2
 			+ sizeof(NeighborList) * (MAX_SOLVENTS + MAX_COMPOUNDS);
-		printf("Moving %.2f GB to device\n", (float)bytes_total * 1e-9);
+		printf("BOX: moving %.2f MB to device\n", (float)bytes_total * 1e-6);
 
 		compounds = genericMoveToDevice(compounds, n_compounds);
 		solvents = genericMoveToDevice(solvents, MAX_SOLVENTS);
@@ -122,7 +122,7 @@ public:
 
 		cudaDeviceSynchronize();
 
-		printf("Box transferred to device\n\n");
+		printf("Box transferred to device\n");
 	}
 	
 };
@@ -143,7 +143,7 @@ public:
 			fprintf(stderr, "Error during Simulation Host->Device transfer\n");
 			exit(1);
 		}
-		printf("Simulation ready for device\n");
+		printf("Simulation ready for device\n\n");
 	}
 	__host__ void copyBoxVariables() {
 		n_compounds = box->n_compounds;

@@ -230,7 +230,7 @@ T* genericMoveToDevice(T* data_ptr, int n_elements) {	// Currently uses MallocMa
 
 	data_ptr = gpu_ptr;
 
-	printf("Moved %.2f MB to device\n", bytesize*1e-6);
+	//printf("Moved %.2f MB to device\n", bytesize*1e-6);
 	return gpu_ptr;
 }
 

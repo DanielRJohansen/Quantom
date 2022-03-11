@@ -32,7 +32,7 @@ Engine::Engine(Simulation* simulation) {
 
 	handleNLISTS(simulation, false, true);				// Fix neighborlists before running
 
-	printf("Engine ready\n");
+	printf("Engine ready\n\n\n");
 }
 
 
@@ -105,6 +105,13 @@ void Engine::handleNLISTS(Simulation* simulation, bool async, bool force_update)
 
 	if (updated_neighborlists_ready) {
 		pushNlistsToDevice();
+	}
+
+	if (force_update) {
+		Int3 n_data(nlist_data_collection->compound_neighborlists[0].n_compound_neighbors, nlist_data_collection->compound_neighborlists[0].n_solvent_neighbors, 0);
+		//Int3 after(nlist_data_collection->solvent_neighborlists[193].n_compound_neighbors, nlist_data_collection->solvent_neighborlists[193].n_solvent_neighbors, 0);
+
+		printf("\nEntity went from %d %d neighbors to %d %d\n", n_data.x, n_data.y);
 	}
 }
 

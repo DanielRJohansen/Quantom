@@ -2,7 +2,9 @@
 
 
 DisplayV2::DisplayV2() {
+#ifdef ENABLE_DISPLAY
     int success = initGLFW();
+#endif
 }
 
 
@@ -39,6 +41,7 @@ void DisplayV2::drawBalls(RenderBall* balls, int n_balls) {
 }
 
 void DisplayV2::render(Simulation* simulation) {
+#ifdef ENABLE_DISPLAY
     auto start = std::chrono::high_resolution_clock::now();
 
     RenderBall* balls = rasterizer.render(simulation);
@@ -55,15 +58,18 @@ void DisplayV2::render(Simulation* simulation) {
     auto stop = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
     printf("\tRender time: %4d ys  ", duration.count());
+#endif
 }
 
 bool DisplayV2::checkWindowStatus() {
+#ifdef ENABLE_DISPLAY
     glfwPollEvents();
     if (glfwWindowShouldClose(window)) {
         glfwTerminate();
 
         return false;
     }
+#endif
     return true;
 }
 

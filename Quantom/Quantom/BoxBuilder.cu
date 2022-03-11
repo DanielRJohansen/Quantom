@@ -65,28 +65,30 @@ void BoxBuilder::finishBox(Simulation* simulation)
 	solvateBox(simulation);	// Always do after placing compounds
 
 
-
 	// Need this variable both on host and device
 	simulation->total_particles_upperbound = simulation->box->n_compounds * MAX_COMPOUND_PARTICLES + simulation->box->n_solvents;											// BAD AMBIGUOUS AND WRONG CONSTANTS
 	simulation->box->total_particles_upperbound = simulation->total_particles_upperbound;											// BAD AMBIGUOUS AND WRONG CONSTANTS
 
-
-	cudaMemcpy(simulation->box->compound_state_array_next, simulation->box->compound_state_array, sizeof(CompoundState) * MAX_COMPOUNDS, cudaMemcpyHostToDevice);	// Just make sure they have the same n_particles info...
-	cudaMemcpy(simulation->box->solvents_next, simulation->box->solvents, sizeof(Solvent) * MAX_SOLVENTS, cudaMemcpyHostToDevice);
-
-
-	/*
+		/*
 	compoundLinker(simulation);
 	solvateLinker(simulation);
 	solvateCompoundCrosslinker(simulation);
 	*/
 
 
+
+
+
+
+	cudaMemcpy(simulation->box->compound_state_array_next, simulation->box->compound_state_array, sizeof(CompoundState) * MAX_COMPOUNDS, cudaMemcpyHostToDevice);	// Just make sure they have the same n_particles info...
+	cudaMemcpy(simulation->box->solvents_next, simulation->box->solvents, sizeof(Solvent) * MAX_SOLVENTS, cudaMemcpyHostToDevice);
+
+
+
 	
 
-
-
 	int n_points = simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER;
+	printf("Malloc %d MB on device for data buffers\n", (sizeof(double) * simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER + sizeof(Float3) * simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER) / 1000000);
 	cudaMallocManaged(&simulation->box->potE_buffer, sizeof(double) * simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER);	// Can only log molecules of size 3 for now...
 	simulation->potE_buffer = new double[simulation->total_particles_upperbound * simulation->n_steps];
 
@@ -101,6 +103,7 @@ void BoxBuilder::finishBox(Simulation* simulation)
 
 	long double total_bytes = sizeof(double) * 10 * simulation->n_steps
 		+ sizeof(Float3) * 6 * MAX_COMPOUND_PARTICLES * STEPS_PER_TRAINDATATRANSFER;
+
 	printf("Reserving %.2lf GB device mem for logging\n", (total_bytes) * 1e-9);
 	cudaMallocManaged(&simulation->box->outdata, sizeof(double) * 10 * simulation->n_steps);	// 10 data streams for 10k steps. 1 step at a time.
 	//cudaMallocManaged(&simulation->box->data_GAN, sizeof(Float3) * 6 * MAX_COMPOUND_PARTICLES * simulation->n_steps);
@@ -116,7 +119,7 @@ void BoxBuilder::finishBox(Simulation* simulation)
 
 	simulation->copyBoxVariables();
 	simulation->box->moveToDevice();
-	printf("Boxbuild complete!\n");
+	printf("Boxbuild complete!\n\n\n");
 }
 
 

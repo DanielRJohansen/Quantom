@@ -8,6 +8,8 @@
 #endif // !__linux__
 
 
+#define ENABLE_DISPLAY 
+
 #include "Rasterizer.cuh"
 #include "QuantomTypes.cuh"
 
