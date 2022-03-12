@@ -19,8 +19,10 @@ Engine::Engine(Simulation* simulation) {
 
 
 
-	int kernel_shared_mem = sizeof(Compound) + sizeof(CompoundState) + sizeof(NeighborList) + sizeof(Float3) * NEIGHBORLIST_MAX_SOLVENTS;
-	printf("Forcekernel shared mem. size: %d B\n", kernel_shared_mem);
+	int Ckernel_shared_mem = sizeof(Compound) + sizeof(CompoundState) + sizeof(NeighborList) + sizeof(Float3) * NEIGHBORLIST_MAX_SOLVENTS + sizeof(uint8_t) * NEIGHBORLIST_MAX_SOLVENTS;	
+	int Skernel_shared_mem = sizeof(Float3) * MAX_COMPOUND_PARTICLES + sizeof(uint8_t) * MAX_COMPOUND_PARTICLES;
+	printf("Compoundkernel shared mem. size: %d B\n", Ckernel_shared_mem);
+	printf("Solventkernel shared mem. size: %d B\n", Skernel_shared_mem);
 
 
 
@@ -111,7 +113,7 @@ void Engine::handleNLISTS(Simulation* simulation, bool async, bool force_update)
 		Int3 n_data(nlist_data_collection->compound_neighborlists[0].n_compound_neighbors, nlist_data_collection->compound_neighborlists[0].n_solvent_neighbors, 0);
 		//Int3 after(nlist_data_collection->solvent_neighborlists[193].n_compound_neighbors, nlist_data_collection->solvent_neighborlists[193].n_solvent_neighbors, 0);
 
-		printf("\nEntity went from %d %d neighbors to %d %d\n", n_data.x, n_data.y);
+		printf("\nEntity neighbors: %d %d\n", n_data.x, n_data.y);
 	}
 }
 

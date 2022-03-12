@@ -32,9 +32,9 @@ struct Int3 {
 
 struct Float3 {
 	__host__ __device__ Float3() {}
-	__host__ __device__ Float3(double a) : x(a), y(a), z(a) {}
-	__host__ __device__ Float3(double x, double y, double z) : x(x), y(y), z(z) {}
-	__host__ __device__ Float3(double* a) { x = a[0]; y = a[1]; z = a[2]; }
+	__host__ __device__ Float3(float a) : x(a), y(a), z(a) {}
+	__host__ __device__ Float3(float x, float y, float z) : x(x), y(y), z(z) {}
+	__host__ __device__ Float3(float* a) { x = a[0]; y = a[1]; z = a[2]; }
 
 	__host__ __device__ inline Float3 operator * (const double a) const { return Float3(x * a, y * a, z * a); }
 	__host__ __device__ inline Float3 operator * (const Float3 a) const { return Float3(x * a.x, y * a.y, z * a.z); }
@@ -42,23 +42,23 @@ struct Float3 {
 	__host__ __device__ inline Float3 operator - (const Float3 a) const { return Float3(x - a.x, y - a.y, z - a.z); }
 	__host__ __device__ inline bool operator == (const Float3 a) const { return (a.x == x && a.y == y && a.z == z); }
 	__host__ __device__ inline void operator += (const Float3 a) { x += a.x; y += a.y; z += a.z; }
-	__host__ __device__ inline void operator *= (const double a) { x *= a; y *= a; z *= a; }
+	__host__ __device__ inline void operator *= (const float a) { x *= a; y *= a; z *= a; }
 
 	__host__ __device__ inline bool operator < (const Float3 a) {return x < a.x && y < a.y && z < a.z; }
 	__host__ __device__ inline bool operator > (const Float3 a) { return x > a.x&& y > a.y&& z > a.z; }
 
 	__host__ __device__ Float3 norm() {
-		double l = len();
+		float l = len();
 		if (l)
 			return *this * (1.f / l); 
 		return Float3(0, 0, 0);
 	}
 	__host__ __device__ Float3 square() {return Float3(x * x, y * y, z * z);}
-	__host__ __device__ inline double len() {return (double)sqrtf(x * x + y * y + z * z); }
-	__host__ __device__ inline double lenSquared() { return (double)(x * x + y * y + z * z); }
-	__host__ __device__ Float3 zeroIfAbove(double a) { return Float3(x * (x < a), y * (y < a), z * (z < a)); }
-	__host__ __device__ Float3 zeroIfBelow(double a) { return Float3(x * (x > a), y * (y > a), z * (z > a)); }
-	__host__ __device__ Float3 elementwiseModulus(double a) {
+	__host__ __device__ inline float len() {return (float)sqrtf(x * x + y * y + z * z); }
+	__host__ __device__ inline float lenSquared() { return (double)(x * x + y * y + z * z); }
+	__host__ __device__ Float3 zeroIfAbove(float a) { return Float3(x * (x < a), y * (y < a), z * (z < a)); }
+	__host__ __device__ Float3 zeroIfBelow(float a) { return Float3(x * (x > a), y * (y > a), z * (z > a)); }
+	__host__ __device__ Float3 elementwiseModulus(float a) {
 		while (x > a)
 			x -= a;
 		while (y > a)
@@ -125,7 +125,7 @@ struct Float3 {
 		return v * cos(theta) + k.cross(v) * sin(theta) + k * (k.dot(v)) * (1 - cos(theta));
 	}
 
-	__host__ __device__ double at(int index) {
+	__host__ __device__ float at(int index) {
 		switch (index) {
 		case 0:
 			return x;
@@ -139,7 +139,7 @@ struct Float3 {
 		}
 	}
 
-	__host__ __device__ double* placeAt(int index) {
+	__host__ __device__ float* placeAt(int index) {
 		switch (index) {
 		case 0:
 			return &x;
@@ -161,7 +161,7 @@ struct Float3 {
 
 
 
-	double x = 0, y = 0, z = 0;
+	float x = 0, y = 0, z = 0;
 };
 
 struct BoundingBox {
@@ -241,7 +241,7 @@ struct Trajectory {
 	Trajectory() {}
 	Trajectory(std::string path) {
 		positions = new Float3[max_size];
-		double buffer[3];
+		float buffer[3];
 
 		printf("Path: ");
 		cout << path << std::endl;

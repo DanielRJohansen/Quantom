@@ -55,7 +55,7 @@ void BoxBuilder::addSingleMolecule(Simulation* simulation, Compound* molecule)
 
 void BoxBuilder::addScatteredMolecules(Simulation* simulation, Compound* molecule, int n_copies)
 {
-	placeMultipleCompoundsRandomly(simulation, molecule, N_LIPID_COPIES);
+	placeMultipleCompoundsRandomly(simulation, molecule, n_copies);
 	printf("Scattered %d Compounds in box\n", simulation->box->n_compounds);
 }
 

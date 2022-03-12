@@ -65,7 +65,7 @@ bool Environment::verifySimulationParameters() {	// Not yet implemented
 void Environment::run() {
 	printf("Simulation started\n\n");
 
-#ifdef USE_CHRONO
+#ifdef ENABLE_CHRONO
 	time0 = std::chrono::high_resolution_clock::now();
 #endif
 
@@ -123,7 +123,7 @@ void Environment::postRunEvents() {
 }
 
 void Environment::handleStatus(Simulation* simulation) {
-#ifdef USE_CHRONO
+#ifdef ENABLE_CHRONO
 	if (!(simulation->getStep() % simulation->steps_per_render)) {
 		printf("\r\tStep #%06d", simulation->box->step);
 		double duration = (double)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - time0).count();

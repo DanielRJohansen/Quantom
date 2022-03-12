@@ -28,8 +28,9 @@
 
 #ifndef __linux__
 #include <direct.h>
-#define USE_CHRONO
 #endif
+
+#define ENABLE_CHRONO
 
 
 
@@ -75,8 +76,11 @@ private:
 
 
 
-
+#ifdef __linux__
+	std::chrono::system_clock::time_point time0;
+#else
 	std::chrono::steady_clock::time_point time0;
+#endif
 
 };
 

@@ -11,14 +11,14 @@ constexpr double BOX_LEN_HALF = BOX_LEN/2.f;
 
 
 const int STEPS_PER_NLIST_UPDATE = 100;
-const int STEPS_PER_LOGTRANSFER = 100;
+const int STEPS_PER_LOGTRANSFER = 500;
 //const int STEPS_PER_TRAJTRANSFER = 100;
-const int STEPS_PER_THERMOSTAT = 100;
-const int STEPS_PER_TRAINDATATRANSFER = 40;
+const int STEPS_PER_THERMOSTAT = 500;
+const int STEPS_PER_TRAINDATATRANSFER = 500;
 
 
 
-const int STEPS_PER_RENDER = 80;
+const int STEPS_PER_RENDER = 100;
 
 
 const bool APPLY_THERMOSTAT = false;
@@ -43,7 +43,7 @@ const int LOG_P_ID = 17;
 
 const int MAX_COMPOUNDS = 0xFF;
 const int MAX_SOLVENTS = 0xFFFF;
-constexpr float CUTOFF = 0.8f;	//nm/
+constexpr float CUTOFF = 1.f;	//nm/
 //const int MAX_ATOM_TYPES = 16;
 
 
@@ -55,7 +55,6 @@ const int BLOCKS_PER_SOLVENTKERNEL = ceil((float)N_SOLVATE_MOLECULES/(float)THRE
 
 const int THREADS_PER_COMPOUNDBLOCK = 128; // Must be >= max comp particles
 
-const int N_LIPID_COPIES = 32;
 
 
 const int SIMULATION_STEPS = 20000;
@@ -104,7 +103,6 @@ public:
 
 
 	void moveToDevice() {	// Loses pointer to RAM location!
-
 		int bytes_total = sizeof(Compound) * n_compounds
 			+ sizeof(Solvent) * MAX_SOLVENTS * 2
 			+ sizeof(CompoundState) * MAX_COMPOUNDS * 2
@@ -119,12 +117,9 @@ public:
 		compound_neighborlists = genericMoveToDevice(compound_neighborlists, MAX_COMPOUNDS);
 		solvent_neighborlists = genericMoveToDevice(solvent_neighborlists, MAX_SOLVENTS);
 
-
 		cudaDeviceSynchronize();
-
 		printf("Box transferred to device\n");
 	}
-	
 };
 
 	
