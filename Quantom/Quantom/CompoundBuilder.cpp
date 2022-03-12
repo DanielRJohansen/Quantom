@@ -85,6 +85,7 @@ void CompoundBuilder::loadParticles(Molecule* molecule, vector<CompoundBuilder::
 
 			particle_id_maps[record.atom_serial_number] = IDMap(record.atom_serial_number, current_compound_id, molecule->compounds[current_compound_id].n_particles);
 			current_compound->addParticle(FFM.atomTypeToIndex(record.atom_name[0]), CompactParticle(record.coordinate));
+			molecule->n_atoms_total++;
 			//compound->addParticle(FFM.atomTypeToIndex(record.atom_name[0]), CompactParticle(record.coordinate));
 	}
 }

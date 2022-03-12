@@ -309,7 +309,7 @@ struct Molecule {
 	int n_compounds = 1;
 	Compound* compounds;
 	Compound compound_bridge;	// Special compound, for special kernel. For now we only need one
-
+	uint32_t n_atoms_total = 0;
 
 	Float3 calcCOM() {
 		Float3 com(0.f);

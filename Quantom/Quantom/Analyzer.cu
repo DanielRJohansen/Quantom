@@ -157,7 +157,7 @@ Analyzer::AnalyzedPackage Analyzer::analyzeEnergy(Simulation* simulation) {	// C
 	Float3* average_compound_energy = analyzeCompoundEnergy(simulation, analysable_steps);	//avg energy PER PARTICLE in compound
 
 	for (int i = 0; i < analysable_steps; i++) {
-		average_energy[i] = (average_solvent_energy[i] * simulation->box->n_solvents * 1 + average_compound_energy[i] * simulation->box->compounds[0].n_particles) * (1.f/ (simulation->box->n_solvents + simulation->box->compounds[0].n_particles));
+		average_energy[i] = (average_solvent_energy[i] * simulation->box->n_solvents * 1 + average_compound_energy[i] * simulation->total_compound_particles) * (1.f/ (simulation->total_particles));
 		//average_energy[i].print('E');
 	}
 	
@@ -227,7 +227,7 @@ Float3* Analyzer::analyzeCompoundEnergy(Simulation* simulation, int n_steps) {
 				//printf("Block: %d energy: %f\n", i, host_data[i + step * 256].x);
 			average_compound_energy[step] += host_data[i + step * simulation->box->n_compounds];
 		}
-		average_compound_energy[step] *= (1.f / (simulation->box->compounds[0].n_particles));
+		average_compound_energy[step] *= (1.f / (simulation->total_compound_particles));
 	}
 
 

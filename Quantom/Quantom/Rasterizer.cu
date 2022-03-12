@@ -10,8 +10,6 @@ void mergeSortAPI(RenderBall* balls, int n_balls);
 
 
 RenderBall* Rasterizer::render(Simulation* simulation) {    
-    //actual_n_particles = simulation->box->compounds[0].n_particles + simulation->n_solvents;
-    //solvent_offset = simulation->box->compounds[0].n_particles;
     solvent_offset = simulation->n_compounds * MAX_COMPOUND_PARTICLES;
     n_threadblocks = ceil((float)simulation->total_particles_upperbound / (float)RAS_THREADS_PER_BLOCK);
 
@@ -177,9 +175,7 @@ __global__ void loadCompoundatomsKernel(Box * box, RenderAtom * atoms) {        
     int global_id = threadIdx.x + blockIdx.x * blockDim.x;
 
     atoms[global_id].pos = box->compound_state_array[compound_id].positions[local_id];                                                          // Might need to change this, if thread> n_particles!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    //atoms[threadIdx.x].mass = box->compounds[0].particles[threadIdx.x].mass;
     atoms[global_id].mass = SOLVENT_MASS;                                                         // TEMP
-    //atoms[threadIdx.x].mass = forcefield_device.particle_parameters[box->compounds[0].atom_types[threadIdx.x]].mass;
     if (local_id < box->compounds[compound_id].n_particles) {
         atoms[global_id].atom_type = RAS_getTypeFromIndex(box->compounds[compound_id].atom_types[local_id]);
     }

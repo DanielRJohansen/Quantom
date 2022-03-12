@@ -1,7 +1,5 @@
 #include "Engine.cuh"
 
-//using namespace LIMAENG;
-
 
 __constant__ ForceField forcefield_device;
 
@@ -323,18 +321,21 @@ float Engine::getBoxTemperature() {
 	const int solvent_offset = MAX_COMPOUND_PARTICLES;
 
 
-	const int particles_in_compounds = simulation->box->compounds[0].n_particles;
-	const int particles_total = simulation->n_solvents;
 
-	for (int i = 0; i < particles_in_compounds; i++) {	// i gotta move this somewhere else....
-		int p_index = i;
-		
-		Float3 posa = simulation->traj_buffer[i + step_offset_a];
-		Float3 posb = simulation->traj_buffer[i + step_offset_b];
-		//float kinE = LIMAENG::calcKineticEnergy(&posa, &posb, simulation->box->compounds[0].particles[i].mass, simulation->dt);
-		float kinE = LIMAENG::calcKineticEnergy(&posa, &posb, forcefield_device.particle_parameters[simulation->box->compounds[0].atom_types[i]].mass, simulation->dt);			// Doesnt work, use forcefield_host!!
-		kinE_sum += kinE;
+	int particles_total = simulation->n_solvents;
+
+	for (int c = 0; c < simulation->n_compounds; c++) {
+		for (int i = 0; i < simulation->compounds_host[c].n_particles; i++) {	// i gotta move this somewhere else....
+
+			Float3 posa = simulation->traj_buffer[i + step_offset_a];
+			Float3 posb = simulation->traj_buffer[i + step_offset_b];
+			float kinE = LIMAENG::calcKineticEnergy(&posa, &posb, forcefield_device.particle_parameters[simulation->box->compounds[c].atom_types[i]].mass, simulation->dt);			// Doesnt work, use forcefield_host!!
+			//float kinE = LIMAENG::calcKineticEnergy(&posa, &posb, forcefield_device.particle_parameters[simulation->box->compounds[c].atom_types[i]].mass, simulation->dt);			// Doesnt work, use forcefield_host!!
+			kinE_sum += kinE;
+			particles_total++;
+		}
 	}
+	
 	for (int i = 0; i < simulation->n_solvents; i++) {
 		Float3 posa = simulation->traj_buffer[i + solvent_offset + step_offset_a];
 		Float3 posb = simulation->traj_buffer[i + solvent_offset + step_offset_b];
@@ -969,9 +970,6 @@ __global__ void solventForceKernel(Box* box) {
 		}
 		__syncthreads();
 
-		// BEFORE:
-		//force += computeCompoundToSolventLJForces(&solvent.pos, box->compounds[0].n_particles, utility_buffer, data_ptr, &potE_sum);	// wrong, i think?
-		//force += computeCompoundToSolventLJForces(&solvent.pos, n_particles, utility_buffer, data_ptr, &potE_sum);					// right, i think??
 
 	}
 	// ----------------------------------------------------------------------------------------------------------------------------------------------------- //

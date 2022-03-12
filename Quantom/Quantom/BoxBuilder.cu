@@ -43,6 +43,9 @@ void BoxBuilder::addSingleMolecule(Simulation* simulation, Molecule* molecule) {
 		}
 		integrateCompound(compound,	simulation);
 	}
+
+	simulation->total_compound_particles = molecule->n_atoms_total;						// TODO: Unknown behavior, if multiple molecules are added!
+	simulation->total_particles += molecule->n_atoms_total;
 }
 
 void BoxBuilder::addScatteredMolecules(Simulation* simulation, Compound* molecule, int n_copies)
@@ -159,6 +162,7 @@ int BoxBuilder::solvateBox(Simulation* simulation)
 			}
 		}
 	}
+	simulation->total_particles += simulation->box->n_solvents;
 	printf("%d solvents added to box\n", simulation->box->n_solvents);
 	return simulation->box->n_solvents;
 }

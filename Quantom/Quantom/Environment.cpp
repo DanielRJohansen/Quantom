@@ -22,7 +22,7 @@ Environment::Environment() {
 	//Compound mol_4pcw10 = compoundbuilder.buildMolecule("D:\\Quantom\\filaggrin\\conf.gro", "D:\\Quantom\\filaggrin\\topol.top", 4);
 	//Compound mol_6lzm_10 = compoundbuilder.buildMolecule(MOL_FOLDER + "conf.gro", MOL_FOLDER + "topol.top", 10);
 	Molecule mol_6lzm_10 = compoundbuilder.buildMolecule(MOL_FOLDER + "conf.gro", MOL_FOLDER + "topol.top", 10);
-	Compound temp = mol_6lzm_10.compounds[0];
+	
 
 	//printf("here %d", temp.n_particles);
 	

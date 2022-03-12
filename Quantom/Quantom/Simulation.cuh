@@ -22,7 +22,7 @@ const int STEPS_PER_TRAINDATATRANSFER = 500;
 const int STEPS_PER_RENDER = 100;
 
 
-const bool APPLY_THERMOSTAT = false;
+const bool APPLY_THERMOSTAT = false;										// Switch to using forcefield_host first
 
 #ifndef __linux__
 const string MOL_FOLDER = "C:\\PROJECTS\\Quantom\\t4lys\\";
@@ -166,7 +166,8 @@ public:
 
 
 	uint32_t total_particles_upperbound = 0;
-
+	uint32_t total_compound_particles;			// Precise number, but DO NOT EVER USE IN INDEXING!!
+	uint32_t total_particles = 0;				// Precise number, but DO NOT EVER USE IN INDEXING!!
 	
 	int n_steps = SIMULATION_STEPS;
 
