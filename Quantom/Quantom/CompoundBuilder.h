@@ -72,7 +72,7 @@ private:
 	struct ResidueComboId;
 
 	ResidueComboId parseResidueID(string s);
-	bool isAsciiNumber(char c);
+	inline bool isAsciiNumber(char c) { return (c > 47 && c < 58); }
 
 
 

@@ -323,17 +323,7 @@ void BoxBuilder::moveCompound(Compound* compound, Float3 vector)
 	for (int i = 0; i < compound->n_particles; i++)
 		compound->particles[i].pos_tsub1 += vector;
 }
-/*
-Float3 BoxBuilder::calcCompoundCom(Compound* compound)
-{
-	Float3 com = Float3(0, 0, 0);
-	for (int i = 0; i < compound->n_particles; i++)
-		com += compound->particles[i].pos_tsub1;
-	com *= (1.f / compound->n_particles);
 
-	return com;
-}
-*/
 void BoxBuilder::rotateCompound(Compound* compound, Float3 xyz_rot)
 {
 	Float3 vec_to_origo = Float3(0, 0, 0) - compound->calcCOM();

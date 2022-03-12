@@ -2,25 +2,6 @@
 
 
 
-float massFromAtom(char atom) {
-	switch (atom)
-	{
-	case 'C':
-		return 12.0096; //g/mol
-	case 'O':
-		return 15.9994;	
-	case 'P':
-		return 30.9738;
-	case 'N':
-		return 14.0067;
-	case 'H':
-		return 1.f;
-	default:
-		printf("Element %c not found", atom);
-		exit(1);
-	}
-}
-
 
 
 Compound CompoundBuilder::buildMolecule(string pdb_path, string itp_path, int max_residue_id)
@@ -47,12 +28,18 @@ Compound CompoundBuilder::buildMolecule(string pdb_path, string itp_path, int ma
 	return compound;
 }
 
-void CompoundBuilder::loadParticles(Compound* compound, vector<CompoundBuilder::Record_ATOM>* pdb_data, int max_residue_id, bool ignore_protons)
-{
-	int max_atom_cnt = 1 << 24;
+
+
+
+
+void CompoundBuilder::loadParticles(Compound* compound, vector<CompoundBuilder::Record_ATOM>* pdb_data, int max_residue_id, bool ignore_protons) {
+	int max_atom_cnt = (int)1e+6;// 1 << 24;
 	particle_id_map = new int[max_atom_cnt];
 	for (int i = 0; i < max_atom_cnt; i++)
 		particle_id_map[i] = -1;
+
+
+	int current_res_id = 0;
 
 
 	for (Record_ATOM record : *pdb_data) {
@@ -78,16 +65,7 @@ void CompoundBuilder::loadParticles(Compound* compound, vector<CompoundBuilder::
 			particle_id_map[record.atom_serial_number] = compound->n_particles;
 
 
-			//if (stoi(record[4]) > max_monomer_id)
-				//break;
-
-
-			//particle_id_map[particle_id] = compound->n_particles;
-			float mass = massFromAtom(record.atom_name[0]) / 1000.f;							// kg/mol;
-
-			compound->atom_types[compound->n_particles] = FFM.atomTypeToIndex(record.atom_name[0]);
-			compound->particles[compound->n_particles] = CompactParticle(record.coordinate);
-			compound->n_particles++;
+			compound->addParticle(FFM.atomTypeToIndex(record.atom_name[0]), CompactParticle(record.coordinate));
 	}
 }
 
@@ -194,15 +172,15 @@ void CompoundBuilder::addAngle(Compound* compound, vector<string>* record)
 void CompoundBuilder::addDihedral(Compound* compound, vector<string>* record) {
 }
 
-/*
-Float3 CompoundBuilder::calcCOM(Compound* compound) {
-	Float3 com(0.f);
-	for (int i = 0; i < compound->n_particles; i++) {
-		com += compound->particles[i].pos_tsub1;
-	}
-	return com * (1.f / (float) compound->n_particles);
-}
-*/
+
+
+
+
+
+
+
+
+
 vector<vector<string>> CompoundBuilder::parseTOP(string path)		// Naive file segmentation, DANGEROUS!
 {
 	fstream file;
@@ -355,8 +333,7 @@ CompoundBuilder::ResidueComboId CompoundBuilder::parseResidueID(string s)
 	return ResidueComboId(stoi(id), name);
 }
 
-bool CompoundBuilder::isAsciiNumber(char c)
-{
-	return (c > 47 && c < 58);
-}
+
+
+
 

@@ -224,6 +224,12 @@ struct Compound {
 	__host__ bool intersects(Compound a) {
 		return (a.center_of_mass - center_of_mass).len() < (a.radius + radius + max_LJ_dist);
 	}*/
+	__host__ void addParticle(int atomtype_id, CompactParticle particle) {
+		atom_types[n_particles] = atomtype_id;
+		particles[n_particles] = particle;
+		n_particles++;
+	}
+
 	//---------------------------------------------------------------------------------//
 
 	__device__ void loadMeta(Compound* compound) {
@@ -270,8 +276,10 @@ struct Compound {
 	float confining_particle_sphere = 0;		// All particles in compound are PROBABLY within this radius
 };
 
+//struct CompoundBridge
 
 struct Molecule {
 	int n_compounds = 0;
 	Compound* compounds;
+	Compound compound_bridge;	// Special compound, for special kernel. For now we only need one
 };
