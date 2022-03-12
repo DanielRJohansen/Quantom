@@ -209,7 +209,7 @@ struct Compound {
 	__host__ void init() {	// Only call this if the compound has already been assigned particles & bonds
 		center_of_mass = calcCOM();
 		//printf("")
-		radius = pairbonds[0].reference_dist * n_particles * 0.5f;
+		//radius = pairbonds[0].reference_dist * n_particles * 0.5f;
 		//center_of_mass.print('C');
 		//printf("Radius %f\n", radius);
 	}
@@ -287,7 +287,7 @@ struct Compound {
 	uint8_t atom_types[MAX_COMPOUND_PARTICLES];
 
 	Float3 center_of_mass = Float3(0, 0, 0);
-	double radius = 0;
+	//double radius = 0;
 
 	uint16_t n_pairbonds = 0;
 	PairBond pairbonds[MAX_PAIRBONDS];
@@ -309,6 +309,19 @@ struct Molecule {
 	int n_compounds = 1;
 	Compound* compounds;
 	Compound compound_bridge;	// Special compound, for special kernel. For now we only need one
+
+
+	Float3 calcCOM() {
+		Float3 com(0.f);
+		for (int i = 0; i < n_compounds; i++) {
+			com += (compounds[i].calcCOM() * (1.f/ (float)n_compounds));
+		}
+		return com;
+	}
+
+
+
+
 
 	~Molecule() {
 		//printf("Deleting\n");		// Huh, this deletes too early. I better implement properly at some point.

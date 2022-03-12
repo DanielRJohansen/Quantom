@@ -28,7 +28,7 @@ Environment::Environment() {
 	
 	boxbuilder.buildBox(simulation);
 	//boxbuilder.addSingleMolecule(simulation, &mol_6lzm_10);
-	boxbuilder.addSingleMolecule(simulation, &temp);
+	boxbuilder.addSingleMolecule(simulation, &mol_6lzm_10);
 	//boxbuilder.addScatteredMolecules(simulation, &mol_dpc, N_LIPID_COPIES);
 	delete[] mol_6lzm_10.compounds;
 	boxbuilder.finishBox(simulation);

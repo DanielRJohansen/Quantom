@@ -9,7 +9,7 @@ public:
 		srand(290128309);
 	};
 	void buildBox(Simulation* simulation);
-	void addSingleMolecule(Simulation* simulation, Compound* molecule);		// Can only use a single "add" function per Simulation for now!!!!!!!!!!!!!
+	void addSingleMolecule(Simulation* simulation, Molecule* molecule);		// Can only use a single "add" function per Simulation for now!!!!!!!!!!!!!
 	void addScatteredMolecules(Simulation* simulation, Compound* molecule, int n_copies);
 	void addDoubleMembrane(Simulation* simulation, Compound* molecule);
 	void finishBox(Simulation* simulation);

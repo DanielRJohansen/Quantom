@@ -32,20 +32,17 @@ void BoxBuilder::buildBox(Simulation* simulation) {
 
 }
 
-void BoxBuilder::addSingleMolecule(Simulation* simulation, Compound* molecule)
-{
-	Float3 compound_center = Float3(BOX_LEN_HALF, BOX_LEN_HALF, BOX_LEN_HALF);
+void BoxBuilder::addSingleMolecule(Simulation* simulation, Molecule* molecule) {
+	Float3 desired_molecule_center = Float3(BOX_LEN_HALF);
+	Float3 offset = desired_molecule_center - molecule->calcCOM();
 
-	Float3 offset = compound_center - molecule->calcCOM();
-	for (int i = 0; i < molecule->n_particles; i++) {
-		molecule->particles[i].pos_tsub1 += offset;
+	for (int c = 0; c < molecule->n_compounds; c++) {
+		Compound* compound = &molecule->compounds[c];
+		for (int i = 0; i < compound->n_particles; i++) {
+			compound->particles[i].pos_tsub1 += offset;
+		}
+		integrateCompound(compound,	simulation);
 	}
-
-
-	integrateCompound(
-		molecule,
-		simulation
-	);
 }
 
 void BoxBuilder::addScatteredMolecules(Simulation* simulation, Compound* molecule, int n_copies)
