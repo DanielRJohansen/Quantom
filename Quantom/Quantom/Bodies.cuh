@@ -3,7 +3,7 @@
 #include "QuantomTypes.cuh"
 #include <iostream>
 
-
+#include "Constants.cuh"
 
 
 
@@ -225,11 +225,35 @@ struct Compound {
 		return (a.center_of_mass - center_of_mass).len() < (a.radius + radius + max_LJ_dist);
 	}*/
 	__host__ void addParticle(int atomtype_id, CompactParticle particle) {
+		if (n_particles == MAX_COMPOUND_PARTICLES) {
+			printf("ERROR: Cannot add particle to compound!\n");
+			exit(1);
+		}
+
 		atom_types[n_particles] = atomtype_id;
 		particles[n_particles] = particle;
 		n_particles++;
 	}
+	__host__ bool hasRoomForRes() {					// TODO: Implement, that it checks n atoms in res
+		return ((int)n_particles + MAX_ATOMS_IN_RESIDUE) <= MAX_COMPOUND_PARTICLES;
+	}
+	__host__ void calcParticleSphere() {
+		Float3 com = calcCOM();// calcCOM(compound);
 
+		float furthest = LONG_MIN;
+		float closest = LONG_MAX;
+		int closest_index = 0;
+
+		for (int i = 0; i < n_particles; i++) {
+			float dist = (particles[i].pos_tsub1 - com).len();
+			closest_index = dist < closest ? i : closest_index;
+			closest = min(closest, dist);
+			furthest = max(furthest, dist);
+		}
+
+		key_particle_index = closest_index;
+		confining_particle_sphere = furthest;
+	}
 	//---------------------------------------------------------------------------------//
 
 	__device__ void loadMeta(Compound* compound) {
@@ -279,7 +303,15 @@ struct Compound {
 //struct CompoundBridge
 
 struct Molecule {
-	int n_compounds = 0;
+	Molecule() {
+		compounds = new Compound[MAX_COMPOUNDS];
+	}
+	int n_compounds = 1;
 	Compound* compounds;
 	Compound compound_bridge;	// Special compound, for special kernel. For now we only need one
+
+	~Molecule() {
+		//printf("Deleting\n");		// Huh, this deletes too early. I better implement properly at some point.
+		//delete[] compounds;
+	}
 };

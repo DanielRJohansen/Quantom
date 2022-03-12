@@ -3,7 +3,7 @@
 
 
 void BoxBuilder::buildBox(Simulation* simulation) {
-
+	printf("Building box...\n");
 	simulation->box->compounds = new Compound[MAX_COMPOUNDS];
 	simulation->box->solvents = new Solvent[MAX_SOLVENTS];
 

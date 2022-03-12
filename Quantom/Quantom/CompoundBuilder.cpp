@@ -4,43 +4,49 @@
 
 
 
-Compound CompoundBuilder::buildMolecule(string pdb_path, string itp_path, int max_residue_id)
+Molecule CompoundBuilder::buildMolecule(string pdb_path, string itp_path, int max_residue_id)
 {
 	//vector<vector<string>> pdb_data = readFile(pdb_path);
 	//vector<Record_ATOM> atom_data = parsePDB(pdb_path);
+	particle_id_maps = new IDMap[MAX_ATOMS];
+
 	vector<Record_ATOM> atom_data = parseGRO(pdb_path);
 	vector<vector<string>> top_data = parseTOP(itp_path);
 
 
-	Compound compound;													// position of particles stored in compund.particles.pos_tsub1
+	//Compound compound;													// position of particles stored in compund.particles.pos_tsub1
+	Molecule molecule;
 
-	loadParticles(&compound, &atom_data, max_residue_id, true);
-	printf("%d particles added\n", compound.n_particles);
-	loadTopology(&compound, &top_data, particle_id_map);
-	printf("%d pairbonds added\n", compound.n_pairbonds);
-	printf("%d anglebonds added\n", compound.n_anglebonds);
-
-	calcParticleSphere(&compound);
+	//loadParticles(&compound, &atom_data, max_residue_id, true);
+	loadParticles(&molecule, &atom_data, max_residue_id, true);
+	//printf("%d particles added\n", compound.n_particles);
+	loadTopology(&molecule, &top_data);
 
 
 
-	delete[] particle_id_map;
-	return compound;
+	countElements(&molecule);
+	printf("Molecule built\n\n\n");
+
+	for (int i = 0; i < molecule.n_compounds; i++) {
+		molecule.compounds[i].calcParticleSphere();
+	}
+
+
+	delete[] particle_id_maps;
+	return molecule;
 }
 
 
 
 
 
-void CompoundBuilder::loadParticles(Compound* compound, vector<CompoundBuilder::Record_ATOM>* pdb_data, int max_residue_id, bool ignore_protons) {
-	int max_atom_cnt = (int)1e+6;// 1 << 24;
-	particle_id_map = new int[max_atom_cnt];
-	for (int i = 0; i < max_atom_cnt; i++)
-		particle_id_map[i] = -1;
+void CompoundBuilder::loadParticles(Molecule* molecule, vector<CompoundBuilder::Record_ATOM>* pdb_data, int max_residue_id, bool ignore_protons) {
 
 
 	int current_res_id = 0;
-
+	int current_compound_id = 0;
+	Compound* current_compound = &molecule->compounds[current_compound_id];
+	int prev_atom_id;
 
 	for (Record_ATOM record : *pdb_data) {
 
@@ -55,6 +61,8 @@ void CompoundBuilder::loadParticles(Compound* compound, vector<CompoundBuilder::
 			coord *= 0.1f;	// convert A to nm
 			*/
 			//printf("res %d   max res %d\n", record.residue_seq_number, max_residue_id);
+
+
 			if (record.residue_seq_number > max_residue_id)
 				break;
 
@@ -62,14 +70,26 @@ void CompoundBuilder::loadParticles(Compound* compound, vector<CompoundBuilder::
 				continue;
 
 
-			particle_id_map[record.atom_serial_number] = compound->n_particles;
+			//particle_id_map[record.atom_serial_number] = compound->n_particles;
+			if (record.residue_seq_number != current_res_id) {
+				if (!current_compound->hasRoomForRes()) {
 
+					molecule->compound_bridge.addParticle(current_compound->atom_types[current_compound->n_particles - 1], current_compound->particles[current_compound->n_particles - 1]);		// Add prev atom to the bridge
+					molecule->compound_bridge.addParticle(FFM.atomTypeToIndex(record.atom_name[0]), CompactParticle(record.coordinate));														// And new atom to the bridge
+					current_compound_id++;
+					current_compound = &molecule->compounds[current_compound_id];
+					molecule->n_compounds++;
+				}
+				current_res_id = record.residue_seq_number;
+			}
 
-			compound->addParticle(FFM.atomTypeToIndex(record.atom_name[0]), CompactParticle(record.coordinate));
+			particle_id_maps[record.atom_serial_number] = IDMap(record.atom_serial_number, current_compound_id, molecule->compounds[current_compound_id].n_particles);
+			current_compound->addParticle(FFM.atomTypeToIndex(record.atom_name[0]), CompactParticle(record.coordinate));
+			//compound->addParticle(FFM.atomTypeToIndex(record.atom_name[0]), CompactParticle(record.coordinate));
 	}
 }
 
-void CompoundBuilder::loadTopology(Compound* compound, vector<vector<string>>* top_data, int* particle_id_map)
+void CompoundBuilder::loadTopology(Molecule* molecule, vector<vector<string>>* top_data)
 {
 	TopologyMode mode = INACTIVE;
 	for (vector<string> record : *top_data) {
@@ -83,30 +103,10 @@ void CompoundBuilder::loadTopology(Compound* compound, vector<vector<string>>* t
 			continue;
 		}
 
-		addGeneric(compound, &record, mode);
+		addGeneric(molecule, &record, mode);
 	}
 }
 
-void CompoundBuilder::calcParticleSphere(Compound* compound) {
-	Float3 com = compound->calcCOM();// calcCOM(compound);
-
-	float furthest = LONG_MIN;
-	float closest = LONG_MAX;
-	int closest_index = 0;
-
-	for (int i = 0; i < compound->n_particles; i++) {
-		float dist = (compound->particles[i].pos_tsub1 - com).len();
-
-		if (dist < closest) {
-			closest = dist;
-			closest_index = i;
-		}
-		furthest = max(furthest, dist);
-	}
-
-	compound->key_particle_index = closest_index;
-	compound->confining_particle_sphere = furthest;
-}
 
 CompoundBuilder::TopologyMode CompoundBuilder::setMode(string entry)
 {
@@ -119,27 +119,27 @@ CompoundBuilder::TopologyMode CompoundBuilder::setMode(string entry)
 	return INACTIVE;
 }
 
-void CompoundBuilder::addGeneric(Compound* compound, vector<string>* record, TopologyMode mode)
-{
+void CompoundBuilder::addGeneric(Molecule* molecule, vector<string>* record, TopologyMode mode) {
 	switch (mode)
 	{
 	case CompoundBuilder::INACTIVE:
 		return;
 	case CompoundBuilder::BOND:
-		return addBond(compound, record);
+		return addBond(molecule, record);
 	case CompoundBuilder::ANGLE:
-		return addAngle(compound, record);
+		return addAngle(molecule, record);
 	case CompoundBuilder::DIHEDRAL:
-		return addDihedral(compound, record);
+		return addDihedral(molecule, record);
 	default:
 		return;
 	}
 }
 
-void CompoundBuilder::addBond(Compound* compound, vector<string>* record)
-{
-	int particle_indexes[2] = { particle_id_map[stoi((*record)[0])],
-							particle_id_map[stoi((*record)[1])],
+void CompoundBuilder::addBond(Molecule* molecule, vector<string>* record) {
+	Compound* compound = &molecule->compounds[particle_id_maps[stoi((*record)[0])].compound_id];
+	int particle_indexes[2] = { 
+		particle_id_maps[stoi((*record)[0])].local_id,
+		particle_id_maps[stoi((*record)[1])].local_id
 	};	// left, right
 
 	for (int i = 0; i < 2; i++) {
@@ -147,17 +147,18 @@ void CompoundBuilder::addBond(Compound* compound, vector<string>* record)
 			return;
 	}
 
-	double dist = (compound->particles[particle_indexes[0]].pos_tsub1 - compound->particles[particle_indexes[1]].pos_tsub1).len();
+	double dist = (compound->particles[particle_indexes[0]].pos_tsub1 - compound->particles[particle_indexes[1]].pos_tsub1).len();			// TODO: Remove, information is in forcefield!
 	//printf("Calculated ref dist: %f\n", dist);
 	compound->pairbonds[compound->n_pairbonds++] = PairBond(dist, particle_indexes[0], particle_indexes[1]);
 	//printf("Pairbond error: %f\n", OH_refdist - ();
 }
 
-void CompoundBuilder::addAngle(Compound* compound, vector<string>* record)
-{
-	int particle_indexes[3] = {	particle_id_map[stoi((*record)[0])],
-						particle_id_map[stoi((*record)[1])],
-						particle_id_map[stoi((*record)[2])]
+void CompoundBuilder::addAngle(Molecule* molecule, vector<string>* record) {
+	Compound* compound = &molecule->compounds[particle_id_maps[stoi((*record)[0])].compound_id];
+	int particle_indexes[3] = {	
+		particle_id_maps[stoi((*record)[0])].local_id,
+		particle_id_maps[stoi((*record)[1])].local_id,
+		particle_id_maps[stoi((*record)[2])].local_id
 	};	// left, middle, right
 	
 	for (int i = 0; i < 3; i++) {
@@ -169,7 +170,9 @@ void CompoundBuilder::addAngle(Compound* compound, vector<string>* record)
 	compound->anglebonds[compound->n_anglebonds++] = AngleBond(angle, particle_indexes[0], particle_indexes[1], particle_indexes[2]);
 }
 
-void CompoundBuilder::addDihedral(Compound* compound, vector<string>* record) {
+void CompoundBuilder::addDihedral(Molecule* molecule, vector<string>* record) {
+	Compound* compound = &molecule->compounds[particle_id_maps[stoi((*record)[0])].compound_id];
+
 }
 
 
@@ -331,6 +334,22 @@ CompoundBuilder::ResidueComboId CompoundBuilder::parseResidueID(string s)
 	if (id == "" || name == "")
 		return ResidueComboId();
 	return ResidueComboId(stoi(id), name);
+}
+
+void CompoundBuilder::countElements(Molecule* molecule) {
+	int counters[4] = { 0 };
+	for (int c = 0; c < molecule->n_compounds; c++) {
+		Compound* C = &molecule->compounds[c];
+		counters[0] += C->n_particles;
+		counters[1] += C->n_pairbonds;
+		counters[2] += C->n_anglebonds;
+		//counters[3] += C->n_dihedrals;
+	}
+
+	printf("Molecule created with %d compounds\n", molecule->n_compounds);
+	printf("%d particles added\n", counters[0]);
+	printf("%d pairbonds added\n", counters[1]);
+	printf("%d anglebonds added\n", counters[2]);
 }
 
 

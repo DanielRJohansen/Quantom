@@ -1,6 +1,7 @@
 #pragma once
 
 //#include "QuantomTypes.cuh"
+#include "Constants.cuh"
 #include "Bodies.cuh"
 
 
@@ -41,7 +42,6 @@ constexpr double WARN_FORCE = 80'000;
 constexpr double END_SIM_FORCE = 10'500'000;
 const int LOG_P_ID = 17;
 
-const int MAX_COMPOUNDS = 0xFF;
 const int MAX_SOLVENTS = 0xFFFF;
 constexpr float CUTOFF = 1.f;	//nm/
 //const int MAX_ATOM_TYPES = 16;

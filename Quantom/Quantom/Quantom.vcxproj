@@ -100,6 +100,7 @@
     <ClInclude Include="Bodies.cuh" />
     <ClInclude Include="BoxBuilder.cuh" />
     <ClInclude Include="CompoundBuilder.h" />
+    <ClInclude Include="Constants.cuh" />
     <ClInclude Include="DisplayV2.h" />
     <ClInclude Include="Engine.cuh" />
     <ClInclude Include="Environment.h" />

@@ -6,6 +6,7 @@
 #include <fstream>
 #include <vector>
 
+#include "Constants.cuh"
 #include "Forcefield.cuh"
 
 
@@ -30,34 +31,37 @@ struct ParsedLine {
 using namespace std;
 class CompoundBuilder
 {
+	struct IDMap {
+		IDMap() {}
+		IDMap(int global_id, int compound_id, int local_id) : global_id(global_id), compound_id(compound_id), local_id(local_id) {}
+		int global_id = -1, compound_id = -1, local_id = -1;	// local_id is local to the compound
+	};
 public:
 	CompoundBuilder() {}
-	Compound buildMolecule(string pdb_path, string itp_path, int max_residue_id=INT16_MAX);
+	Molecule buildMolecule(string pdb_path, string itp_path, int max_residue_id=INT16_MAX);
 
 
 
 
 private:
 	ForceFieldMaker FFM;
+	IDMap* particle_id_maps;
 
 
 	struct Record_ATOM;
-	void loadParticles(Compound* compound, vector<Record_ATOM>* pdb_data, int max_monomer_id = INT32_MAX, bool ignore_protons =false);
-	void loadTopology(Compound* compound, vector<vector<string>>* itp_data, int* particle_id_map);
+	void loadParticles(Molecule* molecule, vector<Record_ATOM>* pdb_data, int max_monomer_id = INT32_MAX, bool ignore_protons =false);
+	void loadTopology(Molecule* molecule, vector<vector<string>>* itp_data);
 	void calcParticleSphere(Compound* compound);
 
 
 	enum TopologyMode { INACTIVE, BOND, ANGLE, DIHEDRAL };
 	TopologyMode setMode(string entry);
-	void addGeneric(Compound* compound, vector<string>* record, TopologyMode mode);
-	void addBond(Compound* compound, vector<string>* record);
-	void addAngle(Compound* compound, vector<string>* record);
-	void addDihedral(Compound* compound, vector<string>* record);
+	void addGeneric(Molecule* molecule, vector<string>* record, TopologyMode mode);
+	void addBond(Molecule* molecule, vector<string>* record);
+	void addAngle(Molecule* molecule, vector<string>* record);
+	void addDihedral(Molecule* molecule, vector<string>* record);
 
 
-	//Float3 calcCOM(Compound* compound);
-
-	int* particle_id_map;
 
 
 	ParsedLine parseLine(int line_index);
@@ -73,6 +77,8 @@ private:
 
 	ResidueComboId parseResidueID(string s);
 	inline bool isAsciiNumber(char c) { return (c > 47 && c < 58); }
+	void countElements(Molecule* molecule);
+
 
 
 
