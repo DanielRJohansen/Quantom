@@ -35,7 +35,8 @@ private:
 	void placeMultipleCompoundsRandomly(Simulation* simulation, Compound* template_compound, int n_copies);
 	Compound* randomizeCompound(Compound* template_compound);
 	void moveCompound(Compound* compound, Float3 vector);
-	Float3 calcCompoundCom(Compound* compound);
+
+	//Float3 calcCompoundCom(Compound* compound);
 	void rotateCompound(Compound* compound, Float3 xyz_rot);
 	BoundingBox calcCompoundBoundingBox(Compound* compound);
 	bool spaceAvailable(Box* box, Compound* compound);

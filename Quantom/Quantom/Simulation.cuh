@@ -73,7 +73,6 @@ public:
 	uint16_t n_solvents = 0;
 	uint32_t total_particles_upperbound = 0;
 
-	RenderMolecule rendermolecule;	// Not proud, TEMP
 
 	// These are shared for all compounds, MUST be allocated before adding any compounds to box, so not in moveToDevice //
 	CompoundState* compound_state_array;	

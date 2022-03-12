@@ -14,92 +14,8 @@ const int MAX_COMPOUND_PARTICLES = 128;
 
 
 
-
-
-
-
-struct Atom {
-	__host__ __device__ Atom() {}
-	__host__ Atom(Float3 pos, double r, double mass, uint8_t c[3]) : pos(pos), radius(r), mass(mass) {
-		mass *= 0.001f;	// Convert to kg/mol
-		for (int i = 0; i < 3; i++) {
-			color[i] = c[i];
-		}
-	}
-	Float3 pos;	// Relative	to CoM, and (0,0,0) rotation
-	double radius;	// in fm?
-	double mass;		// in kg/mol
-	uint8_t color[3] = { 0,100,0 };
-};
-
-
-struct Molecule {
-	Molecule();
-	int n_atoms;
-	Atom* atoms;
-	Float3 CoM;	// Relative		
-
-	void moveToDevice() {
-		Atom* atoms_temp;
-		int bytesize = n_atoms * sizeof(Atom);
-		cudaMallocManaged(&atoms_temp, bytesize);
-		cudaMemcpy(atoms_temp, atoms, bytesize, cudaMemcpyHostToDevice);
-		cudaDeviceSynchronize();
-		delete atoms;
-		atoms = atoms_temp;
-	}
-};
-
-struct MoleculeLibrary {
-
-	MoleculeLibrary() {
-		molecules = new Molecule[1];
-		n_molecules++;
-
-
-		moveToDevice();
-	}
-
-	void moveToDevice() {
-		for (int i = 0; i < n_molecules; i++)
-			molecules[i].moveToDevice();
-
-		Molecule* temp;
-		int bytesize = n_molecules * sizeof(Molecule);
-		cudaMallocManaged(&temp, bytesize);
-		cudaMemcpy(temp, molecules, bytesize, cudaMemcpyHostToDevice);
-		cudaDeviceSynchronize();
-		delete molecules;
-		molecules = temp;
-
-	}
-
-	int n_molecules = 0;
-	Molecule* molecules;
-
-};
-
-
-
-
-
-
-
-
-
-
-
-
-struct RenderMolecule {	// Just temporary, dont know howq to properly implement functionality for rendering.
-	uint8_t colors[3][3];
-	double radii[3];
-};
-
-constexpr double BODY_RADIUS = 0.2;		// CRITICAL VALUE!
-constexpr unsigned char UNUSED_BODY = 255;
 struct CompactParticle {	// Contains information only needed by the Ownerkernel
 	CompactParticle() {}	
-	//CompactParticle(double mass, Float3 pos_sub1) : mass(mass), pos_tsub1(pos_sub1)  {}	// This breaks on linux??
 	CompactParticle(Float3 pos_sub1) {
 		this->pos_tsub1 = pos_sub1;
 	}	
@@ -265,18 +181,8 @@ public:
 
 
 
-// A shell script will automate writing these compounds
-const int H2O_PARTICLES = 3;
-const int H2O_PAIRBONDS = 2;
-const int H2O_ANGLEBONDS = 1;
-const double OH_refdist = 0.095;			// nm
-const double HOH_refangle = 1.822996;	// radians
-const double max_LJ_dist = 1;			// nm
-
 const int MAX_PAIRBONDS = 128;
 const int MAX_ANGLEBONDS = 256;
-const double CC_refdist = 0.153; // nm
-const double CCC_reftheta = 1.953; // nm
 
 struct CompoundState {
 	__device__ void setMeta(int n_p) {
@@ -298,40 +204,26 @@ struct Compound {
 
 
 	//---------------------------------------------------------------------------------//
-	__host__ Compound(uint32_t index, CompoundState* states_host) {		// Default for testing only!
-		pairbonds[0] = PairBond(CC_refdist, 0, 1);
-		n_pairbonds++;
 
-		pairbonds[1] = PairBond(CC_refdist, 0, 2);
-		n_pairbonds++;
-
-		anglebonds[0] = AngleBond(CCC_reftheta, 1, 0, 2);
-		n_anglebonds++;
-
-		for (uint32_t i = 0; i < n_particles; i++)
-			center_of_mass = center_of_mass + states_host->positions[i];
-		center_of_mass = center_of_mass * (1.f / states_host->n_particles);
-
-		radius = pairbonds[0].reference_dist * states_host->n_particles;					// TODO: Shitty estimate, do better later
-	};
 	
 	__host__ void init() {	// Only call this if the compound has already been assigned particles & bonds
-		center_of_mass = getCOM();
+		center_of_mass = calcCOM();
 		//printf("")
 		radius = pairbonds[0].reference_dist * n_particles * 0.5f;
 		//center_of_mass.print('C');
 		//printf("Radius %f\n", radius);
 	}
 
-	__host__ Float3 getCOM() {
+	__host__ Float3 calcCOM() {
 		Float3 com;
 		for (int i = 0; i < n_particles; i++)
 			com += (particles[i].pos_tsub1 * (1.f / (double) n_particles));
 		return com;
 	}
+	/*
 	__host__ bool intersects(Compound a) {
 		return (a.center_of_mass - center_of_mass).len() < (a.radius + radius + max_LJ_dist);
-	}
+	}*/
 	//---------------------------------------------------------------------------------//
 
 	__device__ void loadMeta(Compound* compound) {
@@ -379,7 +271,7 @@ struct Compound {
 };
 
 
-struct Molecule1 {
+struct Molecule {
 	int n_compounds = 0;
 	Compound* compounds;
 };

@@ -25,12 +25,7 @@ void BoxBuilder::buildBox(Simulation* simulation) {
 
 
 
-	Molecule water;
-	for (int i = 0; i < water.n_atoms; i++) {
-		simulation->box->rendermolecule.radii[i] = water.atoms[i].radius;
-		for (int j = 0; j < 3; j++)
-			simulation->box->rendermolecule.colors[i][j] = water.atoms[i].color[j];
-	}
+
 
 	simulation->box->dt = simulation->dt;
 
@@ -41,7 +36,7 @@ void BoxBuilder::addSingleMolecule(Simulation* simulation, Compound* molecule)
 {
 	Float3 compound_center = Float3(BOX_LEN_HALF, BOX_LEN_HALF, BOX_LEN_HALF);
 
-	Float3 offset = compound_center - molecule->getCOM();
+	Float3 offset = compound_center - molecule->calcCOM();
 	for (int i = 0; i < molecule->n_particles; i++) {
 		molecule->particles[i].pos_tsub1 += offset;
 	}
@@ -317,7 +312,7 @@ Compound* BoxBuilder::randomizeCompound(Compound* original_compound)
 
 
 	Float3 xyz_target = (get3Random() * 0.6 + Float3(0.2))* BOX_LEN;
-	Float3 xyz_mov = xyz_target - calcCompoundCom(original_compound);
+	Float3 xyz_mov = xyz_target - original_compound->calcCOM();// calcCompoundCom(original_compound);
 	moveCompound(compound, xyz_mov);
 
 	return compound;
@@ -328,7 +323,7 @@ void BoxBuilder::moveCompound(Compound* compound, Float3 vector)
 	for (int i = 0; i < compound->n_particles; i++)
 		compound->particles[i].pos_tsub1 += vector;
 }
-
+/*
 Float3 BoxBuilder::calcCompoundCom(Compound* compound)
 {
 	Float3 com = Float3(0, 0, 0);
@@ -338,10 +333,10 @@ Float3 BoxBuilder::calcCompoundCom(Compound* compound)
 
 	return com;
 }
-
+*/
 void BoxBuilder::rotateCompound(Compound* compound, Float3 xyz_rot)
 {
-	Float3 vec_to_origo = Float3(0, 0, 0) - calcCompoundCom(compound);
+	Float3 vec_to_origo = Float3(0, 0, 0) - compound->calcCOM();
 	moveCompound(compound, vec_to_origo);
 
 	for (int i = 0; i < compound->n_particles; i++)

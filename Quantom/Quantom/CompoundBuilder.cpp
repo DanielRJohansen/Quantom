@@ -110,7 +110,7 @@ void CompoundBuilder::loadTopology(Compound* compound, vector<vector<string>>* t
 }
 
 void CompoundBuilder::calcParticleSphere(Compound* compound) {
-	Float3 com = calcCOM(compound);
+	Float3 com = compound->calcCOM();// calcCOM(compound);
 
 	float furthest = LONG_MIN;
 	float closest = LONG_MAX;
@@ -191,10 +191,10 @@ void CompoundBuilder::addAngle(Compound* compound, vector<string>* record)
 	compound->anglebonds[compound->n_anglebonds++] = AngleBond(angle, particle_indexes[0], particle_indexes[1], particle_indexes[2]);
 }
 
-void CompoundBuilder::addDihedral(Compound* compound, vector<string>* record)
-{
+void CompoundBuilder::addDihedral(Compound* compound, vector<string>* record) {
 }
 
+/*
 Float3 CompoundBuilder::calcCOM(Compound* compound) {
 	Float3 com(0.f);
 	for (int i = 0; i < compound->n_particles; i++) {
@@ -202,7 +202,7 @@ Float3 CompoundBuilder::calcCOM(Compound* compound) {
 	}
 	return com * (1.f / (float) compound->n_particles);
 }
-
+*/
 vector<vector<string>> CompoundBuilder::parseTOP(string path)		// Naive file segmentation, DANGEROUS!
 {
 	fstream file;

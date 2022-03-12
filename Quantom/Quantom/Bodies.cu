@@ -1,6 +1,7 @@
 #include "Bodies.cuh"
 
 
+/*
 Molecule::Molecule() {	// Always returns a h2o molecule rn
 	n_atoms = 3;
 	atoms = new Atom[3];
@@ -52,4 +53,4 @@ Molecule::Molecule() {	// Always returns a h2o molecule rn
 
 }
 
-	
+	*/

@@ -55,7 +55,7 @@ private:
 	void addDihedral(Compound* compound, vector<string>* record);
 
 
-	Float3 calcCOM(Compound* compound);
+	//Float3 calcCOM(Compound* compound);
 
 	int* particle_id_map;
 
