@@ -362,6 +362,7 @@ struct RenderBall {
 	Float3 pos;	// only uses x and y
 	float radius;
 	Int3 color;
+	bool disable = false;
 };
 
 

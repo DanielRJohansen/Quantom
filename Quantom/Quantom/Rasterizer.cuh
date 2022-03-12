@@ -25,13 +25,14 @@ public:
 	
 	RenderBall* render(Simulation* simulation);
 
-	int actual_n_particles;
+	//int actual_n_particles;
+	//int n_particles_upperbound;
 	int solvent_offset;
 
 private:
 	RenderAtom* getAllAtoms(Simulation* simulation);
 	void sortAtoms(RenderAtom* atoms, int dim);
-	RenderBall* processAtoms(RenderAtom* atoms);
+	RenderBall* processAtoms(RenderAtom* atoms, Simulation* simulation);
 
 
 	int n_threadblocks;

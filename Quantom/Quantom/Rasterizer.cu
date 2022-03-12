@@ -10,17 +10,17 @@ void mergeSortAPI(RenderBall* balls, int n_balls);
 
 
 RenderBall* Rasterizer::render(Simulation* simulation) {    
-    actual_n_particles = simulation->box->compounds[0].n_particles + simulation->n_solvents;
-    solvent_offset = simulation->box->compounds[0].n_particles;
-    n_threadblocks = ceil((float)actual_n_particles / (float)RAS_THREADS_PER_BLOCK);
+    //actual_n_particles = simulation->box->compounds[0].n_particles + simulation->n_solvents;
+    //solvent_offset = simulation->box->compounds[0].n_particles;
+    solvent_offset = simulation->n_compounds * MAX_COMPOUND_PARTICLES;
+    n_threadblocks = ceil((float)simulation->total_particles_upperbound / (float)RAS_THREADS_PER_BLOCK);
 
 
 	RenderAtom* atoms = getAllAtoms(simulation);
 
-    //sortAtoms(atoms, 1);    // dim 1 is y
 
-    RenderBall* balls = processAtoms(atoms);
-    mergeSortAPI(balls, actual_n_particles);
+    RenderBall* balls = processAtoms(atoms, simulation);
+    mergeSortAPI(balls, simulation->total_particles_upperbound);
 
 	return balls;
 }
@@ -37,17 +37,17 @@ RenderBall* Rasterizer::render(Simulation* simulation) {
 
 __global__ void loadCompoundatomsKernel(Box* box, RenderAtom* atoms);
 __global__ void loadSolventatomsKernel(Box* box, RenderAtom* atoms, int offset);
-__global__ void processAtomsKernel(RenderAtom* atoms, RenderBall* balls, int n_atoms);
+__global__ void processAtomsKernel(RenderAtom* atoms, RenderBall* balls);
 
 
 RenderAtom* Rasterizer::getAllAtoms(Simulation* simulation) {
 	
 
 	RenderAtom* atoms;
-	cudaMalloc(&atoms, sizeof(RenderAtom) * actual_n_particles);
+	cudaMalloc(&atoms, sizeof(RenderAtom) * simulation->total_particles_upperbound);
 
 	Box* box = simulation->box;
-	loadCompoundatomsKernel << <1, simulation->box->compounds[0].n_particles >> > (box, atoms);
+	loadCompoundatomsKernel << <simulation->n_compounds, MAX_COMPOUND_PARTICLES >> > (box, atoms);
 	loadSolventatomsKernel << <1, simulation->n_solvents >> > (simulation->box, atoms, solvent_offset);
 	cudaDeviceSynchronize();
 
@@ -59,15 +59,15 @@ void Rasterizer::sortAtoms(RenderAtom* atoms, int dim) {
     cudaDeviceSynchronize();
 }
 
-RenderBall* Rasterizer::processAtoms(RenderAtom* atoms) {
+RenderBall* Rasterizer::processAtoms(RenderAtom* atoms, Simulation* simulation) {
     RenderBall* balls_device;
-    cudaMalloc(&balls_device, sizeof(RenderBall) * actual_n_particles);
+    cudaMalloc(&balls_device, sizeof(RenderBall) * simulation->total_particles_upperbound);
 
-    processAtomsKernel <<< n_threadblocks, RAS_THREADS_PER_BLOCK >>> (atoms, balls_device, actual_n_particles);
+    processAtomsKernel <<< n_threadblocks, RAS_THREADS_PER_BLOCK >>> (atoms, balls_device);
     cudaDeviceSynchronize();
 
-    RenderBall* balls_host = new RenderBall[actual_n_particles];
-    cudaMemcpy(balls_host, balls_device, sizeof(RenderBall) * actual_n_particles, cudaMemcpyDeviceToHost);
+    RenderBall* balls_host = new RenderBall[simulation->total_particles_upperbound];
+    cudaMemcpy(balls_host, balls_device, sizeof(RenderBall) * simulation->total_particles_upperbound, cudaMemcpyDeviceToHost);
 
     cudaFree(atoms);
     cudaFree(balls_device);
@@ -117,8 +117,6 @@ __device__ ATOM_TYPE RAS_getTypeFromMass(double mass) {
         return ATOM_TYPE::P;
     return ATOM_TYPE::NONE;
 }
-
-
 
 __device__ Int3 getColor(ATOM_TYPE atom_type) {
     switch (atom_type)
@@ -174,11 +172,20 @@ __device__ float getRadius(ATOM_TYPE atom_type) {
 
 
 __global__ void loadCompoundatomsKernel(Box * box, RenderAtom * atoms) {                                                            // TODO: CAN ONLY HANDLE ONE COMPOUND!!!
-    atoms[threadIdx.x].pos = box->compound_state_array[0].positions[threadIdx.x];
+    int local_id = threadIdx.x;
+    int compound_id = blockIdx.x;
+    int global_id = threadIdx.x + blockIdx.x * blockDim.x;
+
+    atoms[global_id].pos = box->compound_state_array[compound_id].positions[local_id];                                                          // Might need to change this, if thread> n_particles!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     //atoms[threadIdx.x].mass = box->compounds[0].particles[threadIdx.x].mass;
-    atoms[threadIdx.x].mass = SOLVENT_MASS;                                                         // TEMP
+    atoms[global_id].mass = SOLVENT_MASS;                                                         // TEMP
     //atoms[threadIdx.x].mass = forcefield_device.particle_parameters[box->compounds[0].atom_types[threadIdx.x]].mass;
-    atoms[threadIdx.x].atom_type = RAS_getTypeFromIndex(box->compounds[0].atom_types[threadIdx.x]);
+    if (local_id < box->compounds[compound_id].n_particles) {
+        atoms[global_id].atom_type = RAS_getTypeFromIndex(box->compounds[compound_id].atom_types[local_id]);
+    }
+    else {
+        atoms[global_id].atom_type = ATOM_TYPE::NONE;
+    }
 }
 
 __global__ void loadSolventatomsKernel(Box * box, RenderAtom * atoms, int offset) {
@@ -187,16 +194,14 @@ __global__ void loadSolventatomsKernel(Box * box, RenderAtom * atoms, int offset
     atoms[threadIdx.x + offset].atom_type = SOL;
 }
 
-__global__ void processAtomsKernel(RenderAtom* atoms, RenderBall* balls, int n_atoms) {
+
+
+
+__global__ void processAtomsKernel(RenderAtom* atoms, RenderBall* balls) { 
     int index = threadIdx.x + blockIdx.x * RAS_THREADS_PER_BLOCK;
     
-    if (index > n_atoms)
-        return;
 
     RenderAtom atom = atoms[index];
-
-    //atom.atom_type = atom.atom_type == NONE ? RAS_getTypeFromMass(atom.mass) : atom.atom_type;
-    atom.atom_type = atom.atom_type == NONE ? RAS_getTypeFromMass(atom.mass) : atom.atom_type;
 
     atom.color = getColor(atom.atom_type);
     atom.radius = (getRadius(atom.atom_type)) / (1.f+atom.pos.y * 0.001f);       // [nm]
@@ -211,6 +216,8 @@ __global__ void processAtomsKernel(RenderAtom* atoms, RenderBall* balls, int n_a
 
 
     RenderBall ball(atom.pos, atom.radius, atom.color);
+    if (atom.atom_type == ATOM_TYPE::NONE)
+        ball.disable = true;
     balls[index] = ball;
 }
 
@@ -266,11 +273,6 @@ RenderBall* mergeSort(const RenderBall* atoms, const int l, const int r) {	// l 
 }
 
 void mergeSortAPI(RenderBall* balls, int n_balls) {					// Returns a mapping where mapping[0] is the closest id, mapping [1] seconds closest, so on
-
-    //RenderBall* balls_temp = new RenderBall[n_balls];
-    //memcpy(balls_temp, balls, sizeof(RenderBall) * n_balls);
-
-
 
 
     RenderBall* sorted_balls = mergeSort(balls, 0, n_balls - 1);

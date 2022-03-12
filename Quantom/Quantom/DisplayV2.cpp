@@ -33,10 +33,10 @@ void DisplayV2::drawFilledCircle(GLfloat x, GLfloat y, GLfloat radius, Int3 colo
 
 
 void DisplayV2::drawBalls(RenderBall* balls, int n_balls) {
-    for (int i = 0; i < n_balls; i++) {
+    for (int i = n_balls-1; i >= 0; i--) {
         RenderBall ball = balls[i];
-
-        drawFilledCircle(ball.pos.x, ball.pos.z, ball.radius, ball.color);
+        if (!ball.disable)
+            drawFilledCircle(ball.pos.x, ball.pos.z, ball.radius, ball.color);
     }
 }
 
@@ -48,7 +48,7 @@ void DisplayV2::render(Simulation* simulation) {
     glClear(GL_COLOR_BUFFER_BIT);
 
 
-    drawBalls(balls, rasterizer.actual_n_particles);
+    drawBalls(balls, simulation->total_particles_upperbound);
 
     /* Swap front and back buffers */
     glfwSwapBuffers(window);
