@@ -11,6 +11,8 @@ const int MAX_ATOM_TYPES = 16;
 #define ATOMTYPE_O 2
 #define ATOMTYPE_N 3
 #define ATOMTYPE_H 4
+#define ATOMTYPE_P 5
+#define ATOMTYPE_S 6
 
 
 
@@ -66,6 +68,8 @@ public:
 		make('O', 2, 15.999000, 0.302905564168f, 0.50208f);
 		make('N', 3, 14.007000, 0.329632525712, 0.83680);
 		make('H', 4, 1.008000, 0.040001352445, 0.19246);
+		make('P', 5, 30.974000, 0.383086448800, 2.44764);
+		make('S', 6, 32.060000, 0.356359487256,  1.88280);
 		/*forcefield.particle_parameters[0] = ParticleParameters('C', 12.011f, 0.356359487256f, 0.46024f);
 		forcefield.particle_parameters[1] = ParticleParameters('O', 12.011f, 0.356359487256f, 0.46024f);
 		forcefield.particle_parameters[2] = ParticleParameters('N', 12.011f, 0.356359487256f, 0.46024f);
@@ -92,13 +96,17 @@ public:
 
 	int atomTypeToIndex(char atom) {
 		if (atom == 'C')
-			return 0;
-		if (atom == 'O')
 			return 1;
-		if (atom == 'N')
+		if (atom == 'O')
 			return 2;
-		if (atom == 'H')
+		if (atom == 'N')
 			return 3;
+		if (atom == 'H')
+			return 4;
+		if (atom == 'P')
+			return 5;
+		if (atom == 'S')
+			return 6;
 		printf("Unable to find atom %c\n", atom);
 		exit(1);
 	}

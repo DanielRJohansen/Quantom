@@ -19,20 +19,20 @@ const int STEPS_PER_TRAINDATATRANSFER = 500;
 
 
 
-const int STEPS_PER_RENDER = 100;
+const int STEPS_PER_RENDER = 1;
 
 
 const bool APPLY_THERMOSTAT = false;										// Switch to using forcefield_host first
 
 #ifndef __linux__
-const string MOL_FOLDER = "C:\\PROJECTS\\Quantom\\t4lys\\";
+const string MOL_FOLDER = "C:\\PROJECTS\\Quantom\\molecules\\t4lys_full\\";
 const string OUT_DIR = "C:\\PROJECTS\\Quantom\\LIMANET\\sim_out";
 #else
 const string MOL_FOLDER = "../Compounds/t4lys/";
 const string OUT_DIR = "/home/lima/Desktop/LIMA";
 #endif
 
-const int N_SOLVATE_MOLECULES = 800;	// Must not be above 255, as that can't be represented as uint8_t5
+const int N_SOLVATE_MOLECULES = 50;	// Must not be above 255, as that can't be represented as uint8_t5
 
 
 

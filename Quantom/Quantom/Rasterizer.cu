@@ -96,6 +96,10 @@ __device__ ATOM_TYPE RAS_getTypeFromIndex(int atom_index) {
         return ATOM_TYPE::N;
     case 4:
         return ATOM_TYPE::H;
+    case 5: 
+        return ATOM_TYPE::P;
+    case 6:
+        return ATOM_TYPE::SOL;
     default:
         return ATOM_TYPE::NONE;
     }
