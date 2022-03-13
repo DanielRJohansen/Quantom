@@ -414,17 +414,6 @@ void Engine::step() {
 // ------------------------------------------------------------------------------------------- DEVICE FUNCTIONS -------------------------------------------------------------------------------------------//
 
 
-/*
-void __device__ __host__ LIMAENG::applyHyperpos(Float3* static_particle, Float3* movable_particle) {
-	//Float3 tmp = *movable_particle;
-	for (int i = 0; i < 3; i++) {
-		*movable_particle->placeAt(i) += BOX_LEN * ((static_particle->at(i) - movable_particle->at(i)) > BOX_LEN_HALF);
-		*movable_particle->placeAt(i) -= BOX_LEN * ((static_particle->at(i) - movable_particle->at(i)) < -BOX_LEN_HALF);	// use at not X!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-	}
-
-}
-*/
-
 
 __device__ void applyPBC(Float3* current_position) {	// Only changes position if position is outside of box;
 	for (int dim = 0; dim < 3; dim++) {
@@ -435,49 +424,10 @@ __device__ void applyPBC(Float3* current_position) {	// Only changes position if
 
 
 
-
+/*
 constexpr double sigma = 0.3923f;										// nm, point at which d/dE or force is 0.
 constexpr double epsilon = 0.5986 * 1'000.f;							// J/mol
-__device__ Float3 calcLJForce(Float3* pos0, Float3* pos1, double* data_ptr, double* potE) {																				// Uhhhh, delete this function soon please!
-	// Calculates LJ force on p0	//
-	//	Returns force in J/mol*M		//
-
-	double dist = (*pos0 - *pos1).len();								// [nm]
-
-	double fraction = sigma / dist;										// [nm/nm], so unitless
-	double f2 = fraction * fraction;
-	double f6 = f2 * f2 * f2;
-
-	double force = 24.f * (epsilon / (dist)) * f6 * (1.f - 2.f * f6);	// [N/mol] (or J/mol??, no direction)
-
-	double LJ_pot = 4.f * epsilon * (f6 * f6 - f6);
-	Float3 force_unit_vector = (*pos1 - *pos0).norm();
-
-	*potE += LJ_pot * 0.5;												// Log this value for energy monitoring purposes
-
-	if (threadIdx.x == 59 && blockIdx.x == 0) {
-		//printf("Thread %d Block %d self %f %f %f other %f %f %f\n", threadIdx.x, blockIdx.x, pos0->x, pos0->y, pos0->z, pos1->x, pos1->y, pos1->z);
-	}
-
-	{	
-		//data_ptr[1] += force;
-		//data_ptr[2] = cudaMin(data_ptr[2], dist);
-		//data_ptr[2] = min(data_ptr[2], dist);
-		Float3 force_vec = force_unit_vector * force;
-		if (force_vec.x != force_vec.x) {
-			//printf("Force: %f\n", force);
-			//force_unit_vector.print('u');
-			printf("Thread %d Block %d self %f %f %f other %f %f %f\n", threadIdx.x, blockIdx.x, pos0->x, pos0->y, pos0->z, pos1->x, pos1->y, pos1->z);
-			
-		}
-		/*if (dist < 0.1f) {
-			printf("\nThread %d Block %d step %d dist %f force %f\n", threadIdx.x, blockIdx.x, (int)data_ptr[3], (*pos0 - *pos1).len(), force);
-			printf("Self %f %f %f -> %f %f %f\n", data_ptr[0], data_ptr[1], data_ptr[2], pos0->x, pos0->y, pos0->z);
-		}*/
-	}
-
-	return force_unit_vector * force;									//J/mol*M	(M is direction)
-}
+*/
 
 __device__ Float3 calcLJForce(Float3* pos0, Float3* pos1, double* data_ptr, double* potE, float sigma, float epsilon, bool verbose=false) {		
 	// Calculates LJ force on p0	//
@@ -583,27 +533,6 @@ __device__ Float3 computeLJForces(Float3* self_pos, int n_particles, Float3* pos
 	}
 	return force;
 }
-__device__ Float3 computeLJForces(Float3* self_pos, int n_particles, Float3* positions, double* data_ptr, double* potE_sum) {	// Assumes all positions are 
-	Float3 force(0, 0, 0);
-	for (int i = 0; i < n_particles; i++) {
-		force += calcLJForce(self_pos, &positions[i], data_ptr, potE_sum);
-	}
-	return force;
-}
-
-/*
-__device__ Float3 computeSolventToSolventLJForces(Float3* self_pos, int self_index, int n_particles, Float3* positions, double* data_ptr, double* potE_sum) {	// Specific to solvent kernel
-	Float3 force(0, 0, 0);
-	for (int i = 0; i < n_particles; i++) {
-		if (i != self_index) {
-			Float3 hyperpos = positions[i];			// copy, DONT ref it as all threads will cann applyHyperpos
-			LIMAENG::applyHyperpos(self_pos, &hyperpos);
-			force += calcLJForce(self_pos, &hyperpos, data_ptr, potE_sum);
-		}		
-	}
-	return force;
-}
-*/
 
 __device__ Float3 computeSolventToSolventLJForces(Float3* self_pos, NeighborList* nlist, Solvent* solvents, double* data_ptr, double* potE_sum) {	// Specific to solvent kernel
 	Float3 force(0.f);
@@ -621,14 +550,10 @@ __device__ Float3 computeSolventToSolventLJForces(Float3* self_pos, NeighborList
 __device__ Float3 computeSolventToCompoundLJForces(Float3* self_pos, int n_particles, Float3* positions, double* data_ptr, double* potE_sum, uint8_t atomtype_self) {	// Specific to solvent kernel
 	Float3 force(0, 0, 0);
 	for (int i = 0; i < n_particles; i++) {
-		if (threadIdx.x == 0)
-			printf("here \n");
 		force += calcLJForce(self_pos, &positions[i], data_ptr, potE_sum,
 			forcefield_device.particle_parameters[atomtype_self].sigma + forcefield_device.particle_parameters[ATOMTYPE_SOL].sigma,
 			forcefield_device.particle_parameters[atomtype_self].epsilon + forcefield_device.particle_parameters[ATOMTYPE_SOL].epsilon
 		);
-		if (threadIdx.x == 0)
-			force.print('F');
 	}
 	return force;
 }
@@ -831,8 +756,8 @@ __global__ void forceKernel(Box* box) {
 	}
 	__syncthreads();
 	if (threadIdx.x < compound.n_particles) {
-		force_LJ_sol += computeLJForces(&compound_state.positions[threadIdx.x], neighborlist.n_solvent_neighbors, utility_buffer, data_ptr, &potE_sum);
-		//force_LJ_sol += computeSolventToCompoundLJForces(&compound_state.positions[threadIdx.x], neighborlist.n_solvent_neighbors, utility_buffer, data_ptr, &potE_sum, compound.atom_types[threadIdx.x]);
+		//force_LJ_sol += computeLJForces(&compound_state.positions[threadIdx.x], neighborlist.n_solvent_neighbors, utility_buffer, data_ptr, &potE_sum);
+		force_LJ_sol += computeSolventToCompoundLJForces(&compound_state.positions[threadIdx.x], neighborlist.n_solvent_neighbors, utility_buffer, data_ptr, &potE_sum, compound.atom_types[threadIdx.x]);
 	}		
 	// ------------------------------------------------------------------------------------------------------------------------------------------------ //
 
@@ -987,7 +912,8 @@ __global__ void solventForceKernel(Box* box) {
 
 		if (thread_active) {
 			LIMAENG::applyHyperpos(&utility_buffer[0], &solvent_pos);									// Move own particle in relation to compound-key-position
-			force += computeLJForces(&solvent_pos, n_compound_particles, utility_buffer, data_ptr, &potE_sum);
+			//force += computeLJForces(&solvent_pos, n_compound_particles, utility_buffer, data_ptr, &potE_sum);
+			force += computeLJForces(&solvent_pos, n_compound_particles, utility_buffer, data_ptr, &potE_sum, ATOMTYPE_SOL, utility_buffer_small);
 		}
 		__syncthreads();
 
