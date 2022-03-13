@@ -19,7 +19,7 @@ const int STEPS_PER_TRAINDATATRANSFER = 500;
 
 
 
-const int STEPS_PER_RENDER = 1;
+const int STEPS_PER_RENDER = 20;
 
 
 const bool APPLY_THERMOSTAT = false;										// Switch to using forcefield_host first

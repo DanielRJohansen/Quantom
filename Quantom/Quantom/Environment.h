@@ -58,7 +58,8 @@ public:
 
 
 private:
-	bool verifySimulationParameters();
+	void verifySimulationParameters();			// Constants before doing anything
+	void verifyBox();							// Checks wheter the box will break
 	//Display* display;
 	DisplayV2* display;
 	Interface* interface;

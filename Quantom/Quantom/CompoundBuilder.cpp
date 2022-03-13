@@ -4,8 +4,7 @@
 
 
 
-Molecule CompoundBuilder::buildMolecule(string pdb_path, string itp_path, int max_residue_id)
-{
+Molecule CompoundBuilder::buildMolecule(string pdb_path, string itp_path, int max_residue_id, int min_residue_id) {
 	//vector<vector<string>> pdb_data = readFile(pdb_path);
 	//vector<Record_ATOM> atom_data = parsePDB(pdb_path);
 	particle_id_maps = new IDMap[MAX_ATOMS];
@@ -18,7 +17,7 @@ Molecule CompoundBuilder::buildMolecule(string pdb_path, string itp_path, int ma
 	Molecule molecule;
 
 	//loadParticles(&compound, &atom_data, max_residue_id, true);
-	loadParticles(&molecule, &atom_data, max_residue_id, true);
+	loadParticles(&molecule, &atom_data, max_residue_id, min_residue_id, true);
 	//printf("%d particles added\n", compound.n_particles);
 	loadTopology(&molecule, &top_data);
 
@@ -40,7 +39,7 @@ Molecule CompoundBuilder::buildMolecule(string pdb_path, string itp_path, int ma
 
 
 
-void CompoundBuilder::loadParticles(Molecule* molecule, vector<CompoundBuilder::Record_ATOM>* pdb_data, int max_residue_id, bool ignore_protons) {
+void CompoundBuilder::loadParticles(Molecule* molecule, vector<CompoundBuilder::Record_ATOM>* pdb_data, int max_residue_id, int min_residue_id, bool ignore_protons) {
 
 
 	int current_res_id = 0;
@@ -62,31 +61,33 @@ void CompoundBuilder::loadParticles(Molecule* molecule, vector<CompoundBuilder::
 			*/
 			//printf("res %d   max res %d\n", record.residue_seq_number, max_residue_id);
 
+		if (record.residue_seq_number < min_residue_id)
+			continue;
 
-			if (record.residue_seq_number > max_residue_id)
-				break;
+		if (record.residue_seq_number > max_residue_id)
+			break;
 
-			if (ignore_protons && record.atom_name[0] == 'H')
-				continue;
+		if (ignore_protons && record.atom_name[0] == 'H')
+			continue;
 
 
-			//particle_id_map[record.atom_serial_number] = compound->n_particles;
-			if (record.residue_seq_number != current_res_id) {
-				if (!current_compound->hasRoomForRes()) {
+		//particle_id_map[record.atom_serial_number] = compound->n_particles;
+		if (record.residue_seq_number != current_res_id) {
+			if (!current_compound->hasRoomForRes()) {
 
-					molecule->compound_bridge.addParticle(current_compound->atom_types[current_compound->n_particles - 1], current_compound->particles[current_compound->n_particles - 1]);		// Add prev atom to the bridge
-					molecule->compound_bridge.addParticle(FFM.atomTypeToIndex(record.atom_name[0]), CompactParticle(record.coordinate));														// And new atom to the bridge
-					current_compound_id++;
-					current_compound = &molecule->compounds[current_compound_id];
-					molecule->n_compounds++;
-				}
-				current_res_id = record.residue_seq_number;
+				molecule->compound_bridge.addParticle(current_compound->atom_types[current_compound->n_particles - 1], current_compound->particles[current_compound->n_particles - 1]);		// Add prev atom to the bridge
+				molecule->compound_bridge.addParticle(FFM.atomTypeToIndex(record.atom_name[0]), CompactParticle(record.coordinate));														// And new atom to the bridge
+				current_compound_id++;
+				current_compound = &molecule->compounds[current_compound_id];
+				molecule->n_compounds++;
 			}
+			current_res_id = record.residue_seq_number;
+		}
 
-			particle_id_maps[record.atom_serial_number] = IDMap(record.atom_serial_number, current_compound_id, molecule->compounds[current_compound_id].n_particles);
-			current_compound->addParticle(FFM.atomTypeToIndex(record.atom_name[0]), CompactParticle(record.coordinate));
-			molecule->n_atoms_total++;
-			//compound->addParticle(FFM.atomTypeToIndex(record.atom_name[0]), CompactParticle(record.coordinate));
+		particle_id_maps[record.atom_serial_number] = IDMap(record.atom_serial_number, current_compound_id, molecule->compounds[current_compound_id].n_particles);
+		current_compound->addParticle(FFM.atomTypeToIndex(record.atom_name[0]), CompactParticle(record.coordinate));
+		molecule->n_atoms_total++;
+		//compound->addParticle(FFM.atomTypeToIndex(record.atom_name[0]), CompactParticle(record.coordinate));
 	}
 }
 

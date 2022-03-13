@@ -8,9 +8,8 @@ Environment::Environment() {
 
 
 	simulation = new Simulation();
-	if (!verifySimulationParameters()) {
-		exit(0);
-	}
+	verifySimulationParameters();
+
 
 
 
@@ -21,7 +20,7 @@ Environment::Environment() {
 	//Compound mol_4pcw10 = compoundbuilder.buildMolecule("D:\\Quantom\\filaggrin\\4pcw_first10.pdb", "D:\\Quantom\\filaggrin\\topol.top", 7);
 	//Compound mol_4pcw10 = compoundbuilder.buildMolecule("D:\\Quantom\\filaggrin\\conf.gro", "D:\\Quantom\\filaggrin\\topol.top", 4);
 	//Compound mol_6lzm_10 = compoundbuilder.buildMolecule(MOL_FOLDER + "conf.gro", MOL_FOLDER + "topol.top", 10);
-	Molecule mol_6lzm_10 = compoundbuilder.buildMolecule(MOL_FOLDER + "conf.gro", MOL_FOLDER + "topol.top", 11);
+	Molecule mol_6lzm_10 = compoundbuilder.buildMolecule(MOL_FOLDER + "conf.gro", MOL_FOLDER + "topol.top", 10, 0);
 	
 
 	//printf("here %d", temp.n_particles);
@@ -33,21 +32,17 @@ Environment::Environment() {
 	delete[] mol_6lzm_10.compounds;
 	boxbuilder.finishBox(simulation);
 
-
-
 	simulation->moveToDevice();	// Only moves the Box to the device
+	verifyBox();
 
 	engine = new Engine(simulation);
 
 
-	if (cudaGetLastError() != cudaSuccess) {
-		fprintf(stderr, "Error during Display Initiation\n");
-		exit(1);
-	}
+
 
 }
 
-bool Environment::verifySimulationParameters() {	// Not yet implemented
+void Environment::verifySimulationParameters() {	// Not yet implemented
 	assert(THREADS_PER_COMPOUNDBLOCK >= MAX_COMPOUND_PARTICLES);
 	//assert(THREADS_PER_SOLVENTBLOCK >= N_SOLVATE_MOLECULES);
 	assert(BOX_LEN > 3.f);
@@ -60,8 +55,21 @@ bool Environment::verifySimulationParameters() {	// Not yet implemented
 
 	assert(STEPS_PER_THERMOSTAT % STEPS_PER_LOGTRANSFER == 0);		// Change to trajtransfer later
 	//assert(STEPS_PER_THERMOSTAT >= STEPS_PER_LOGTRANSFER);
-	return true;
+
 }
+
+void Environment::verifyBox() {
+
+	printf("FSDA OJØÆMVPSEWM %d\n", simulation->n_compounds);
+	for (int c = 0; c < simulation->n_compounds; c++) {
+		printf("Compound radius: %f\n", simulation->compounds_host[c].confining_particle_sphere);
+		if ((simulation->compounds_host[c].confining_particle_sphere * 1.1) > BOX_LEN_HALF) {
+			printf("Compound %d too large for simulation-box\n");
+			exit(1);
+		}
+	}
+}
+
 
 
 

@@ -20,7 +20,7 @@ struct ParticleParameters {
 	//ParticleParameters() {}
 	//ParticleParameters(char atom, float m, float s, float e) : mass(m), sigma(s), epsilon(e) {}
 
-	float mass = -1;
+	float mass = -1;		//[kg/mol]
 
 	//Nonbonded
 	float sigma = -1;
@@ -76,8 +76,8 @@ public:
 		forcefield.particle_parameters[3] = ParticleParameters('H', 12.011f, 0.356359487256f, 0.46024f);
 		*/
 		for (int i = 0; i < MAX_ATOM_TYPES; i++) {
-			forcefield.particle_parameters[i].mass /= 1000.f;		// Convert g/mo to kg/mol
-			forcefield.particle_parameters[i].epsilon *= 1000.f;		// convert kJ/mo to J/mol
+			forcefield.particle_parameters[i].mass /= 1000.f;		// Convert g/moæ to kg/mol
+			forcefield.particle_parameters[i].epsilon *= 1000.f;		// convert kJ/mol to J/mol
 		}
 			
 		printf("Forcefield size: %d bytes\n", sizeof(ForceField));

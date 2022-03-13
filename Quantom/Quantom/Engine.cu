@@ -438,7 +438,7 @@ __device__ void applyPBC(Float3* current_position) {	// Only changes position if
 
 constexpr double sigma = 0.3923f;										// nm, point at which d/dE or force is 0.
 constexpr double epsilon = 0.5986 * 1'000.f;							// J/mol
-__device__ Float3 calcLJForce(Float3* pos0, Float3* pos1, double* data_ptr, double* potE) {	
+__device__ Float3 calcLJForce(Float3* pos0, Float3* pos1, double* data_ptr, double* potE) {																				// Uhhhh, delete this function soon please!
 	// Calculates LJ force on p0	//
 	//	Returns force in J/mol*M		//
 
@@ -470,32 +470,40 @@ __device__ Float3 calcLJForce(Float3* pos0, Float3* pos1, double* data_ptr, doub
 			printf("Thread %d Block %d self %f %f %f other %f %f %f\n", threadIdx.x, blockIdx.x, pos0->x, pos0->y, pos0->z, pos1->x, pos1->y, pos1->z);
 			
 		}
-		if (dist < 0.1f) {
+		/*if (dist < 0.1f) {
 			printf("\nThread %d Block %d step %d dist %f force %f\n", threadIdx.x, blockIdx.x, (int)data_ptr[3], (*pos0 - *pos1).len(), force);
 			printf("Self %f %f %f -> %f %f %f\n", data_ptr[0], data_ptr[1], data_ptr[2], pos0->x, pos0->y, pos0->z);
-		}
+		}*/
 	}
 
 	return force_unit_vector * force;									//J/mol*M	(M is direction)
 }
 
-__device__ Float3 calcLJForce(Float3* pos0, Float3* pos1, double* data_ptr, double* potE, float sigma, float epsilon) {
+__device__ Float3 calcLJForce(Float3* pos0, Float3* pos1, double* data_ptr, double* potE, float sigma, float epsilon, bool verbose=false) {		
 	// Calculates LJ force on p0	//
-	//	Returns force in J/mol*M		//
+	// input positions in cartesian coordinates [nm]
+	// sigma [nm]
+	// epsilon
+	//	Returns force in J/mol*M		?????????????!?!?//
 
 	double dist = (*pos0 - *pos1).len();								// [nm]
+	
 
 	double fraction = sigma / dist;										// [nm/nm], so unitless
 	double f2 = fraction * fraction;
 	double f6 = f2 * f2 * f2;
 
-	double force = 24.f * (epsilon / (dist)) * f6 * (1.f - 2.f * f6);	// [N/mol] (or J/mol??, no direction)
+	double force = 24.f * (epsilon / (dist)) * f6 * (1.f - 2.f * f6) * 1e-9;	//	1e+9 * [kg*m/(mol*s^2)] * 1e-9 => [kg*nm/(mol * ns^2)]										wrong: [J/mol]/[nm] [N/mol] 
 
-	double LJ_pot = 4.f * epsilon * (f6 * f6 - f6);
+	double LJ_pot = 4.f * epsilon * (f6 * f6 - f6);						// [J/mol]
 	Float3 force_unit_vector = (*pos1 - *pos0).norm();
 
 	*potE += LJ_pot * 0.5;												// Log this value for energy monitoring purposes
 
+
+	if (verbose) {
+		//printf("Dist %f       force %f      sigma: %f         epsilon %f\n", (float)dist, (float)force, sigma, epsilon);
+	}
 	if (threadIdx.x == 0 && blockIdx.x == 0) {
 		//printf("Thread %d Block %d self %f %f %f other %f %f %f\n", threadIdx.x, blockIdx.x, pos0->x, pos0->y, pos0->z, pos1->x, pos1->y, pos1->z);
 		//printf("Force %f %f %f\n", force_unit_vector.x * force, force_unit_vector.y * force, force_unit_vector.z * force);
@@ -513,12 +521,12 @@ __device__ Float3 calcLJForce(Float3* pos0, Float3* pos1, double* data_ptr, doub
 
 		}
 		if (dist < 0.1f) {
-			printf("\nThread %d Block %d step %d dist %f force %f\n", threadIdx.x, blockIdx.x, (int)data_ptr[3], (*pos0 - *pos1).len(), force);
-			printf("Self %f %f %f -> %f %f %f\n", data_ptr[0], data_ptr[1], data_ptr[2], pos0->x, pos0->y, pos0->z);
+			//printf("\nThread %d Block %d step %d dist %f force %f\n", threadIdx.x, blockIdx.x, (int)data_ptr[3], (*pos0 - *pos1).len(), force);
+			//printf("Self %f %f %f -> %f %f %f\n", data_ptr[0], data_ptr[1], data_ptr[2], pos0->x, pos0->y, pos0->z);
 		}
 	}
 
-	return force_unit_vector * force;									//J/mol*M	(M is direction)
+	return force_unit_vector * force;									//N/mol*v	(v is direction)
 }
 
 constexpr double kb = 17.5 * 1e+6;		//	J/(mol*nm^2)
@@ -703,9 +711,13 @@ __device__ Float3 computeAnglebondForces(Compound* compound, CompoundState* comp
 
 
 __device__ void integratePosition(Float3* pos, Float3* pos_tsub1, Float3* force, const double mass, const double dt, float* thermostat_scalar, int p_index, bool verbose=false) {
+	// Force is in ??Newton, [kg * nm /(mol*ns^2)] //
+
+
 	Float3 temp = *pos;
 	LIMAENG::applyHyperpos(pos, pos_tsub1);
-	*pos = *pos * 2 - *pos_tsub1 + *force * (1.f / mass) * dt * dt;	// no *0.5?
+	//*pos = *pos * 2 - *pos_tsub1 + *force * (1.f / mass) * dt * dt;	// no *0.5?	// [nm] - [nm] + [kg*m*s^-2]/[kg] * [ns]^2
+	*pos = *pos * 2 - *pos_tsub1 + *force * (1.f / mass) * dt * dt;		// [nm] - [nm] + [kg/mol*m*/s^2]/[kg/mol] * [s]^2 * (1e-9)^2	=> [nm]-[nm]+[]
 	*pos_tsub1 = temp;
 
 	Float3 delta_pos = *pos - *pos_tsub1;
@@ -779,6 +791,15 @@ __global__ void forceKernel(Box* box) {
 		if (force_angle.x != force_angle.x) {
 			force_angle.print('a');
 			box->critical_error_encountered = 1;
+		}
+		for (int i = 0; i < compound.n_particles; i++) {
+			if (i != threadIdx.x) {
+				force_LJ_com += calcLJForce(&compound_state.positions[threadIdx.x], &compound_state.positions[i], data_ptr, &potE_sum,
+					(forcefield_device.particle_parameters[compound.atom_types[threadIdx.x]].sigma + forcefield_device.particle_parameters[compound.atom_types[i]].sigma),
+					(forcefield_device.particle_parameters[compound.atom_types[threadIdx.x]].epsilon + forcefield_device.particle_parameters[compound.atom_types[i]].epsilon),
+					true
+					);
+			}
 		}
 	}
 	// ----------------------------------------------------------------------------------------------------------------------------------------------- //

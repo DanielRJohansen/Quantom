@@ -38,7 +38,7 @@ class CompoundBuilder
 	};
 public:
 	CompoundBuilder() {}
-	Molecule buildMolecule(string pdb_path, string itp_path, int max_residue_id=INT16_MAX);
+	Molecule buildMolecule(string pdb_path, string itp_path, int max_residue_id=INT16_MAX, int min_residue_id=0);
 
 
 
@@ -49,7 +49,7 @@ private:
 
 
 	struct Record_ATOM;
-	void loadParticles(Molecule* molecule, vector<Record_ATOM>* pdb_data, int max_monomer_id = INT32_MAX, bool ignore_protons =false);
+	void loadParticles(Molecule* molecule, vector<Record_ATOM>* pdb_data, int max_monomer_id = INT32_MAX, int min_residue_id=0, bool ignore_protons =false);
 	void loadTopology(Molecule* molecule, vector<vector<string>>* itp_data);
 	void calcParticleSphere(Compound* compound);
 
