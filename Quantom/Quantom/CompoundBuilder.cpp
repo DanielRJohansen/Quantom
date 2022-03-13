@@ -45,7 +45,9 @@ void CompoundBuilder::loadParticles(Molecule* molecule, vector<CompoundBuilder::
 	int current_res_id = 0;
 	int current_compound_id = 0;
 	Compound* current_compound = &molecule->compounds[current_compound_id];
-	int prev_atom_id;
+	//int prev_atom_id;
+
+	int prev_global_id = 0;
 
 	for (Record_ATOM record : *pdb_data) {
 
@@ -71,12 +73,18 @@ void CompoundBuilder::loadParticles(Molecule* molecule, vector<CompoundBuilder::
 			continue;
 
 
-		//particle_id_map[record.atom_serial_number] = compound->n_particles;
+		
+
+
+
 		if (record.residue_seq_number != current_res_id) {
 			if (!current_compound->hasRoomForRes()) {
 
-				molecule->compound_bridge.addParticle(current_compound->atom_types[current_compound->n_particles - 1], current_compound->particles[current_compound->n_particles - 1]);		// Add prev atom to the bridge
-				molecule->compound_bridge.addParticle(FFM.atomTypeToIndex(record.atom_name[0]), CompactParticle(record.coordinate));														// And new atom to the bridge
+				molecule->compound_bridge.addParticle(prev_global_id, current_compound_id, current_compound->n_particles - 1);					// Last particle was added to what is here current compound
+				molecule->compound_bridge.addParticle(record.atom_serial_number, current_compound_id+1, 0);		// current particle will be added to next compound
+
+				//molecule->compound_bridge.addParticle(current_compound->atom_types[current_compound->n_particles - 1], current_compound->particles[current_compound->n_particles - 1]);		// Add prev atom to the bridge
+				//molecule->compound_bridge.addParticle(FFM.atomTypeToIndex(record.atom_name[0]), CompactParticle(record.coordinate));														// And new atom to the bridge
 				current_compound_id++;
 				current_compound = &molecule->compounds[current_compound_id];
 				molecule->n_compounds++;
@@ -87,6 +95,7 @@ void CompoundBuilder::loadParticles(Molecule* molecule, vector<CompoundBuilder::
 		particle_id_maps[record.atom_serial_number] = IDMap(record.atom_serial_number, current_compound_id, molecule->compounds[current_compound_id].n_particles);
 		current_compound->addParticle(FFM.atomTypeToIndex(record.atom_name[0]), CompactParticle(record.coordinate));
 		molecule->n_atoms_total++;
+		prev_global_id = record.atom_serial_number;
 		//compound->addParticle(FFM.atomTypeToIndex(record.atom_name[0]), CompactParticle(record.coordinate));
 	}
 }
@@ -138,6 +147,21 @@ void CompoundBuilder::addGeneric(Molecule* molecule, vector<string>* record, Top
 }
 
 void CompoundBuilder::addBond(Molecule* molecule, vector<string>* record) {
+	int global_particle_indexes[2] = {
+		stoi((*record)[0]),
+		stoi((*record)[1])
+	};
+	bool belongs_in_bridge = molecule->compound_bridge.particlesCrossBridge(global_particle_indexes, 2);
+
+
+
+	if (belongs_in_bridge) {
+		printf("Belongs!");
+		exit(0);
+
+	}
+
+
 	Compound* compound = &molecule->compounds[particle_id_maps[stoi((*record)[0])].compound_id];
 	int particle_indexes[2] = { 
 		particle_id_maps[stoi((*record)[0])].local_id,

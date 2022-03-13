@@ -8,12 +8,12 @@
 struct Test {
 
 	int arr[4];
+	//const static int size = 14;
 };
 
 
 
 int main() {
-
 
 	std::printf("Program starting...\n");
 	Environment Env;

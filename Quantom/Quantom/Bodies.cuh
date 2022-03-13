@@ -56,6 +56,7 @@ struct PairBond {	// IDS and indexes are used interchangeably here!
 	//uint32_t bond_index;	
 	double reference_dist;
 	uint32_t atom_indexes[2];	// Relative to the compund - NOT ABSOLUTE INDEX. Used in global table with compunds start-index
+	const static int n_atoms = 2;
 };
 
 struct AngleBond {
@@ -69,6 +70,7 @@ struct AngleBond {
 
 	double reference_angle;
 	uint32_t atom_indexes[3]; // i,j,k angle between i and k
+	const static int n_atoms = 3;
 };
 
 
@@ -300,7 +302,50 @@ struct Compound {
 	float confining_particle_sphere = 0;		// All particles in compound are PROBABLY within this radius
 };
 
-//struct CompoundBridge
+struct CompoundBridge {
+	struct ParticleRef {
+		ParticleRef() {}
+		ParticleRef(int g, int c, int l): global_id(g), compound_id(c), local_id(l) {}
+		int compound_id;
+		int local_id;		// Particles id in compound
+		int global_id;		// refers to the id in conf file!
+	};
+	
+
+	ParticleRef particles[MAX_COMPOUND_PARTICLES * 2];
+	int n_particles = 0;
+
+
+	void addParticle(int global_id, int compound_id, int local_id) {
+		particles[n_particles++] = ParticleRef(global_id, compound_id, local_id);
+	}
+
+
+	bool particlesCrossBridge(int* global_ids, int n_bond_particles) {
+		int hits = 0;
+		for (int i = 0; i < n_bond_particles; i++) {
+			for (int j = 0; j < n_particles; j++) {
+				printf("%d %d \n", global_ids[i], particles[j].global_id);
+				hits += (global_ids[i] == particles[j].global_id);
+			}
+			if (hits >= 2)
+				return true;
+		}
+		printf("hits %d\n\n", hits);
+		return false;
+	}
+
+	template<typename T>
+	bool addBond(T bond) {
+		int hits = 0;
+		for (int i = 0; i < n_particles; i++) {
+			for (int j = 0; j < bond.n_atoms; j++) {
+
+			}
+		}
+	}
+
+};
 
 struct Molecule {
 	Molecule() {
@@ -308,7 +353,7 @@ struct Molecule {
 	}
 	int n_compounds = 1;
 	Compound* compounds;
-	Compound compound_bridge;	// Special compound, for special kernel. For now we only need one
+	CompoundBridge compound_bridge;	// Special compound, for special kernel. For now we only need one
 	uint32_t n_atoms_total = 0;
 
 	Float3 calcCOM() {
