@@ -31,8 +31,8 @@ struct ParsedLine {
 using namespace std;
 class CompoundBuilder
 {
-	struct IDMap {
-		IDMap() {}
+	struct IDMap {				// Delete for particle refs!
+		IDMap() {}	
 		IDMap(int global_id, int compound_id, int local_id) : global_id(global_id), compound_id(compound_id), local_id(local_id) {}
 		int global_id = -1, compound_id = -1, local_id = -1;	// local_id is local to the compound
 	};
@@ -45,8 +45,8 @@ public:
 
 private:
 	ForceFieldMaker FFM;
-	IDMap* particle_id_maps;
-
+	//IDMap* particle_id_maps;
+	ParticleRef* particle_id_maps;
 
 	struct Record_ATOM;
 	void loadParticles(Molecule* molecule, vector<Record_ATOM>* pdb_data, int max_monomer_id = INT32_MAX, int min_residue_id=0, bool ignore_protons =false);
@@ -56,10 +56,11 @@ private:
 
 	enum TopologyMode { INACTIVE, BOND, ANGLE, DIHEDRAL };
 	TopologyMode setMode(string entry);
+	void loadMaps(ParticleRef* maps, vector<string>* record, int n);
 	void addGeneric(Molecule* molecule, vector<string>* record, TopologyMode mode);
-	void addBond(Molecule* molecule, vector<string>* record);
-	void addAngle(Molecule* molecule, vector<string>* record);
-	void addDihedral(Molecule* molecule, vector<string>* record);
+	PairBond makeBond(Molecule* molecule, vector<string>* record);
+	AngleBond makeAngle(Molecule* molecule, vector<string>* record);
+	DihedralBond makeDihedral(Molecule* molecule, vector<string>* record);
 
 
 

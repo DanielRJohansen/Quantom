@@ -6,8 +6,8 @@
 
 
 
-constexpr double BOX_LEN = 7.f;		// Must be > twice the len of largest compound
-constexpr double BOX_LEN_HALF = BOX_LEN/2.f;
+constexpr float BOX_LEN = 8.f;		// Must be > twice the len of largest compound
+constexpr float BOX_LEN_HALF = BOX_LEN/2.f;
 
 
 

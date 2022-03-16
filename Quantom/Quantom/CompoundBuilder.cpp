@@ -7,7 +7,7 @@
 Molecule CompoundBuilder::buildMolecule(string pdb_path, string itp_path, int max_residue_id, int min_residue_id) {
 	//vector<vector<string>> pdb_data = readFile(pdb_path);
 	//vector<Record_ATOM> atom_data = parsePDB(pdb_path);
-	particle_id_maps = new IDMap[MAX_ATOMS];
+	particle_id_maps = new ParticleRef[MAX_ATOMS];
 
 	vector<Record_ATOM> atom_data = parseGRO(pdb_path);
 	vector<vector<string>> top_data = parseTOP(itp_path);
@@ -47,7 +47,6 @@ void CompoundBuilder::loadParticles(Molecule* molecule, vector<CompoundBuilder::
 	Compound* current_compound = &molecule->compounds[current_compound_id];
 	//int prev_atom_id;
 
-	int prev_global_id = 0;
 
 	for (Record_ATOM record : *pdb_data) {
 
@@ -79,12 +78,8 @@ void CompoundBuilder::loadParticles(Molecule* molecule, vector<CompoundBuilder::
 
 		if (record.residue_seq_number != current_res_id) {
 			if (!current_compound->hasRoomForRes()) {
+				molecule->compound_bridge_bundle.addBridge(current_compound_id, current_compound_id + 1);
 
-				molecule->compound_bridge.addParticle(prev_global_id, current_compound_id, current_compound->n_particles - 1);					// Last particle was added to what is here current compound
-				molecule->compound_bridge.addParticle(record.atom_serial_number, current_compound_id+1, 0);		// current particle will be added to next compound
-
-				//molecule->compound_bridge.addParticle(current_compound->atom_types[current_compound->n_particles - 1], current_compound->particles[current_compound->n_particles - 1]);		// Add prev atom to the bridge
-				//molecule->compound_bridge.addParticle(FFM.atomTypeToIndex(record.atom_name[0]), CompactParticle(record.coordinate));														// And new atom to the bridge
 				current_compound_id++;
 				current_compound = &molecule->compounds[current_compound_id];
 				molecule->n_compounds++;
@@ -92,11 +87,11 @@ void CompoundBuilder::loadParticles(Molecule* molecule, vector<CompoundBuilder::
 			current_res_id = record.residue_seq_number;
 		}
 
-		particle_id_maps[record.atom_serial_number] = IDMap(record.atom_serial_number, current_compound_id, molecule->compounds[current_compound_id].n_particles);
+
+		//particle_id_maps[record.atom_serial_number] = IDMap(record.atom_serial_number, current_compound_id, molecule->compounds[current_compound_id].n_particles);
+		particle_id_maps[record.atom_serial_number] = ParticleRef(record.atom_serial_number, current_compound_id, molecule->compounds[current_compound_id].n_particles);
 		current_compound->addParticle(FFM.atomTypeToIndex(record.atom_name[0]), CompactParticle(record.coordinate));
 		molecule->n_atoms_total++;
-		prev_global_id = record.atom_serial_number;
-		//compound->addParticle(FFM.atomTypeToIndex(record.atom_name[0]), CompactParticle(record.coordinate));
 	}
 }
 
@@ -130,23 +125,69 @@ CompoundBuilder::TopologyMode CompoundBuilder::setMode(string entry)
 	return INACTIVE;
 }
 
+void CompoundBuilder::loadMaps(ParticleRef* maps, vector<string>* record, int n) {
+	for (int i = 0; i < n; i++)
+		maps[i] = particle_id_maps[stoi((*record)[i])];
+}
+
 void CompoundBuilder::addGeneric(Molecule* molecule, vector<string>* record, TopologyMode mode) {
+	GenericBond bond;
+	ParticleRef maps[4];
+	//PairBond pb(maps[0].local_id, maps[1].local_id);
+
+
 	switch (mode)
 	{
 	case CompoundBuilder::INACTIVE:
 		return;
 	case CompoundBuilder::BOND:
-		return addBond(molecule, record);
+		loadMaps(maps, record, 2);		
+		bond = GenericBond(maps, 2);
+		if (!bond.allParticlesExist())
+			break;
+
+		if (!bond.spansTwoCompounds()) {
+			
+			Compound* compound = &molecule->compounds[maps[0].compound_id];
+
+			float dist = (compound->particles[maps[0].local_id].pos_tsub1 - compound->particles[maps[1].local_id].pos_tsub1).len();			// TODO: Remove, information is in forcefield!
+			printf("Dist: %f\n", dist);
+			printf("%d %d %d\n", maps[0].local_id, maps[0].compound_id, maps[0].global_id);
+			printf("%d %d %d\n", maps[1].local_id, maps[1].compound_id, maps[1].global_id);
+			compound->pairbonds[compound->n_pairbonds++] = PairBond(dist, maps[0].local_id, maps[1].local_id);
+		}
+		else { printf("Bond belongs in bridge!\n\n"); }
+		break;
+		
 	case CompoundBuilder::ANGLE:
-		return addAngle(molecule, record);
+		loadMaps(maps, record, 3);
+		bond = GenericBond(maps, 3);
+		if (!bond.allParticlesExist())
+			break;
+
+		if (!bond.spansTwoCompounds()) {
+
+			Compound* compound = &molecule->compounds[maps[0].compound_id];
+
+			float angle = Float3::getAngle(compound->particles[maps[0].local_id].pos_tsub1, compound->particles[maps[1].local_id].pos_tsub1, compound->particles[maps[2].local_id].pos_tsub1);
+			compound->anglebonds[compound->n_anglebonds++] = AngleBond(angle, maps[0].local_id, maps[1].local_id, maps[2].local_id);
+		}
+		else { printf("Angle Bond belongs in bridge!\n\n"); }
+		break;
+
+		//ParticleRef maps[] = { particle_id_maps[stoi((*record)[0])], particle_id_maps[stoi((*record)[1])],, particle_id_maps[stoi((*record)[2])] };
+		//bond = GenericBond(maps, 3);
+		//return addAngle(molecule, record);
 	case CompoundBuilder::DIHEDRAL:
-		return addDihedral(molecule, record);
+
+		break;
+		//return addDihedral(molecule, record);
 	default:
 		return;
 	}
 }
-
-void CompoundBuilder::addBond(Molecule* molecule, vector<string>* record) {
+/*
+PairBond CompoundBuilder::makeBond(Molecule* molecule, vector<string>* record) {
 	int global_particle_indexes[2] = {
 		stoi((*record)[0]),
 		stoi((*record)[1])
@@ -175,11 +216,12 @@ void CompoundBuilder::addBond(Molecule* molecule, vector<string>* record) {
 
 	double dist = (compound->particles[particle_indexes[0]].pos_tsub1 - compound->particles[particle_indexes[1]].pos_tsub1).len();			// TODO: Remove, information is in forcefield!
 	//printf("Calculated ref dist: %f\n", dist);
-	compound->pairbonds[compound->n_pairbonds++] = PairBond(dist, particle_indexes[0], particle_indexes[1]);
+	//compound->pairbonds[compound->n_pairbonds++] = PairBond(dist, particle_indexes[0], particle_indexes[1]);
 	//printf("Pairbond error: %f\n", OH_refdist - ();
+	return PairBond(dist, particle_indexes[0], particle_indexes[1]);
 }
 
-void CompoundBuilder::addAngle(Molecule* molecule, vector<string>* record) {
+AngleBond CompoundBuilder::makeAngle(Molecule* molecule, vector<string>* record) {
 	Compound* compound = &molecule->compounds[particle_id_maps[stoi((*record)[0])].compound_id];
 	int particle_indexes[3] = {	
 		particle_id_maps[stoi((*record)[0])].local_id,
@@ -196,12 +238,12 @@ void CompoundBuilder::addAngle(Molecule* molecule, vector<string>* record) {
 	compound->anglebonds[compound->n_anglebonds++] = AngleBond(angle, particle_indexes[0], particle_indexes[1], particle_indexes[2]);
 }
 
-void CompoundBuilder::addDihedral(Molecule* molecule, vector<string>* record) {
+DihedralBond CompoundBuilder::makeDihedral(Molecule* molecule, vector<string>* record) {
 	Compound* compound = &molecule->compounds[particle_id_maps[stoi((*record)[0])].compound_id];
 
 }
 
-
+*/
 
 
 

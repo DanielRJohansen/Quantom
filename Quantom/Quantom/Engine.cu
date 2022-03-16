@@ -380,8 +380,8 @@ void Engine::step() {
 
 	
 	CompoundState* temp = simulation->box->compound_state_array;
-	simulation->box->compound_state_array = simulation->box->compound_state_array_next;
-	simulation->box->compound_state_array_next = temp;
+	//simulation->box->compound_state_array = simulation->box->compound_state_array_next;
+	//simulation->box->compound_state_array_next = temp;
 	
 	
 	Solvent* temp_s = simulation->box->solvents;
@@ -494,6 +494,13 @@ __device__ void calcPairbondForces(Float3* pos_a, Float3* pos_b, double* referen
 
 	results[0] = difference * force_scalar;
 	results[1] = difference * force_scalar * -1;
+
+	if (error > 5.7f) {
+		printf("thread %d  error %f ref %f force %f\n", threadIdx.x, error, *reference_dist, force_scalar);
+		//pos_a->print('a');
+		//pos_b->print('b');
+	}
+		
 }
 
 
@@ -686,13 +693,7 @@ __global__ void forceKernel(Box* box) {
 	neighborlist.loadData(&box->compound_neighborlists[blockIdx.x]);
 
 
-	if (threadIdx.x < 4) {
-		//printf("Eng %f\n", forcefield_device.particle_parameters[threadIdx.x].sigma);
-	}
-		
 
-	//if (!blockIdx.x && !threadIdx.x)
-		//compound_state.positions[0].print('p');
 
 	float potE_sum = 0;
 	float data_ptr[4];
@@ -705,20 +706,15 @@ __global__ void forceKernel(Box* box) {
 
 	// ------------------------------------------------------------ Intramolecular Operations ------------------------------------------------------------ //
 	{
+
 		LIMAENG::applyHyperpos(&compound_state.positions[0], &compound_state.positions[threadIdx.x]);
-		force = computePairbondForces(&compound, &compound_state, utility_buffer, &potE_sum);
-		/*
-		if (force_bond.x != force_bond.x) {
-			force_bond.print('p');
-			box->critical_error_encountered = 1;
-		}
-		force = computeAnglebondForces(&compound, &compound_state, utility_buffer, &potE_sum);
-		if (force_angle.x != force_angle.x) {
-			force_angle.print('a');
-			box->critical_error_encountered = 1;
-		}
-		*/
+		__syncthreads();	// Dunno if necessary
+		force += computePairbondForces(&compound, &compound_state, utility_buffer, &potE_sum);
+		//force += computeAnglebondForces(&compound, &compound_state, utility_buffer, &potE_sum);
+
+		
 		for (int i = 0; i < compound.n_particles; i++) {
+			break;
 			if (i != threadIdx.x) {
 				force += calcLJForce(&compound_state.positions[threadIdx.x], &compound_state.positions[i], data_ptr, &potE_sum,
 					(forcefield_device.particle_parameters[compound.atom_types[threadIdx.x]].sigma + forcefield_device.particle_parameters[compound.atom_types[i]].sigma),
@@ -728,11 +724,13 @@ __global__ void forceKernel(Box* box) {
 			}
 		}
 	}
+	return;
 	// ----------------------------------------------------------------------------------------------------------------------------------------------- //
 
 
 	// --------------------------------------------------------------- Intermolecular forces --------------------------------------------------------------- //
 	for (int i = 0; i < box->n_compounds; i++) {
+
 		if (i == blockIdx.x)	// Only needed untill we have proper neighbor lists
 			continue;
 		int n_particles = box->compound_state_array[i].n_particles;
@@ -743,7 +741,7 @@ __global__ void forceKernel(Box* box) {
 			LIMAENG::applyHyperpos(&compound_state.positions[0], &utility_buffer[threadIdx.x]);
 		}
 		__syncthreads();
-		force += computeLJForces(&compound_state.positions[threadIdx.x], n_particles, utility_buffer, data_ptr, &potE_sum, compound.atom_types[threadIdx.x], utility_buffer_small);
+//		force += computeLJForces(&compound_state.positions[threadIdx.x], n_particles, utility_buffer, data_ptr, &potE_sum, compound.atom_types[threadIdx.x], utility_buffer_small);
 	}
 	// ------------------------------------------------------------------------------------------------------------------------------------------------------ //
 
@@ -758,7 +756,9 @@ __global__ void forceKernel(Box* box) {
 	__syncthreads();
 	if (threadIdx.x < compound.n_particles) {
 		//force_LJ_sol += computeLJForces(&compound_state.positions[threadIdx.x], neighborlist.n_solvent_neighbors, utility_buffer, data_ptr, &potE_sum);
-		force += computeSolventToCompoundLJForces(&compound_state.positions[threadIdx.x], neighborlist.n_solvent_neighbors, utility_buffer, data_ptr, &potE_sum, compound.atom_types[threadIdx.x]);
+		
+//		force += computeSolventToCompoundLJForces(&compound_state.positions[threadIdx.x], neighborlist.n_solvent_neighbors, utility_buffer, data_ptr, &potE_sum, compound.atom_types[threadIdx.x]);
+
 	}		
 	// ------------------------------------------------------------------------------------------------------------------------------------------------ //
 	/*
@@ -786,18 +786,14 @@ __global__ void forceKernel(Box* box) {
 	if (threadIdx.x < compound.n_particles) {
 		int p_index = threadIdx.x;
 		//integratePosition(&compound_state.positions[threadIdx.x], &compound.particles[threadIdx.x].pos_tsub1, &force, compound.particles[threadIdx.x].mass, box->dt, &box->thermostat_scalar, p_index );
-		if (box->step > 500 ) {
-			integratePosition(&compound_state.positions[threadIdx.x], &compound.particles[threadIdx.x].pos_tsub1, &force, forcefield_device.particle_parameters[compound.atom_types[threadIdx.x]].mass, box->dt, &box->thermostat_scalar, p_index);
-		}
-			
-		else
-			integratePosition(&compound_state.positions[threadIdx.x], &compound.particles[threadIdx.x].pos_tsub1, &force, forcefield_device.particle_parameters[compound.atom_types[threadIdx.x]].mass, box->dt, &box->thermostat_scalar, p_index);
+
+		integratePosition(&compound_state.positions[threadIdx.x], &compound.particles[threadIdx.x].pos_tsub1, &force, forcefield_device.particle_parameters[compound.atom_types[threadIdx.x]].mass, box->dt, &box->thermostat_scalar, p_index);
 		
 		box->compounds[blockIdx.x].particles[threadIdx.x].pos_tsub1 = compound.particles[threadIdx.x].pos_tsub1;
 	}
 	__syncthreads();
 	// ------------------------------------------------------------------------------------------------------------------------------------- //
-	return;
+	//return;
 
 
 
@@ -844,8 +840,11 @@ __global__ void forceKernel(Box* box) {
 	
 	// ----------------------------------------------------------------------------- //
 
-	if (force.len() > 200e+6)
+	if (force.len() > 300e+6) {
+		printf("Critical force %f\n\n\n", force.len());
 		box->critical_error_encountered = true;
+	}
+		
 	
 	box->compound_state_array_next[blockIdx.x].loadData(&compound_state);
 }

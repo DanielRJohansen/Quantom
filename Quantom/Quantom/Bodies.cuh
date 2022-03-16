@@ -45,14 +45,33 @@ struct Solvent {
 
 //--------------------------- THE FOLLOWING IS FOR HANDLING INTRAMOLECULAR FORCES ---------------------------//
 
+struct ParticleRef {		 // Maybe call map instead?
+	ParticleRef() {}
+	ParticleRef(int g, int c, int l) : global_id(g), compound_id(c), local_id(l) {}
+	int compound_id = -1;
+	int local_id = -1;		// Particles id in compound
+	int global_id = -1;		// refers to the id in conf file!
+
+
+
+
+	__host__ inline bool operator == (const ParticleRef a) const { return (global_id == a.global_id); }
+
+};
+
+
 struct PairBond {	// IDS and indexes are used interchangeably here!
 	PairBond(){}
+	PairBond( uint32_t particleindex_a, uint32_t particleindex_b) {
+		atom_indexes[0] = particleindex_a;
+		atom_indexes[1] = particleindex_b;
+	}
 	PairBond(double ref_dist, uint32_t particleindex_a, uint32_t particleindex_b) : 
 		reference_dist(ref_dist) {
 		atom_indexes[0] = particleindex_a;
 		atom_indexes[1] = particleindex_b;
 	}
-
+	
 	//uint32_t bond_index;	
 	double reference_dist;
 	uint32_t atom_indexes[2];	// Relative to the compund - NOT ABSOLUTE INDEX. Used in global table with compunds start-index
@@ -73,8 +92,59 @@ struct AngleBond {
 	const static int n_atoms = 3;
 };
 
+struct DihedralBond {
+
+};
+
+struct GenericBond {					// ONLY used during creation, never on device!
+	enum BONDTYPES { SINGLE, ANGLE, DIHEDRAL, PAIR };
+
+	GenericBond() {}
+	GenericBond(ParticleRef* particle_refs, int n) {
+		for (int i = 0; i < n; i++) {
+			particles[n_particles++] = particle_refs[i];
+
+			if (compound_ids[0] == -1) { 
+				compound_ids[0] = particles[i].compound_id; 
+			}
+			else if (compound_ids[0] != particles[i].compound_id) {
+				compound_ids[1] = particles[i].compound_id;
+			}
+		}
+		if (compound_ids[0] > compound_ids[1] && compound_ids[1] != -1) { swap(compound_ids[0], compound_ids[1]); }
+	}
+
+	bool spansTwoCompounds() {	// Simply check if any id has been put into index 1
+		return (compound_ids[1] != -1);
+	}
+	bool allParticlesExist() {	// Returns false if any particle in bond does not exist, for example when ignoring hydrogens
+		for (int i = 0; i < n_particles; i++) {
+			if (particles[i].local_id == -1)
+				return false;
+		}
+		return true;
+	}
+	/*
+	template<typename T>
+	void assignBond(T* bond) {
+		(T*) bond_ref = bond;
+		for (int i = 0; i < bond->n_atoms; i++) {
 
 
+
+		}
+		//compound_ids[0] = compound_ids[0] == -1 ? bond->
+	}
+	*/
+
+
+	int compound_ids[2] = { -1,-1 };		// Can either span 1 or 2 compounds. If more, then undefined behaviour
+
+	void* bond_ref;
+
+	ParticleRef particles[4];
+	int n_particles = 0;
+};
 
 // ------------------------------------------------- COMPOUNDS ------------------------------------------------- //
 const int NEIGHBORLIST_MAX_COMPOUNDS = 64;
@@ -302,20 +372,65 @@ struct Compound {
 	float confining_particle_sphere = 0;		// All particles in compound are PROBABLY within this radius
 };
 
+
+
+
+
 struct CompoundBridge {
-	struct ParticleRef {
-		ParticleRef() {}
-		ParticleRef(int g, int c, int l): global_id(g), compound_id(c), local_id(l) {}
-		int compound_id;
-		int local_id;		// Particles id in compound
-		int global_id;		// refers to the id in conf file!
-	};
+	CompoundBridge() {}
+	CompoundBridge(int id_left, int id_right): compound_id_left(id_left), compound_id_right(id_right) {}
+
+	int compound_id_left, compound_id_right;
+	ParticleRef particle_refs[32];
+	int n_particles;
+	GenericBond bonds[64];
+	int n_bonds;
+
+
+
+
+
+	bool bondBelongsInBridge(GenericBond* bond) {
+		return (compound_id_left == bond->compound_ids[0] && compound_id_right == bond->compound_ids[1]);
+	}
+	bool particleAlreadyStored(ParticleRef* p_ref) {
+		for (int i = 0; i < n_particles; i++) {
+			if (particle_refs[i] == *p_ref) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	void addBond(GenericBond* bond) {
+		for (int p = 0; p < bond->n_particles; p++) {
+			if (!particleAlreadyStored(&bond->particles[p]))
+				particle_refs[n_particles++] = bond->particles[p];
+		}
+		bonds[n_bonds++] = *bond;
+	}
 	
 
-	ParticleRef particles[MAX_COMPOUND_PARTICLES * 2];
-	int n_particles = 0;
+
+};
+
+struct CompoundBridgeBundle {
+	//ParticleRef particles[MAX_COMPOUND_PARTICLES * 2];
+	//int n_particles = 0;
+	CompoundBridge compound_bridges[16];
+	int n_bridges = 0;
+
+	bool addBridge(int left_c_id, int right_c_id) {
+		if (left_c_id > right_c_id) { swap(left_c_id, right_c_id); }
+		if (n_bridges == 16)
+			return false;
+		compound_bridges[n_bridges++] = CompoundBridge(left_c_id, right_c_id);
+		return true;
+	}
 
 
+
+	/*
 	void addParticle(int global_id, int compound_id, int local_id) {
 		particles[n_particles++] = ParticleRef(global_id, compound_id, local_id);
 	}
@@ -344,7 +459,7 @@ struct CompoundBridge {
 			}
 		}
 	}
-
+	*/
 };
 
 struct Molecule {
@@ -353,7 +468,7 @@ struct Molecule {
 	}
 	int n_compounds = 1;
 	Compound* compounds;
-	CompoundBridge compound_bridge;	// Special compound, for special kernel. For now we only need one
+	CompoundBridgeBundle compound_bridge_bundle;	// Special compound, for special kernel. For now we only need one
 	uint32_t n_atoms_total = 0;
 
 	Float3 calcCOM() {
