@@ -20,8 +20,13 @@ Environment::Environment() {
 	//Compound mol_4pcw10 = compoundbuilder.buildMolecule("D:\\Quantom\\filaggrin\\4pcw_first10.pdb", "D:\\Quantom\\filaggrin\\topol.top", 7);
 	//Compound mol_4pcw10 = compoundbuilder.buildMolecule("D:\\Quantom\\filaggrin\\conf.gro", "D:\\Quantom\\filaggrin\\topol.top", 4);
 	//Compound mol_6lzm_10 = compoundbuilder.buildMolecule(MOL_FOLDER + "conf.gro", MOL_FOLDER + "topol.top", 10);
-	Molecule mol_6lzm_10 = compoundbuilder.buildMolecule(MOL_FOLDER + "conf.gro", MOL_FOLDER + "topol.top", 14, 0);
 	
+	
+	Compound temp = compoundbuilder.buildMolecule(MOL_FOLDER + "conf.gro", MOL_FOLDER + "topol.top", 14);
+	//Molecule mol_6lzm_10 = compoundbuilder.buildMolecule(MOL_FOLDER + "conf.gro", MOL_FOLDER + "topol.top", 14, 0);
+	Molecule mol_6lzm_10;
+	mol_6lzm_10.n_atoms_total = temp.n_particles;
+	mol_6lzm_10.compounds[0] = temp;
 
 	//printf("here %d", temp.n_particles);
 	
