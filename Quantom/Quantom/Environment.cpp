@@ -99,7 +99,7 @@ void Environment::run() {
 	printf("\n\n\n########################## SIMULATION FINISHED ##########################\n\n\n\n");
 
 	if (simulation->finished || simulation->box->critical_error_encountered) {
-		postRunEvents();
+		//postRunEvents();
 	}
 }
 

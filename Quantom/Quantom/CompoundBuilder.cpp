@@ -151,9 +151,9 @@ void CompoundBuilder::addGeneric(Molecule* molecule, vector<string>* record, Top
 			Compound* compound = &molecule->compounds[maps[0].compound_id];
 
 			float dist = (compound->particles[maps[0].local_id].pos_tsub1 - compound->particles[maps[1].local_id].pos_tsub1).len();			// TODO: Remove, information is in forcefield!
-			printf("Dist: %f\n", dist);
-			printf("%d %d %d\n", maps[0].local_id, maps[0].compound_id, maps[0].global_id);
-			printf("%d %d %d\n", maps[1].local_id, maps[1].compound_id, maps[1].global_id);
+			//printf("Dist: %f\n", dist);
+			//printf("%d %d %d\n", maps[0].local_id, maps[0].compound_id, maps[0].global_id);
+			//printf("%d %d %d\n", maps[1].local_id, maps[1].compound_id, maps[1].global_id);
 			compound->pairbonds[compound->n_pairbonds++] = PairBond(dist, maps[0].local_id, maps[1].local_id);
 		}
 		else { printf("Bond belongs in bridge!\n\n"); }

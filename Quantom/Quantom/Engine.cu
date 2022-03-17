@@ -372,7 +372,7 @@ void Engine::applyThermostat() {
 void Engine::step() {
 	auto t0 = std::chrono::high_resolution_clock::now();
 	forceKernel <<< simulation->box->n_compounds, THREADS_PER_COMPOUNDBLOCK >>> (simulation->box);
-	//solventForceKernel <<< BLOCKS_PER_SOLVENTKERNEL, THREADS_PER_SOLVENTBLOCK >>> (simulation->box);
+	solventForceKernel <<< BLOCKS_PER_SOLVENTKERNEL, THREADS_PER_SOLVENTBLOCK >>> (simulation->box);
 
 	cudaDeviceSynchronize();
 	auto t1 = std::chrono::high_resolution_clock::now();
@@ -380,8 +380,8 @@ void Engine::step() {
 
 	
 	CompoundState* temp = simulation->box->compound_state_array;
-	//simulation->box->compound_state_array = simulation->box->compound_state_array_next;
-	//simulation->box->compound_state_array_next = temp;
+	simulation->box->compound_state_array = simulation->box->compound_state_array_next;
+	simulation->box->compound_state_array_next = temp;
 	
 	
 	Solvent* temp_s = simulation->box->solvents;
@@ -495,10 +495,10 @@ __device__ void calcPairbondForces(Float3* pos_a, Float3* pos_b, double* referen
 	results[0] = difference * force_scalar;
 	results[1] = difference * force_scalar * -1;
 
-	if (error > 5.7f) {
+	if (error > 12.7f) {
 		printf("thread %d  error %f ref %f force %f\n", threadIdx.x, error, *reference_dist, force_scalar);
-		//pos_a->print('a');
-		//pos_b->print('b');
+		pos_a->print('a');
+		pos_b->print('b');
 	}
 		
 }
@@ -691,6 +691,7 @@ __global__ void forceKernel(Box* box) {
 	compound.loadData(&box->compounds[blockIdx.x]);
 	compound_state.loadData(&box->compound_state_array[blockIdx.x]);
 	neighborlist.loadData(&box->compound_neighborlists[blockIdx.x]);
+	__syncthreads();
 
 
 
@@ -710,11 +711,10 @@ __global__ void forceKernel(Box* box) {
 		LIMAENG::applyHyperpos(&compound_state.positions[0], &compound_state.positions[threadIdx.x]);
 		__syncthreads();	// Dunno if necessary
 		force += computePairbondForces(&compound, &compound_state, utility_buffer, &potE_sum);
-		//force += computeAnglebondForces(&compound, &compound_state, utility_buffer, &potE_sum);
+		force += computeAnglebondForces(&compound, &compound_state, utility_buffer, &potE_sum);
 
 		
 		for (int i = 0; i < compound.n_particles; i++) {
-			break;
 			if (i != threadIdx.x) {
 				force += calcLJForce(&compound_state.positions[threadIdx.x], &compound_state.positions[i], data_ptr, &potE_sum,
 					(forcefield_device.particle_parameters[compound.atom_types[threadIdx.x]].sigma + forcefield_device.particle_parameters[compound.atom_types[i]].sigma),
@@ -724,7 +724,6 @@ __global__ void forceKernel(Box* box) {
 			}
 		}
 	}
-	return;
 	// ----------------------------------------------------------------------------------------------------------------------------------------------- //
 
 
@@ -757,29 +756,11 @@ __global__ void forceKernel(Box* box) {
 	if (threadIdx.x < compound.n_particles) {
 		//force_LJ_sol += computeLJForces(&compound_state.positions[threadIdx.x], neighborlist.n_solvent_neighbors, utility_buffer, data_ptr, &potE_sum);
 		
-//		force += computeSolventToCompoundLJForces(&compound_state.positions[threadIdx.x], neighborlist.n_solvent_neighbors, utility_buffer, data_ptr, &potE_sum, compound.atom_types[threadIdx.x]);
+		force += computeSolventToCompoundLJForces(&compound_state.positions[threadIdx.x], neighborlist.n_solvent_neighbors, utility_buffer, data_ptr, &potE_sum, compound.atom_types[threadIdx.x]);
 
 	}		
 	// ------------------------------------------------------------------------------------------------------------------------------------------------ //
-	/*
-	if (force_LJ_sol.x != force_LJ_sol.x) {
-		force_LJ_com.print('1');
-		force_LJ_sol.print('2');
-		box->critical_error_encountered = 1;
-	}
-	*/
 
-	/*if (force2 > 50e+6) {
-		printf("Bond %f LJ %f total %f\n", force.len(), force2.len(), (force + force2).len());
-	}
-	force += force2;*/
-	//Float3 force = force_bond + force_angle + force_LJ_com + force_LJ_sol;
-	/*
-	if (force.x != force.x) {
-		compound_state.positions[threadIdx.x].print('p');
-	}
-
-	*/
 
 	
 	// ------------------------------------------------------------ Integration ------------------------------------------------------------ //
@@ -793,7 +774,7 @@ __global__ void forceKernel(Box* box) {
 	}
 	__syncthreads();
 	// ------------------------------------------------------------------------------------------------------------------------------------- //
-	//return;
+
 
 
 
