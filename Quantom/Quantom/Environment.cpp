@@ -20,10 +20,11 @@ Environment::Environment() {
 	//Compound mol_4pcw10 = compoundbuilder.buildMolecule("D:\\Quantom\\filaggrin\\4pcw_first10.pdb", "D:\\Quantom\\filaggrin\\topol.top", 7);
 	//Compound mol_4pcw10 = compoundbuilder.buildMolecule("D:\\Quantom\\filaggrin\\conf.gro", "D:\\Quantom\\filaggrin\\topol.top", 4);
 	//Compound mol_6lzm_10 = compoundbuilder.buildMolecule(MOL_FOLDER + "conf.gro", MOL_FOLDER + "topol.top", 10);
-	Molecule mol_6lzm_10 = compoundbuilder.buildMolecule(MOL_FOLDER + "conf.gro", MOL_FOLDER + "topol.top", 40, 0);
+	Molecule mol_6lzm_10 = compoundbuilder.buildMolecule(MOL_FOLDER + "conf.gro", MOL_FOLDER + "topol.top", 200, 0);
 
+	printf("bridges after %d\n", mol_6lzm_10.compound_bridge_bundle->n_bridges);
 	//printf("here %d", temp.n_particles);
-	
+	printf("mol bridge 0 particles %d\n", mol_6lzm_10.compound_bridge_bundle->compound_bridges[0].n_particles);
 	boxbuilder.buildBox(simulation);
 	//boxbuilder.addSingleMolecule(simulation, &mol_6lzm_10);
 	boxbuilder.addSingleMolecule(simulation, &mol_6lzm_10);

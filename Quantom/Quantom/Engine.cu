@@ -371,10 +371,15 @@ void Engine::applyThermostat() {
 
 void Engine::step() {
 	auto t0 = std::chrono::high_resolution_clock::now();
+
+	compoundBridgeKernel <<< simulation->box->bridge_bundle->n_bridges, MAX_PARTICLES_IN_BRIDGE >>> (simulation->box);	// Must come before forceKernel()
+	cudaDeviceSynchronize();
+	//printf("\n\n");
 	forceKernel <<< simulation->box->n_compounds, THREADS_PER_COMPOUNDBLOCK >>> (simulation->box);
 	solventForceKernel <<< BLOCKS_PER_SOLVENTKERNEL, THREADS_PER_SOLVENTBLOCK >>> (simulation->box);
-
 	cudaDeviceSynchronize();
+	//printf("\n\n");
+
 	auto t1 = std::chrono::high_resolution_clock::now();
 
 
@@ -579,44 +584,14 @@ __device__ Float3 computeCompoundToSolventLJForces(Float3* self_pos, int n_parti
 */
 template <typename T>	// Can either be Compound or CompoundBridgeCompact
 __device__ Float3 computePairbondForces(T* entity, Float3* positions, Float3* utility_buffer, float* potE) {	// only works if n threads >= n bonds
-	utility_buffer[threadIdx.x] = Float3(0, 0, 0);
-	for (int i = 0; (i * blockDim.x) < entity->n_pairbonds; i++) {
+	utility_buffer[threadIdx.x] = Float3(0.f);
+	for (int bond_offset = 0; (bond_offset * blockDim.x) < entity->n_singlebonds; bond_offset++) {
 		PairBond* pb = nullptr;
 		Float3 forces[2];
-		int bond_index = threadIdx.x + i * blockDim.x;
+		int bond_index = threadIdx.x + bond_offset * blockDim.x;
 
-		if (bond_index < entity->n_pairbonds) {
-			pb = &entity->pairbonds[bond_index];
-
-			calcPairbondForces(
-				&positions[pb->atom_indexes[0]],
-				&positions[pb->atom_indexes[1]],
-				&pb->reference_dist,
-				forces, potE
-			);
-		}
-
-
-		for (int i = 0; i < blockDim.x; i++) {
-			if (threadIdx.x == i && pb != nullptr) {
-				utility_buffer[pb->atom_indexes[0]] += forces[0];
-				utility_buffer[pb->atom_indexes[1]] += forces[1];
-			}
-			__syncthreads();
-		}
-	}
-
-	return utility_buffer[threadIdx.x];
-}
-__device__ Float3 computePairbondForces(CompoundBridgeCompact* bridge, Float3* positions, Float3* utility_buffer, float* potE) {	// only works if n threads >= n bonds
-	utility_buffer[threadIdx.x] = Float3(0, 0, 0);
-	for (int i = 0; (i * blockDim.x) < bridge->n_singlebonds; i++) {
-		PairBond* pb = nullptr;
-		Float3 forces[2];
-		int bond_index = threadIdx.x + i * blockDim.x;
-
-		if (bond_index < bridge->n_singlebonds) {
-			pb = &bridge->singlebonds[bond_index];
+		if (bond_index < entity->n_singlebonds) {
+			pb = &entity->singlebonds[bond_index];
 
 			calcPairbondForces(
 				&positions[pb->atom_indexes[0]],
@@ -639,20 +614,21 @@ __device__ Float3 computePairbondForces(CompoundBridgeCompact* bridge, Float3* p
 	return utility_buffer[threadIdx.x];
 }
 
-__device__ Float3 computeAnglebondForces(Compound* compound, CompoundState* compound_state, Float3* utility_buffer, float* potE) {
+template <typename T>	// Can either be Compound or CompoundBridgeCompact
+__device__ Float3 computeAnglebondForces(T* entity, Float3* positions, Float3* utility_buffer, float* potE) {
 	utility_buffer[threadIdx.x] = Float3(0, 0, 0);
-	for (int i = 0; (i * blockDim.x) < compound->n_anglebonds; i++) {
+	for (int bond_offset = 0; (bond_offset * blockDim.x) < entity->n_anglebonds; bond_offset++) {
 		AngleBond* ab = nullptr;
 		Float3 forces[3];
-		int bond_index = threadIdx.x + i * blockDim.x;
+		int bond_index = threadIdx.x + bond_offset * blockDim.x;
 
-		if (bond_index < compound->n_pairbonds) {
-			ab = &compound->anglebonds[bond_index];
+		if (bond_index < entity->n_anglebonds) {
+			ab = &entity->anglebonds[bond_index];
 
 			calcAnglebondForces(
-				&compound_state->positions[ab->atom_indexes[0]],
-				&compound_state->positions[ab->atom_indexes[1]],
-				&compound_state->positions[ab->atom_indexes[2]],
+				&positions[ab->atom_indexes[0]],
+				&positions[ab->atom_indexes[1]],
+				&positions[ab->atom_indexes[2]],
 				&ab->reference_angle,
 				forces, potE
 			);
@@ -734,16 +710,16 @@ __global__ void forceKernel(Box* box) {
 	data_ptr[2] = 9999;
 	data_ptr[3] = box->step + 1;
 
-	Float3 force(0.f);
-
+	//Float3 force(0.f);
+	Float3 force = compound.forces[threadIdx.x];
 	// ------------------------------------------------------------ Intramolecular Operations ------------------------------------------------------------ //
 	{
 
 		LIMAENG::applyHyperpos(&compound_state.positions[0], &compound_state.positions[threadIdx.x]);
 		__syncthreads();	// Dunno if necessary
 		force += computePairbondForces(&compound, compound_state.positions, utility_buffer, &potE_sum);
-		force += computeAnglebondForces(&compound, &compound_state, utility_buffer, &potE_sum);
-
+		//force += computeAnglebondForces(&compound, &compound_state, utility_buffer, &potE_sum);
+		force += computeAnglebondForces(&compound, compound_state.positions, utility_buffer, &potE_sum);
 		
 		for (int i = 0; i < compound.n_particles; i++) {
 			if (i != threadIdx.x) {
@@ -976,25 +952,30 @@ __global__ void solventForceKernel(Box* box) {
 __global__ void compoundBridgeKernel(Box* box) {
 //#define compound_id blockIdx.x
 #define particle_id_bridge threadIdx.x
+//#define particle_active particle_id_bridge < bridge.n_particles
 	__shared__ CompoundBridgeCompact bridge;
 	__shared__ Float3 positions[MAX_PARTICLES_IN_BRIDGE];
-	__shared__ Float3 utility_buffer[NEIGHBORLIST_MAX_SOLVENTS];							// waaaaay too biggg
-	__shared__ uint8_t utility_buffer_small[NEIGHBORLIST_MAX_SOLVENTS];
-
+	__shared__ Float3 utility_buffer[MAX_PARTICLES_IN_BRIDGE];							// waaaaay too biggg
+	__shared__ uint8_t utility_buffer_small[MAX_PARTICLES_IN_BRIDGE];
 
 	if (threadIdx.x == 0) {
-		bridge.loadMeta(&box->bridge_bundle.compound_bridges[blockIdx.x]);
-
+		bridge.loadMeta(&box->bridge_bundle->compound_bridges[blockIdx.x]);
+		//printf("Bridge %d %d %d\n", bridge.n_particles, bridge.n_singlebonds, bridge.n_anglebonds);
 	}
 	__syncthreads();
-	bridge.loadData(&box->bridge_bundle.compound_bridges[blockIdx.x]);
+	bridge.loadData(&box->bridge_bundle->compound_bridges[blockIdx.x]);
+	positions[particle_id_bridge] = Float3(0.f);
 	if (particle_id_bridge < bridge.n_particles) {
 		ParticleRefCompact* p_ref = &bridge.particle_refs[particle_id_bridge];
+		//printf("Query particle: %d,  cid: %d    lid: %d\n",threadIdx.x, p_ref->compound_id, p_ref->local_id);
 		positions[particle_id_bridge] = box->compound_state_array[p_ref->compound_id].positions[p_ref->local_id];
+		//positions[particle_id_bridge].print('p');
 	}
 	__syncthreads();
-
-
+	//positions[particle_id_bridge].print('p');
+	if (threadIdx.x < bridge.n_anglebonds) {
+		//printf("Anglebond indexes %d %d %d\n", bridge.anglebonds[threadIdx.x].atom_indexes[0], bridge.anglebonds[threadIdx.x].atom_indexes[1], bridge.anglebonds[threadIdx.x].atom_indexes[2]);
+	}
 
 
 	float potE_sum = 0;
@@ -1007,17 +988,25 @@ __global__ void compoundBridgeKernel(Box* box) {
 	Float3 force(0.f);
 
 	// ------------------------------------------------------------ Intramolecular Operations ------------------------------------------------------------ //
-	{
+	{											// So for the very first step, these ´should all be 0, but they are not??										TODO: Look into this at some point!!!!
+		//printf("thread %d\n", threadIdx.x);
+		//positions[threadIdx.x].print('p');
 		LIMAENG::applyHyperpos(&positions[0], &positions[particle_id_bridge]);
 		__syncthreads();	// Dunno if necessary
 		force += computePairbondForces(&bridge, positions, utility_buffer, &potE_sum);
-		//force += computeAnglebondForces(&compound, &compound_state, utility_buffer, &potE_sum);
+		force += computeAnglebondForces(&bridge, positions, utility_buffer, &potE_sum);
+	}
+	__syncthreads();
+
+	//printf("Got here\n");
+
+	if (particle_id_bridge < bridge.n_particles) {
+		ParticleRefCompact* p_ref = &bridge.particle_refs[particle_id_bridge];
+		box->compounds[p_ref->compound_id].forces[p_ref->local_id] = force;
+		//force.print(char((int)threadIdx.x+48));
 	}
 
 
-
-
-	// Push data to compound
 }
 
 

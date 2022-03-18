@@ -7,6 +7,7 @@
 Molecule CompoundBuilder::buildMolecule(string pdb_path, string itp_path, int max_residue_id, int min_residue_id) {
 	//vector<vector<string>> pdb_data = readFile(pdb_path);
 	//vector<Record_ATOM> atom_data = parsePDB(pdb_path);
+	compound_bridge_bundle = new CompoundBridgeBundle;
 	particle_id_maps = new ParticleRef[MAX_ATOMS];
 
 	vector<Record_ATOM> atom_data = parseGRO(pdb_path);
@@ -21,7 +22,14 @@ Molecule CompoundBuilder::buildMolecule(string pdb_path, string itp_path, int ma
 	//printf("%d particles added\n", compound.n_particles);
 	loadTopology(&molecule, &top_data);
 
+	printf("		%d\n", compound_bridge_bundle->compound_bridges[0].n_particles);
+	//molecule.compound_bridge_bundle
+	molecule.compound_bridge_bundle = new CompoundBridgeBundleCompact;// (&compound_bridge_bundle);		// Convert the host version to a compact device version, belonging to the molecule
+	*molecule.compound_bridge_bundle = CompoundBridgeBundleCompact(compound_bridge_bundle);
+	printf("		%d\n", molecule.compound_bridge_bundle->compound_bridges[0].n_particles);
 
+
+	printf("bridges before %d\n", molecule.compound_bridge_bundle->n_bridges);
 
 	countElements(&molecule);
 	printf("Molecule built\n\n\n");
@@ -32,6 +40,7 @@ Molecule CompoundBuilder::buildMolecule(string pdb_path, string itp_path, int ma
 
 
 	delete[] particle_id_maps;
+	delete compound_bridge_bundle;
 	return molecule;
 }
 
@@ -79,7 +88,7 @@ void CompoundBuilder::loadParticles(Molecule* molecule, vector<CompoundBuilder::
 		if (record.residue_seq_number != current_res_id) {
 			if (!current_compound->hasRoomForRes()) {
 				//molecule->compound_bridge_bundle.addBridge(current_compound_id, current_compound_id + 1);
-				compound_bridge_bundle.addBridge(current_compound_id, current_compound_id + 1);
+				compound_bridge_bundle->addBridge(current_compound_id, current_compound_id + 1);
 
 				current_compound_id++;
 				current_compound = &molecule->compounds[current_compound_id];
@@ -116,7 +125,6 @@ void CompoundBuilder::loadTopology(Molecule* molecule, vector<vector<string>>* t
 
 
 
-	molecule->compound_bridge_bundle = new CompoundBridgeBundleCompact(&compound_bridge_bundle);		// Convert the host version to a compact device version, belonging to the molecule
 }
 
 
@@ -163,14 +171,14 @@ void CompoundBuilder::addGeneric(Molecule* molecule, vector<string>* record, Top
 
 		if (!g_bond.spansTwoCompounds()) {			
 			Compound* compound = &molecule->compounds[maps[0].compound_id];
-			compound->pairbonds[compound->n_pairbonds++] = PairBond(dist, maps[0].local_id, maps[1].local_id);
+			compound->singlebonds[compound->n_singlebonds++] = PairBond(dist, maps[0].local_id, maps[1].local_id);
 		}
 		else {			
 			// First, we need to make sure all bond particles are added to the bridge.
 			// To create the single-bond we need to access bridge_local_indexes			
 			
 			//CompoundBridge* bridge = molecule->compound_bridge_bundle.getBelongingBridge(&g_bond);
-			CompoundBridge* bridge = compound_bridge_bundle.getBelongingBridge(&g_bond);
+			CompoundBridge* bridge = compound_bridge_bundle->getBelongingBridge(&g_bond);
 			bridge->addBondParticles(&g_bond, molecule);
 			bridge->addSinglebond(PairBond(dist, maps[0].global_id, maps[1].global_id));
 
@@ -197,7 +205,7 @@ void CompoundBuilder::addGeneric(Molecule* molecule, vector<string>* record, Top
 			compound->anglebonds[compound->n_anglebonds++] = AngleBond(angle, maps[0].local_id, maps[1].local_id, maps[2].local_id);
 		}
 		else { 
-			CompoundBridge* bridge = compound_bridge_bundle.getBelongingBridge(&g_bond);
+			CompoundBridge* bridge = compound_bridge_bundle->getBelongingBridge(&g_bond);
 			//CompoundBridge* bridge = molecule->compound_bridge_bundle.getBelongingBridge(&g_bond);
 			bridge->addBondParticles(&g_bond, molecule);
 			bridge->addAnglebond(AngleBond(angle, maps[0].global_id, maps[1].global_id, maps[2].global_id));
@@ -381,14 +389,14 @@ void CompoundBuilder::countElements(Molecule* molecule) {
 	for (int c = 0; c < molecule->n_compounds; c++) {
 		Compound* C = &molecule->compounds[c];
 		counters[0] += C->n_particles;
-		counters[1] += C->n_pairbonds;
+		counters[1] += C->n_singlebonds;
 		counters[2] += C->n_anglebonds;
 		//counters[3] += C->n_dihedrals;
 	}
 
 	printf("Molecule created with %d compounds\n", molecule->n_compounds);
 	printf("%d particles added\n", counters[0]);
-	printf("%d pairbonds added\n", counters[1]);
+	printf("%d singlebonds added\n", counters[1]);
 	printf("%d anglebonds added\n", counters[2]);
 }
 

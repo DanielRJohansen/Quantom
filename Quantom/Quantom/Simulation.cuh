@@ -85,7 +85,7 @@ public:
 	Solvent* solvents;
 	Solvent* solvents_next;
 
-	CompoundBridgeBundleCompact bridge_bundle;
+	CompoundBridgeBundleCompact* bridge_bundle;
 
 
 	uint32_t step = 0;
@@ -111,6 +111,7 @@ public:
 
 		compounds = genericMoveToDevice(compounds, n_compounds);
 		solvents = genericMoveToDevice(solvents, MAX_SOLVENTS);
+		bridge_bundle = genericMoveToDevice(bridge_bundle, 1);
 		compound_state_array = genericMoveToDevice(compound_state_array, MAX_COMPOUNDS);
 
 

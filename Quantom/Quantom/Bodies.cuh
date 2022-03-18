@@ -269,13 +269,14 @@ struct Compound {
 
 	uint8_t n_particles = 0;					// MAX 256 particles!!!!0
 	Float3 prev_positions[MAX_COMPOUND_PARTICLES];;			// Should this really belong to the compound and not the box?
+	Float3 forces[MAX_COMPOUND_PARTICLES];					// Carries forces from bridge_kernels
 	uint8_t atom_types[MAX_COMPOUND_PARTICLES];
 
 	Float3 center_of_mass = Float3(0, 0, 0);
 	//double radius = 0;
 
-	uint16_t n_pairbonds = 0;
-	PairBond pairbonds[MAX_PAIRBONDS];
+	uint16_t n_singlebonds = 0;
+	PairBond singlebonds[MAX_PAIRBONDS];
 
 	uint16_t n_anglebonds = 0;
 	AngleBond anglebonds[MAX_ANGLEBONDS];
@@ -291,7 +292,7 @@ struct Compound {
 	__host__ void init() {	// Only call this if the compound has already been assigned particles & bonds
 		center_of_mass = calcCOM();
 		//printf("")
-		//radius = pairbonds[0].reference_dist * n_particles * 0.5f;
+		//radius = singlebonds[0].reference_dist * n_particles * 0.5f;
 		//center_of_mass.print('C');
 		//printf("Radius %f\n", radius);
 	}
@@ -345,18 +346,22 @@ struct Compound {
 
 	__device__ void loadMeta(Compound* compound) {
 		n_particles = compound->n_particles;
-		n_pairbonds = compound->n_pairbonds;
+		n_singlebonds = compound->n_singlebonds;
 		n_anglebonds = compound->n_anglebonds;
 	}
 	__device__ void loadData(Compound* compound) {
 		if (threadIdx.x < n_particles) {
 			prev_positions[threadIdx.x] = compound->prev_positions[threadIdx.x];
 			atom_types[threadIdx.x] = compound->atom_types[threadIdx.x];
+			forces[threadIdx.x] = compound->forces[threadIdx.x];
+			compound->forces[threadIdx.x] = Float3(0.f);
+			//if (forces[threadIdx.x].len() > 0)
+			//	forces[threadIdx.x].print('f');
 		}
-		for (int i = 0; (i * blockDim.x) < n_pairbonds; i++) {
+		for (int i = 0; (i * blockDim.x) < n_singlebonds; i++) {
 			int index = i * blockDim.x + threadIdx.x;
-			if (index < n_pairbonds)
-				pairbonds[index] = compound->pairbonds[index];
+			if (index < n_singlebonds)
+				singlebonds[index] = compound->singlebonds[index];
 		}
 		for (int i = 0; (i * blockDim.x) < n_anglebonds; i++) {
 			int index = i * blockDim.x + threadIdx.x;
@@ -525,8 +530,9 @@ struct ParticleRefCompact {
 struct CompoundBridgeCompact {
 	CompoundBridgeCompact() {}
 	CompoundBridgeCompact(CompoundBridge* bridge) {
-		int n_particles = bridge->n_particles;
-
+		n_particles = bridge->n_particles;
+		printf("Loading bridge with %d particles\n", n_particles);
+		
 		for (int i = 0; i < n_particles; i++) {
 			particle_refs[i] = ParticleRefCompact(bridge->particle_refs[i]);
 			atom_types[i] = bridge->atom_types[i];
@@ -539,6 +545,7 @@ struct CompoundBridgeCompact {
 		for (int i = 0; i < n_anglebonds; i++) {
 			anglebonds[i] = bridge->anglebonds[i];
 		}
+		
 	}
 	
 	
@@ -563,7 +570,9 @@ struct CompoundBridgeCompact {
 	__device__ void loadData(CompoundBridgeCompact* bridge) {
 		if (threadIdx.x < n_particles) {
 			atom_types[threadIdx.x] = bridge->atom_types[threadIdx.x];
+			particle_refs[threadIdx.x] = bridge->particle_refs[threadIdx.x];
 		}
+		
 		for (int i = 0; (i * blockDim.x) < n_singlebonds; i++) {
 			int index = i * blockDim.x + threadIdx.x;
 			if (index < n_singlebonds)
@@ -574,6 +583,7 @@ struct CompoundBridgeCompact {
 			if (index < n_anglebonds)
 				anglebonds[index] = bridge->anglebonds[index];
 		}
+		
 	}
 
 
@@ -584,13 +594,7 @@ struct CompoundBridgeCompact {
 
 struct CompoundBridgeBundleCompact {
 	CompoundBridgeBundleCompact() {}
-	CompoundBridgeBundleCompact(CompoundBridgeBundle* bundle) {
-		n_bridges = bundle->n_bridges;
-		for (int i = 0; i < n_bridges; i++) {
-			compound_bridges[i] = CompoundBridgeCompact(&bundle->compound_bridges[i]);
-		}
-		
-	}
+	CompoundBridgeBundleCompact(CompoundBridgeBundle* bundle);
 	CompoundBridgeCompact compound_bridges[COMPOUNDBRIDGES_IN_BUNDLE];
 	int n_bridges = 0;
 };

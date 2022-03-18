@@ -15,7 +15,7 @@ const int MAX_ATOMS_IN_RESIDUE = 16;
 
 
 // Related to compound bridges
-const int COMPOUNDBRIDGES_IN_BUNDLE = 8;
+const int COMPOUNDBRIDGES_IN_BUNDLE = 64;
 const int MAX_PARTICLES_IN_BRIDGE = 32;
 const int MAX_SINGLEBONDS_IN_BRIDGE = 32;
 const int MAX_ANGLEBONDS_IN_BRIDGE = 32;

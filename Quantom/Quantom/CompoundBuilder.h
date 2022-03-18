@@ -13,7 +13,7 @@
 using namespace std;
 
 
-enum LineType { atom, pairbond, anglebond, torsionbond };
+enum LineType { atom, singlebond, anglebond, torsionbond };
 
 struct ParsedLine {
 	LineType linetype;
@@ -47,7 +47,7 @@ private:
 	ForceFieldMaker FFM;
 	//IDMap* particle_id_maps;
 	ParticleRef* particle_id_maps;
-	CompoundBridgeBundle compound_bridge_bundle;
+	CompoundBridgeBundle* compound_bridge_bundle;
 
 
 	struct Record_ATOM;
