@@ -13,20 +13,6 @@ const int MAX_COMPOUND_PARTICLES = 128;
 
 
 
-/*
-struct CompactParticle {	// Contains information only needed by the Ownerkernel
-	CompactParticle() {}	
-	CompactParticle(Float3 pos_sub1) {
-		this->pos_tsub1 = pos_sub1;
-	}	
-	//Float3 force_prev;				// For velocity verlet stormer integration
-	Float3 pos_tsub1;				// Must be initiated!
-	//double mass;								// kg/mol
-};
-*/
-
-
-
 
 
 
@@ -282,7 +268,6 @@ struct Compound {
 
 
 	uint8_t n_particles = 0;					// MAX 256 particles!!!!0
-	//CompactParticle particles[MAX_COMPOUND_PARTICLES];
 	Float3 prev_positions[MAX_COMPOUND_PARTICLES];;			// Should this really belong to the compound and not the box?
 	uint8_t atom_types[MAX_COMPOUND_PARTICLES];
 
@@ -313,15 +298,19 @@ struct Compound {
 
 	__host__ Float3 calcCOM() {
 		Float3 com;
-		for (int i = 0; i < n_particles; i++)
+		for (int i = 0; i < n_particles; i++) {
 			com += (prev_positions[i] * (1.f / (float)n_particles));
-			//com += (particles[i].pos_tsub1 * (1.f / (double) n_particles));
+			//com += (particles[i].pos_tsub1 * (1.f / (float) n_particles));
+		}
+			
 		return com;
 	}
 	/*
 	__host__ bool intersects(Compound a) {
 		return (a.center_of_mass - center_of_mass).len() < (a.radius + radius + max_LJ_dist);
 	}*/
+
+	
 	__host__ void addParticle(int atomtype_id, Float3 pos) {
 		if (n_particles == MAX_COMPOUND_PARTICLES) {
 			printf("ERROR: Cannot add particle to compound!\n");
@@ -329,7 +318,6 @@ struct Compound {
 		}
 
 		atom_types[n_particles] = atomtype_id;
-		//particles[n_particles] = particle;
 		prev_positions[n_particles] = pos;
 		n_particles++;
 	}
@@ -344,7 +332,6 @@ struct Compound {
 		int closest_index = 0;
 
 		for (int i = 0; i < n_particles; i++) {
-			//float dist = (particles[i].pos_tsub1 - com).len();
 			float dist = (prev_positions[i] - com).len();
 			closest_index = dist < closest ? i : closest_index;
 			closest = min(closest, dist);
@@ -363,7 +350,6 @@ struct Compound {
 	}
 	__device__ void loadData(Compound* compound) {
 		if (threadIdx.x < n_particles) {
-			//particles[threadIdx.x] = compound->particles[threadIdx.x];
 			prev_positions[threadIdx.x] = compound->prev_positions[threadIdx.x];
 			atom_types[threadIdx.x] = compound->atom_types[threadIdx.x];
 		}

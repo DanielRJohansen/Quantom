@@ -158,7 +158,7 @@ void CompoundBuilder::addGeneric(Molecule* molecule, vector<string>* record, Top
 		//pos_a = molecule->compounds[maps[0].compound_id].particles[maps[0].local_id].pos_tsub1;
 		//pos_b = molecule->compounds[maps[1].compound_id].particles[maps[1].local_id].pos_tsub1;
 		pos_a = molecule->compounds[maps[0].compound_id].prev_positions[maps[0].local_id];
-		pos_a = molecule->compounds[maps[1].compound_id].prev_positions[maps[1].local_id];
+		pos_b = molecule->compounds[maps[1].compound_id].prev_positions[maps[1].local_id];
 		dist = (pos_a - pos_b).len();
 
 		if (!g_bond.spansTwoCompounds()) {			
@@ -183,9 +183,9 @@ void CompoundBuilder::addGeneric(Molecule* molecule, vector<string>* record, Top
 		if (!g_bond.allParticlesExist())
 			break;
 
-//		pos_a = molecule->compounds[maps[0].compound_id].particles[maps[0].local_id].pos_tsub1;	// left
-//		pos_b = molecule->compounds[maps[1].compound_id].particles[maps[1].local_id].pos_tsub1;	// middle
-//		pos_c = molecule->compounds[maps[2].compound_id].particles[maps[2].local_id].pos_tsub1;	// right
+		//pos_a = molecule->compounds[maps[0].compound_id].particles[maps[0].local_id].pos_tsub1;	// left
+		//pos_b = molecule->compounds[maps[1].compound_id].particles[maps[1].local_id].pos_tsub1;	// middle
+		//pos_c = molecule->compounds[maps[2].compound_id].particles[maps[2].local_id].pos_tsub1;	// right
 		pos_a = molecule->compounds[maps[0].compound_id].prev_positions[maps[0].local_id];
 		pos_b = molecule->compounds[maps[1].compound_id].prev_positions[maps[1].local_id];
 		pos_c = molecule->compounds[maps[2].compound_id].prev_positions[maps[2].local_id];
