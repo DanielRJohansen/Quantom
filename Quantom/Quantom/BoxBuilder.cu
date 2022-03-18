@@ -39,8 +39,7 @@ void BoxBuilder::addSingleMolecule(Simulation* simulation, Molecule* molecule) {
 	for (int c = 0; c < molecule->n_compounds; c++) {
 		Compound* compound = &molecule->compounds[c];
 		for (int i = 0; i < compound->n_particles; i++) {
-			//compound->particles[i].pos_tsub1 += offset;
-			compound->prev_positions[i] += offset;
+			compound->particles[i].pos_tsub1 += offset;
 		}
 		integrateCompound(compound,	simulation);
 	}
@@ -204,16 +203,14 @@ void BoxBuilder::integrateCompound(Compound* compound, Simulation* simulation)
 	Float3 compound_united_vel = Float3(random(), random(), random()).norm() * v_rms * 0;
 
 	for (int i = 0; i < compound->n_particles; i++) {
-		//state->positions[i] = compound->particles[i].pos_tsub1;
-		state->positions[i] = compound->prev_positions[i];
+		state->positions[i] = compound->particles[i].pos_tsub1;
 		state->n_particles++;
 	}
 
 
 	for (int i = 0; i < compound->n_particles; i++) {
 		Float3 atom_pos_sub1 = state->positions[i] - compound_united_vel * simulation->dt;
-		//compound->particles[i].pos_tsub1 = atom_pos_sub1;												// Overwrite prev pos here, since we have assigned the former prev pos to the state buffer.
-		compound->prev_positions[i] = atom_pos_sub1;												// Overwrite prev pos here, since we have assigned the former prev pos to the state buffer.
+		compound->particles[i].pos_tsub1 = atom_pos_sub1;												// Overwrite prev pos here, since we have assigned the former prev pos to the state buffer.
 	}
 
 	simulation->box->compounds[simulation->box->n_compounds++] = *compound;
@@ -325,8 +322,7 @@ Compound* BoxBuilder::randomizeCompound(Compound* original_compound)
 void BoxBuilder::moveCompound(Compound* compound, Float3 vector)
 {
 	for (int i = 0; i < compound->n_particles; i++)
-		compound->prev_positions[i] += vector;
-		//compound->particles[i].pos_tsub1 += vector;
+		compound->particles[i].pos_tsub1 += vector;
 }
 
 void BoxBuilder::rotateCompound(Compound* compound, Float3 xyz_rot)
@@ -335,8 +331,7 @@ void BoxBuilder::rotateCompound(Compound* compound, Float3 xyz_rot)
 	moveCompound(compound, vec_to_origo);
 
 	for (int i = 0; i < compound->n_particles; i++)
-		compound->prev_positions[i].rotateAroundOrigo(xyz_rot);
-		//compound->particles[i].pos_tsub1.rotateAroundOrigo(xyz_rot);
+		compound->particles[i].pos_tsub1.rotateAroundOrigo(xyz_rot);
 
 	moveCompound(compound, vec_to_origo * -1);
 }
@@ -345,8 +340,7 @@ BoundingBox BoxBuilder::calcCompoundBoundingBox(Compound* compound)
 {
 	BoundingBox bb(Float3(9999, 9999, 9999), Float3(-9999, -9999, -9999));
 	for (int i = 0; i < compound->n_particles; i++) {
-		//Float3 pos = compound->particles[i].pos_tsub1;
-		Float3 pos = compound->prev_positions[i];
+		Float3 pos = compound->particles[i].pos_tsub1;
 		for (int dim = 0; dim < 3; dim++) {
 			*bb.min.placeAt(dim) = min(bb.min.at(dim), pos.at(dim));
 			*bb.max.placeAt(dim) = max(bb.max.at(dim), pos.at(dim));
@@ -395,10 +389,8 @@ bool BoxBuilder::verifyPairwiseParticleMindist(Compound* a, Compound* b)
 {
 	for (int ia = 0; ia < a->n_particles; ia++) {
 		for (int ib = 0; ib < b->n_particles; ib++) {
-			//Float3 pos_a = a->particles[ia].pos_tsub1;
-			//Float3 pos_b = b->particles[ib].pos_tsub1;
-			Float3 pos_a = a->prev_positions[ia];
-			Float3 pos_b = b->prev_positions[ib];
+			Float3 pos_a = a->particles[ia].pos_tsub1;
+			Float3 pos_b = b->particles[ib].pos_tsub1;
 
 			float dist = (pos_a - pos_b).len();
 			if (dist < MIN_NONBONDED_DIST)

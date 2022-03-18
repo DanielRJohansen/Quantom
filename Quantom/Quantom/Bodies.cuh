@@ -13,7 +13,7 @@ const int MAX_COMPOUND_PARTICLES = 128;
 
 
 
-/*
+
 struct CompactParticle {	// Contains information only needed by the Ownerkernel
 	CompactParticle() {}	
 	CompactParticle(Float3 pos_sub1) {
@@ -23,7 +23,7 @@ struct CompactParticle {	// Contains information only needed by the Ownerkernel
 	Float3 pos_tsub1;				// Must be initiated!
 	//double mass;								// kg/mol
 };
-*/
+
 
 
 
@@ -282,8 +282,7 @@ struct Compound {
 
 
 	uint8_t n_particles = 0;					// MAX 256 particles!!!!0
-	//CompactParticle particles[MAX_COMPOUND_PARTICLES];
-	Float3 prev_positions[MAX_COMPOUND_PARTICLES];;			// Should this really belong to the compound and not the box?
+	CompactParticle particles[MAX_COMPOUND_PARTICLES];
 	uint8_t atom_types[MAX_COMPOUND_PARTICLES];
 
 	Float3 center_of_mass = Float3(0, 0, 0);
@@ -314,23 +313,21 @@ struct Compound {
 	__host__ Float3 calcCOM() {
 		Float3 com;
 		for (int i = 0; i < n_particles; i++)
-			com += (prev_positions[i] * (1.f / (float)n_particles));
-			//com += (particles[i].pos_tsub1 * (1.f / (double) n_particles));
+			com += (particles[i].pos_tsub1 * (1.f / (double) n_particles));
 		return com;
 	}
 	/*
 	__host__ bool intersects(Compound a) {
 		return (a.center_of_mass - center_of_mass).len() < (a.radius + radius + max_LJ_dist);
 	}*/
-	__host__ void addParticle(int atomtype_id, Float3 pos) {
+	__host__ void addParticle(int atomtype_id, CompactParticle particle) {
 		if (n_particles == MAX_COMPOUND_PARTICLES) {
 			printf("ERROR: Cannot add particle to compound!\n");
 			exit(1);
 		}
 
 		atom_types[n_particles] = atomtype_id;
-		//particles[n_particles] = particle;
-		prev_positions[n_particles] = pos;
+		particles[n_particles] = particle;
 		n_particles++;
 	}
 	__host__ bool hasRoomForRes() {					// TODO: Implement, that it checks n atoms in res
@@ -344,8 +341,7 @@ struct Compound {
 		int closest_index = 0;
 
 		for (int i = 0; i < n_particles; i++) {
-			//float dist = (particles[i].pos_tsub1 - com).len();
-			float dist = (prev_positions[i] - com).len();
+			float dist = (particles[i].pos_tsub1 - com).len();
 			closest_index = dist < closest ? i : closest_index;
 			closest = min(closest, dist);
 			furthest = max(furthest, dist);
@@ -363,8 +359,7 @@ struct Compound {
 	}
 	__device__ void loadData(Compound* compound) {
 		if (threadIdx.x < n_particles) {
-			//particles[threadIdx.x] = compound->particles[threadIdx.x];
-			prev_positions[threadIdx.x] = compound->prev_positions[threadIdx.x];
+			particles[threadIdx.x] = compound->particles[threadIdx.x];
 			atom_types[threadIdx.x] = compound->atom_types[threadIdx.x];
 		}
 		for (int i = 0; (i * blockDim.x) < n_pairbonds; i++) {
@@ -476,12 +471,31 @@ struct CompoundBridge {
 			}
 		}
 	}
+
 	void addSinglebond(PairBond pb) {
+		/*for (int p = 0; p < 2; p++) {						// First reassign the global indexes of the bond with local indexes of the bridge
+			for (int i = 0; i < n_particles; i++) {
+
+				if (pb.atom_indexes[p] == particle_refs[i].global_id) {
+					pb.atom_indexes[p] = particle_refs[i].local_id_bridge;
+					break;
+				}
+			}
+		}*/
 		localizeIDs(&pb, 2);
 		singlebonds[n_singlebonds++] = pb;
 		printf("Singlebond added %d %d\n", singlebonds[n_singlebonds - 1].atom_indexes[0], singlebonds[n_singlebonds - 1].atom_indexes[1]);
 	}
 	void addAnglebond(AngleBond ab) {
+		/*for (int p = 0; p < 3; p++) {						// First reassign the global indexes of the bond with local indexes of the bridge
+			for (int i = 0; i < n_particles; i++) {
+
+				if (ab.atom_indexes[p] == particle_refs[i].global_id) {
+					ab.atom_indexes[p] = particle_refs[i].local_id_bridge;
+					break;
+				}
+			}
+		}*/
 		localizeIDs(&ab, 3);
 		anglebonds[n_anglebonds++] = ab;
 		printf("Anglebond added %d %d %d\n", anglebonds[n_anglebonds - 1].atom_indexes[0], anglebonds[n_anglebonds - 1].atom_indexes[1], anglebonds[n_anglebonds - 1].atom_indexes[2]);
