@@ -413,25 +413,23 @@ struct Molecule {
 struct CompoundBridge {
 	CompoundBridge() {}
 	CompoundBridge(int id_left, int id_right): compound_id_left(id_left), compound_id_right(id_right) {
-		singlebonds = new PairBond[128];
-		anglebonds = new AngleBond[128];
 	}
 
 	int compound_id_left, compound_id_right;
-	ParticleRef particle_refs[32];
-	uint8_t atom_types[32];
+	ParticleRef particle_refs[MAX_PARTICLES_IN_BRIDGE];
+	uint8_t atom_types[MAX_PARTICLES_IN_BRIDGE];
 	int n_particles = 0;
 
 
 
 
-	GenericBond bonds[64];
+	GenericBond bonds[MAX_DIHEDRALBONDS_IN_BRIDGE*4];
 	int n_bonds = 0;
 	
 
-	PairBond* singlebonds;
+	PairBond singlebonds[MAX_SINGLEBONDS_IN_BRIDGE];
 	int n_singlebonds = 0;
-	AngleBond* anglebonds;
+	AngleBond anglebonds[MAX_ANGLEBONDS_IN_BRIDGE];
 	int n_anglebonds = 0;
 
 
@@ -461,8 +459,21 @@ struct CompoundBridge {
 				addParticle(&bond->particles[p], molecule);
 		}
 	}
+
+	template <typename T>
+	void localizeIDs(T* bond, int n) {
+		for (int p = 0; p < n; p++) {						// First reassign the global indexes of the bond with local indexes of the bridge
+			for (int i = 0; i < n_particles; i++) {
+				if (bond->atom_indexes[p] == particle_refs[i].global_id) {
+					bond->atom_indexes[p] = particle_refs[i].local_id_bridge;
+					break;
+				}
+			}
+		}
+	}
+
 	void addSinglebond(PairBond pb) {
-		for (int p = 0; p < 2; p++) {						// First reassign the global indexes of the bond with local indexes of the bridge
+		/*for (int p = 0; p < 2; p++) {						// First reassign the global indexes of the bond with local indexes of the bridge
 			for (int i = 0; i < n_particles; i++) {
 
 				if (pb.atom_indexes[p] == particle_refs[i].global_id) {
@@ -470,12 +481,13 @@ struct CompoundBridge {
 					break;
 				}
 			}
-		}
+		}*/
+		localizeIDs(&pb, 2);
 		singlebonds[n_singlebonds++] = pb;
 		printf("Singlebond added %d %d\n", singlebonds[n_singlebonds - 1].atom_indexes[0], singlebonds[n_singlebonds - 1].atom_indexes[1]);
 	}
 	void addAnglebond(AngleBond ab) {
-		for (int p = 0; p < 3; p++) {						// First reassign the global indexes of the bond with local indexes of the bridge
+		/*for (int p = 0; p < 3; p++) {						// First reassign the global indexes of the bond with local indexes of the bridge
 			for (int i = 0; i < n_particles; i++) {
 
 				if (ab.atom_indexes[p] == particle_refs[i].global_id) {
@@ -483,7 +495,8 @@ struct CompoundBridge {
 					break;
 				}
 			}
-		}
+		}*/
+		localizeIDs(&ab, 3);
 		anglebonds[n_anglebonds++] = ab;
 		printf("Anglebond added %d %d %d\n", anglebonds[n_anglebonds - 1].atom_indexes[0], anglebonds[n_anglebonds - 1].atom_indexes[1], anglebonds[n_anglebonds - 1].atom_indexes[2]);
 	}
@@ -498,12 +511,12 @@ struct CompoundBridge {
 struct CompoundBridgeBundle {
 	//ParticleRef particles[MAX_COMPOUND_PARTICLES * 2];
 	//int n_particles = 0;
-	CompoundBridge compound_bridges[16];
+	CompoundBridge compound_bridges[COMPOUNDBRIDGES_IN_BUNDLE];
 	int n_bridges = 0;
 
 	bool addBridge(int left_c_id, int right_c_id) {
 		if (left_c_id > right_c_id) { swap(left_c_id, right_c_id); }
-		if (n_bridges == 16)
+		if (n_bridges == COMPOUNDBRIDGES_IN_BUNDLE)
 			return false;
 		compound_bridges[n_bridges++] = CompoundBridge(left_c_id, right_c_id);
 		return true;
@@ -557,15 +570,15 @@ struct CompoundBridgeCompact {
 	}
 	
 	
-	ParticleRefCompact particle_refs[MAX_COMPOUND_PARTICLES];
-	uint8_t atom_types[MAX_COMPOUND_PARTICLES];			
+	ParticleRefCompact particle_refs[MAX_PARTICLES_IN_BRIDGE];
+	uint8_t atom_types[MAX_PARTICLES_IN_BRIDGE];
 	int n_particles = 0;					
 
 	uint16_t n_singlebonds = 0;
-	PairBond singlebonds[MAX_PAIRBONDS];
+	PairBond singlebonds[MAX_SINGLEBONDS_IN_BRIDGE];
 
 	uint16_t n_anglebonds = 0;
-	AngleBond anglebonds[MAX_ANGLEBONDS];
+	AngleBond anglebonds[MAX_ANGLEBONDS_IN_BRIDGE];
 
 };
 
@@ -578,7 +591,7 @@ struct CompoundBridgeBundleCompact {
 		}
 		
 	}
-	CompoundBridgeCompact compound_bridges[16];
+	CompoundBridgeCompact compound_bridges[COMPOUNDBRIDGES_IN_BUNDLE];
 	int n_bridges = 0;
 };
 

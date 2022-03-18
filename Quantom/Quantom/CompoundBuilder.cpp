@@ -386,6 +386,19 @@ void CompoundBuilder::countElements(Molecule* molecule) {
 }
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
 Molecule::Molecule() {
 	compounds = new Compound[MAX_COMPOUNDS];
 	//compound_bridge_bundle = new CompoundBridgeBundleCompact;
