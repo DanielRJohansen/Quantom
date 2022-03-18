@@ -17,8 +17,6 @@ const int MAX_ATOM_TYPES = 16;
 
 
 struct ParticleParameters {
-	//ParticleParameters() {}
-	//ParticleParameters(char atom, float m, float s, float e) : mass(m), sigma(s), epsilon(e) {}
 
 	float mass = -1;		//[kg/mol]
 
@@ -48,22 +46,11 @@ struct ForceField {
 
 
 
-
-// Doens't work :/
-//extern const __constant__ ForceField forcefield_device;	// Make available in both Engine, Rasterizer (temp) and Analyzer
-
-
-
-
-
-
-
-
-
 class ForceFieldMaker {
 public:
 	ForceFieldMaker() {
 		make('W', 0, 15.999000 + 2 * 1.008000, 0.302905564168 + 2 * 0.040001352445, 0.50208f + 2 * 0.19246);
+		//make('C', 1, 12.011f, 0.356359487256f, 0.46024f, 0.13350000f, 502080.00f);
 		make('C', 1, 12.011f, 0.356359487256f, 0.46024f);
 		make('O', 2, 15.999000, 0.302905564168f, 0.50208f);
 		make('N', 3, 14.007000, 0.329632525712, 0.83680);
@@ -75,6 +62,7 @@ public:
 		forcefield.particle_parameters[2] = ParticleParameters('N', 12.011f, 0.356359487256f, 0.46024f);
 		forcefield.particle_parameters[3] = ParticleParameters('H', 12.011f, 0.356359487256f, 0.46024f);
 		*/
+
 		for (int i = 0; i < MAX_ATOM_TYPES; i++) {
 			forcefield.particle_parameters[i].mass /= 1000.f;		// Convert g/moæ to kg/mol
 			forcefield.particle_parameters[i].epsilon *= 1000.f;		// convert kJ/mol to J/mol
@@ -89,6 +77,13 @@ public:
 		forcefield.particle_parameters[index].epsilon = e;
 	}
 
+	void make(char atom, int index, float m, float s, float e, float b0, float kb) {
+		forcefield.particle_parameters[index].mass = m;
+		forcefield.particle_parameters[index].sigma = s;
+		forcefield.particle_parameters[index].epsilon = e;
+		forcefield.particle_parameters[index].b0 = b0;
+		forcefield.particle_parameters[index].kb = kb;
+	}
 
 	ForceField getForcefield() {
 		return forcefield;

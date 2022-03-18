@@ -48,12 +48,16 @@ struct Solvent {
 struct ParticleRef {		 // Maybe call map instead?
 	ParticleRef() {}
 	ParticleRef(int g, int c, int l) : global_id(g), compound_id(c), local_id(l) {}
-	int compound_id = -1;
-	int local_id = -1;		// Particles id in compound
+
 	int global_id = -1;		// refers to the id in conf file!
 
+	// For designated compound
+	int compound_id = -1;
+	int local_id = -1;		// Particles id in compound
 
-
+	// For designated compound_bridge
+	int bridge_id = -1;
+	int local_id_bridge = -1;
 
 	__host__ inline bool operator == (const ParticleRef a) const { return (global_id == a.global_id); }
 
@@ -124,6 +128,8 @@ struct GenericBond {					// ONLY used during creation, never on device!
 		}
 		return true;
 	}
+
+
 	/*
 	template<typename T>
 	void assignBond(T* bond) {
@@ -275,6 +281,24 @@ struct Compound {
 	__host__ Compound() {}	// {}
 
 
+	uint8_t n_particles = 0;					// MAX 256 particles!!!!0
+	CompactParticle particles[MAX_COMPOUND_PARTICLES];
+	uint8_t atom_types[MAX_COMPOUND_PARTICLES];
+
+	Float3 center_of_mass = Float3(0, 0, 0);
+	//double radius = 0;
+
+	uint16_t n_pairbonds = 0;
+	PairBond pairbonds[MAX_PAIRBONDS];
+
+	uint16_t n_anglebonds = 0;
+	AngleBond anglebonds[MAX_ANGLEBONDS];
+
+
+	int key_particle_index = 404;		// particle which started at center. Used for PBC, applyhyperpos, and neighborlist search.
+	float confining_particle_sphere = 0;		// All particles in compound are PROBABLY within this radius
+
+
 	//---------------------------------------------------------------------------------//
 
 	
@@ -354,39 +378,61 @@ struct Compound {
 	//CompoundState* compound_state_ptr;
 	//CompoundNeighborList* compound_neighborlist_ptr;
 
-	uint8_t n_particles = 0;					// MAX 256 particles!!!!0
-	CompactParticle particles[MAX_COMPOUND_PARTICLES];
-	uint8_t atom_types[MAX_COMPOUND_PARTICLES];
 
-	Float3 center_of_mass = Float3(0, 0, 0);
-	//double radius = 0;
-
-	uint16_t n_pairbonds = 0;
-	PairBond pairbonds[MAX_PAIRBONDS];
-
-	uint16_t n_anglebonds = 0;
-	AngleBond anglebonds[MAX_ANGLEBONDS];
-
-
-	int key_particle_index = 404;		// particle which started at center. Used for PBC, applyhyperpos, and neighborlist search.
-	float confining_particle_sphere = 0;		// All particles in compound are PROBABLY within this radius
 };
 
 
 
+struct CompoundBridgeBundleCompact;
+struct Molecule {
+	Molecule();
+	int n_compounds = 1;
+	Compound* compounds;
+	CompoundBridgeBundleCompact* compound_bridge_bundle;
+	//CompoundBridgeBundle compound_bridge_bundle;	// Special compound, for special kernel. For now we only need one
+	uint32_t n_atoms_total = 0;
 
+	Float3 calcCOM() {
+		Float3 com(0.f);
+		for (int i = 0; i < n_compounds; i++) {
+			com += (compounds[i].calcCOM() * (1.f / (float)n_compounds));
+		}
+		return com;
+	}
+
+
+
+
+
+	~Molecule() {
+		//printf("Deleting\n");		// Huh, this deletes too early. I better implement properly at some point.
+		//delete[] compounds;
+	}
+};
 
 struct CompoundBridge {
 	CompoundBridge() {}
-	CompoundBridge(int id_left, int id_right): compound_id_left(id_left), compound_id_right(id_right) {}
+	CompoundBridge(int id_left, int id_right): compound_id_left(id_left), compound_id_right(id_right) {
+		singlebonds = new PairBond[128];
+		anglebonds = new AngleBond[128];
+	}
 
 	int compound_id_left, compound_id_right;
 	ParticleRef particle_refs[32];
-	int n_particles;
+	uint8_t atom_types[32];
+	int n_particles = 0;
+
+
+
+
 	GenericBond bonds[64];
-	int n_bonds;
+	int n_bonds = 0;
+	
 
-
+	PairBond* singlebonds;
+	int n_singlebonds = 0;
+	AngleBond* anglebonds;
+	int n_anglebonds = 0;
 
 
 
@@ -401,18 +447,53 @@ struct CompoundBridge {
 		}
 		return false;
 	}
+	void addParticle(ParticleRef* particle_ref, Molecule* molecule) {
+		particle_ref->bridge_id = 0;
+		particle_ref->local_id_bridge = n_particles;
+		atom_types[n_particles] = molecule->compounds[particle_ref->compound_id].atom_types[particle_ref->local_id];
+		particle_refs[n_particles] = *particle_ref;
+		n_particles++;
+	}
 
-	void addBond(GenericBond* bond) {
+	void addBondParticles(GenericBond* bond, Molecule* molecule) {
 		for (int p = 0; p < bond->n_particles; p++) {
 			if (!particleAlreadyStored(&bond->particles[p]))
-				particle_refs[n_particles++] = bond->particles[p];
+				addParticle(&bond->particles[p], molecule);
 		}
-		bonds[n_bonds++] = *bond;
 	}
-	
+	void addSinglebond(PairBond pb) {
+		for (int p = 0; p < 2; p++) {						// First reassign the global indexes of the bond with local indexes of the bridge
+			for (int i = 0; i < n_particles; i++) {
+
+				if (pb.atom_indexes[p] == particle_refs[i].global_id) {
+					pb.atom_indexes[p] = particle_refs[i].local_id_bridge;
+					break;
+				}
+			}
+		}
+		singlebonds[n_singlebonds++] = pb;
+		printf("Singlebond added %d %d\n", singlebonds[n_singlebonds - 1].atom_indexes[0], singlebonds[n_singlebonds - 1].atom_indexes[1]);
+	}
+	void addAnglebond(AngleBond ab) {
+		for (int p = 0; p < 3; p++) {						// First reassign the global indexes of the bond with local indexes of the bridge
+			for (int i = 0; i < n_particles; i++) {
+
+				if (ab.atom_indexes[p] == particle_refs[i].global_id) {
+					ab.atom_indexes[p] = particle_refs[i].local_id_bridge;
+					break;
+				}
+			}
+		}
+		anglebonds[n_anglebonds++] = ab;
+		printf("Anglebond added %d %d %d\n", anglebonds[n_anglebonds - 1].atom_indexes[0], anglebonds[n_anglebonds - 1].atom_indexes[1], anglebonds[n_anglebonds - 1].atom_indexes[2]);
+	}
+
 
 
 };
+
+
+
 
 struct CompoundBridgeBundle {
 	//ParticleRef particles[MAX_COMPOUND_PARTICLES * 2];
@@ -428,63 +509,83 @@ struct CompoundBridgeBundle {
 		return true;
 	}
 
-
-
-	/*
-	void addParticle(int global_id, int compound_id, int local_id) {
-		particles[n_particles++] = ParticleRef(global_id, compound_id, local_id);
-	}
-
-
-	bool particlesCrossBridge(int* global_ids, int n_bond_particles) {
-		int hits = 0;
-		for (int i = 0; i < n_bond_particles; i++) {
-			for (int j = 0; j < n_particles; j++) {
-				printf("%d %d \n", global_ids[i], particles[j].global_id);
-				hits += (global_ids[i] == particles[j].global_id);
+	CompoundBridge* getBelongingBridge(GenericBond* bond) {
+		for (int i = 0; i < n_bridges; i++) {
+			CompoundBridge* bridge = &compound_bridges[i];
+			if (bridge->bondBelongsInBridge(bond)) {
+				return bridge;
 			}
-			if (hits >= 2)
-				return true;
 		}
-		printf("hits %d\n\n", hits);
-		return false;
 	}
 
-	template<typename T>
-	bool addBond(T bond) {
-		int hits = 0;
+};
+
+
+
+
+
+
+
+
+
+
+struct ParticleRefCompact {
+	ParticleRefCompact() {}
+	ParticleRefCompact(ParticleRef pref) : compound_id(pref.compound_id), local_id(pref.local_id) {}
+
+	int compound_id = -1;
+	int local_id = -1;
+};
+
+struct CompoundBridgeCompact {
+	CompoundBridgeCompact() {}
+	CompoundBridgeCompact(CompoundBridge* bridge) {
+		int n_particles = bridge->n_particles;
+
 		for (int i = 0; i < n_particles; i++) {
-			for (int j = 0; j < bond.n_atoms; j++) {
-
-			}
+			particle_refs[i] = ParticleRefCompact(bridge->particle_refs[i]);
+			atom_types[i] = bridge->atom_types[i];
+		}
+		n_singlebonds = bridge->n_singlebonds;
+		for (int i = 0; i < n_singlebonds; i++) {
+			singlebonds[i] = bridge->singlebonds[i];
+		}
+		n_anglebonds = bridge->n_anglebonds;
+		for (int i = 0; i < n_anglebonds; i++) {
+			anglebonds[i] = bridge->anglebonds[i];
 		}
 	}
-	*/
+	
+	
+	ParticleRefCompact particle_refs[MAX_COMPOUND_PARTICLES];
+	uint8_t atom_types[MAX_COMPOUND_PARTICLES];			
+	int n_particles = 0;					
+
+	uint16_t n_singlebonds = 0;
+	PairBond singlebonds[MAX_PAIRBONDS];
+
+	uint16_t n_anglebonds = 0;
+	AngleBond anglebonds[MAX_ANGLEBONDS];
+
 };
 
-struct Molecule {
-	Molecule() {
-		compounds = new Compound[MAX_COMPOUNDS];
-	}
-	int n_compounds = 1;
-	Compound* compounds;
-	CompoundBridgeBundle compound_bridge_bundle;	// Special compound, for special kernel. For now we only need one
-	uint32_t n_atoms_total = 0;
-
-	Float3 calcCOM() {
-		Float3 com(0.f);
-		for (int i = 0; i < n_compounds; i++) {
-			com += (compounds[i].calcCOM() * (1.f/ (float)n_compounds));
+struct CompoundBridgeBundleCompact {
+	CompoundBridgeBundleCompact() {}
+	CompoundBridgeBundleCompact(CompoundBridgeBundle* bundle) {
+		n_bridges = bundle->n_bridges;
+		for (int i = 0; i < n_bridges; i++) {
+			compound_bridges[i] = CompoundBridgeCompact(&bundle->compound_bridges[i]);
 		}
-		return com;
+		
 	}
-
-
-
-
-
-	~Molecule() {
-		//printf("Deleting\n");		// Huh, this deletes too early. I better implement properly at some point.
-		//delete[] compounds;
-	}
+	CompoundBridgeCompact compound_bridges[16];
+	int n_bridges = 0;
 };
+
+
+
+
+
+
+
+

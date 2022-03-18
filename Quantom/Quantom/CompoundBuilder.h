@@ -47,6 +47,8 @@ private:
 	ForceFieldMaker FFM;
 	//IDMap* particle_id_maps;
 	ParticleRef* particle_id_maps;
+	CompoundBridgeBundle compound_bridge_bundle;
+
 
 	struct Record_ATOM;
 	void loadParticles(Molecule* molecule, vector<Record_ATOM>* pdb_data, int max_monomer_id = INT32_MAX, int min_residue_id=0, bool ignore_protons =false);

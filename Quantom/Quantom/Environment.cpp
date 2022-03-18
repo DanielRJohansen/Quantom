@@ -20,8 +20,7 @@ Environment::Environment() {
 	//Compound mol_4pcw10 = compoundbuilder.buildMolecule("D:\\Quantom\\filaggrin\\4pcw_first10.pdb", "D:\\Quantom\\filaggrin\\topol.top", 7);
 	//Compound mol_4pcw10 = compoundbuilder.buildMolecule("D:\\Quantom\\filaggrin\\conf.gro", "D:\\Quantom\\filaggrin\\topol.top", 4);
 	//Compound mol_6lzm_10 = compoundbuilder.buildMolecule(MOL_FOLDER + "conf.gro", MOL_FOLDER + "topol.top", 10);
-	Molecule mol_6lzm_10 = compoundbuilder.buildMolecule(MOL_FOLDER + "conf.gro", MOL_FOLDER + "topol.top", 14, 0);
-	
+	Molecule mol_6lzm_10 = compoundbuilder.buildMolecule(MOL_FOLDER + "conf.gro", MOL_FOLDER + "topol.top", 40, 0);
 
 	//printf("here %d", temp.n_particles);
 	
@@ -47,7 +46,7 @@ void Environment::verifySimulationParameters() {	// Not yet implemented
 	//assert(THREADS_PER_SOLVENTBLOCK >= N_SOLVATE_MOLECULES);
 	assert(BOX_LEN > 3.f);
 	//assert(BOX_LEN >= CUTOFF + 0.5f);
-	assert(simulation->n_compounds <= 1);	// Otherwise data_GAN goes haywire
+	//assert(simulation->n_compounds <= 1);	// Otherwise data_GAN goes haywire
 
 	assert(simulation->n_steps % STEPS_PER_LOGTRANSFER == 0);
 	assert(simulation->n_steps % STEPS_PER_THERMOSTAT == 0);
@@ -59,8 +58,6 @@ void Environment::verifySimulationParameters() {	// Not yet implemented
 }
 
 void Environment::verifyBox() {
-
-	printf("FSDA OJØÆMVPSEWM %d\n", simulation->n_compounds);
 	for (int c = 0; c < simulation->n_compounds; c++) {
 		printf("Compound radius: %f\n", simulation->compounds_host[c].confining_particle_sphere);
 		if ((simulation->compounds_host[c].confining_particle_sphere * 1.1) > BOX_LEN_HALF) {
