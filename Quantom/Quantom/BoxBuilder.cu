@@ -47,6 +47,8 @@ void BoxBuilder::addSingleMolecule(Simulation* simulation, Molecule* molecule) {
 
 	simulation->total_compound_particles = molecule->n_atoms_total;						// TODO: Unknown behavior, if multiple molecules are added!
 	simulation->total_particles += molecule->n_atoms_total;
+
+	simulation->box->bridge_bundle = *molecule->compound_bridge_bundle;					// TODO: Breaks if multiple compounds are added, as only one bridgebundle can exist for now!
 }
 
 void BoxBuilder::addScatteredMolecules(Simulation* simulation, Compound* molecule, int n_copies)

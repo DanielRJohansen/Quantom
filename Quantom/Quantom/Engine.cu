@@ -577,19 +577,50 @@ __device__ Float3 computeCompoundToSolventLJForces(Float3* self_pos, int n_parti
 	return force;
 }
 */
-__device__ Float3 computePairbondForces(Compound* compound, CompoundState* compound_state, Float3* utility_buffer, float* potE) {	// only works if n threads >= n bonds
+template <typename T>	// Can either be Compound or CompoundBridgeCompact
+__device__ Float3 computePairbondForces(T* entity, Float3* positions, Float3* utility_buffer, float* potE) {	// only works if n threads >= n bonds
 	utility_buffer[threadIdx.x] = Float3(0, 0, 0);
-	for (int i = 0; (i * blockDim.x) < compound->n_pairbonds; i++) {					
+	for (int i = 0; (i * blockDim.x) < entity->n_pairbonds; i++) {
 		PairBond* pb = nullptr;
 		Float3 forces[2];
 		int bond_index = threadIdx.x + i * blockDim.x;
 
-		if (bond_index < compound->n_pairbonds) {
-			pb = &compound->pairbonds[bond_index];
+		if (bond_index < entity->n_pairbonds) {
+			pb = &entity->pairbonds[bond_index];
 
 			calcPairbondForces(
-				&compound_state->positions[pb->atom_indexes[0]],
-				&compound_state->positions[pb->atom_indexes[1]],
+				&positions[pb->atom_indexes[0]],
+				&positions[pb->atom_indexes[1]],
+				&pb->reference_dist,
+				forces, potE
+			);
+		}
+
+
+		for (int i = 0; i < blockDim.x; i++) {
+			if (threadIdx.x == i && pb != nullptr) {
+				utility_buffer[pb->atom_indexes[0]] += forces[0];
+				utility_buffer[pb->atom_indexes[1]] += forces[1];
+			}
+			__syncthreads();
+		}
+	}
+
+	return utility_buffer[threadIdx.x];
+}
+__device__ Float3 computePairbondForces(CompoundBridgeCompact* bridge, Float3* positions, Float3* utility_buffer, float* potE) {	// only works if n threads >= n bonds
+	utility_buffer[threadIdx.x] = Float3(0, 0, 0);
+	for (int i = 0; (i * blockDim.x) < bridge->n_singlebonds; i++) {
+		PairBond* pb = nullptr;
+		Float3 forces[2];
+		int bond_index = threadIdx.x + i * blockDim.x;
+
+		if (bond_index < bridge->n_singlebonds) {
+			pb = &bridge->singlebonds[bond_index];
+
+			calcPairbondForces(
+				&positions[pb->atom_indexes[0]],
+				&positions[pb->atom_indexes[1]],
 				&pb->reference_dist,
 				forces, potE
 			);
@@ -710,7 +741,7 @@ __global__ void forceKernel(Box* box) {
 
 		LIMAENG::applyHyperpos(&compound_state.positions[0], &compound_state.positions[threadIdx.x]);
 		__syncthreads();	// Dunno if necessary
-		force += computePairbondForces(&compound, &compound_state, utility_buffer, &potE_sum);
+		force += computePairbondForces(&compound, compound_state.positions, utility_buffer, &potE_sum);
 		force += computeAnglebondForces(&compound, &compound_state, utility_buffer, &potE_sum);
 
 		
@@ -942,7 +973,52 @@ __global__ void solventForceKernel(Box* box) {
 
 
 
+__global__ void compoundBridgeKernel(Box* box) {
+//#define compound_id blockIdx.x
+#define particle_id_bridge threadIdx.x
+	__shared__ CompoundBridgeCompact bridge;
+	__shared__ Float3 positions[MAX_PARTICLES_IN_BRIDGE];
+	__shared__ Float3 utility_buffer[NEIGHBORLIST_MAX_SOLVENTS];							// waaaaay too biggg
+	__shared__ uint8_t utility_buffer_small[NEIGHBORLIST_MAX_SOLVENTS];
 
+
+	if (threadIdx.x == 0) {
+		bridge.loadMeta(&box->bridge_bundle.compound_bridges[blockIdx.x]);
+
+	}
+	__syncthreads();
+	bridge.loadData(&box->bridge_bundle.compound_bridges[blockIdx.x]);
+	if (particle_id_bridge < bridge.n_particles) {
+		ParticleRefCompact* p_ref = &bridge.particle_refs[particle_id_bridge];
+		positions[particle_id_bridge] = box->compound_state_array[p_ref->compound_id].positions[p_ref->local_id];
+	}
+	__syncthreads();
+
+
+
+
+	float potE_sum = 0;
+	float data_ptr[4];
+	for (int i = 0; i < 4; i++)
+		data_ptr[i] = 0;
+	data_ptr[2] = 9999;
+	data_ptr[3] = box->step + 1;
+
+	Float3 force(0.f);
+
+	// ------------------------------------------------------------ Intramolecular Operations ------------------------------------------------------------ //
+	{
+		LIMAENG::applyHyperpos(&positions[0], &positions[particle_id_bridge]);
+		__syncthreads();	// Dunno if necessary
+		force += computePairbondForces(&bridge, positions, utility_buffer, &potE_sum);
+		//force += computeAnglebondForces(&compound, &compound_state, utility_buffer, &potE_sum);
+	}
+
+
+
+
+	// Push data to compound
+}
 
 
 

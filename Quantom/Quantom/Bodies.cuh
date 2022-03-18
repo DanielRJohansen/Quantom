@@ -248,7 +248,7 @@ public:
 const int MAX_PAIRBONDS = 128;
 const int MAX_ANGLEBONDS = 256;
 
-struct CompoundState {
+struct CompoundState {							// Maybe delete this soon?
 	__device__ void setMeta(int n_p) {
 		n_particles = n_p;
 	}
@@ -551,6 +551,34 @@ struct CompoundBridgeCompact {
 
 	uint16_t n_anglebonds = 0;
 	AngleBond anglebonds[MAX_ANGLEBONDS_IN_BRIDGE];
+
+
+
+	// -------------- Device functions ------------- //
+	__device__ void loadMeta(CompoundBridgeCompact* bridge) {
+		n_particles = bridge->n_particles;
+		n_singlebonds = bridge->n_singlebonds;
+		n_anglebonds = bridge->n_anglebonds;
+	}
+	__device__ void loadData(CompoundBridgeCompact* bridge) {
+		if (threadIdx.x < n_particles) {
+			atom_types[threadIdx.x] = bridge->atom_types[threadIdx.x];
+		}
+		for (int i = 0; (i * blockDim.x) < n_singlebonds; i++) {
+			int index = i * blockDim.x + threadIdx.x;
+			if (index < n_singlebonds)
+				singlebonds[index] = bridge->singlebonds[index];
+		}
+		for (int i = 0; (i * blockDim.x) < n_anglebonds; i++) {
+			int index = i * blockDim.x + threadIdx.x;
+			if (index < n_anglebonds)
+				anglebonds[index] = bridge->anglebonds[index];
+		}
+	}
+
+
+
+
 
 };
 

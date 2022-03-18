@@ -85,6 +85,7 @@ public:
 	Solvent* solvents;
 	Solvent* solvents_next;
 
+	CompoundBridgeBundleCompact bridge_bundle;
 
 
 	uint32_t step = 0;
