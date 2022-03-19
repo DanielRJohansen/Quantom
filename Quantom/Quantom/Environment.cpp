@@ -77,11 +77,8 @@ void Environment::verifyBox() {
 void Environment::run() {
 	printf("Simulation started\n\n");
 
-#ifdef ENABLE_CHRONO
 	time0 = std::chrono::high_resolution_clock::now();
-#endif
 
-	//while (display->window->isOpen()) {
 	while (display->checkWindowStatus()) {
 		
 		engine->deviceMaster();		// Device first, otherwise offloading data always needs the last datapoint!
@@ -135,7 +132,6 @@ void Environment::postRunEvents() {
 }
 
 void Environment::handleStatus(Simulation* simulation) {
-#ifdef ENABLE_CHRONO
 	if (!(simulation->getStep() % simulation->steps_per_render)) {
 		printf("\r\tStep #%06d", simulation->box->step);
 		double duration = (double)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - time0).count();
@@ -147,11 +143,6 @@ void Environment::handleStatus(Simulation* simulation) {
 		time0 = std::chrono::high_resolution_clock::now();
 
 	}
-#else
-	if (!(simulation->getStep() % simulation->steps_per_render)) {
-		printf("\r\tStep #%06d", simulation->box->step);
-	}
-#endif
 }
 
 void Environment::handleDisplay(Simulation* simulation) {

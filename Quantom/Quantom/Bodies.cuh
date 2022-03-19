@@ -470,12 +470,12 @@ struct CompoundBridge {
 	void addSinglebond(PairBond pb) {
 		localizeIDs(&pb, 2);
 		singlebonds[n_singlebonds++] = pb;
-		printf("Singlebond added %d %d\n", singlebonds[n_singlebonds - 1].atom_indexes[0], singlebonds[n_singlebonds - 1].atom_indexes[1]);
+		//printf("Singlebond added %d %d\n", singlebonds[n_singlebonds - 1].atom_indexes[0], singlebonds[n_singlebonds - 1].atom_indexes[1]);
 	}
 	void addAnglebond(AngleBond ab) {
 		localizeIDs(&ab, 3);
 		anglebonds[n_anglebonds++] = ab;
-		printf("Anglebond added %d %d %d\n", anglebonds[n_anglebonds - 1].atom_indexes[0], anglebonds[n_anglebonds - 1].atom_indexes[1], anglebonds[n_anglebonds - 1].atom_indexes[2]);
+		//printf("Anglebond added %d %d %d\n", anglebonds[n_anglebonds - 1].atom_indexes[0], anglebonds[n_anglebonds - 1].atom_indexes[1], anglebonds[n_anglebonds - 1].atom_indexes[2]);
 	}
 
 
@@ -531,7 +531,6 @@ struct CompoundBridgeCompact {
 	CompoundBridgeCompact() {}
 	CompoundBridgeCompact(CompoundBridge* bridge) {
 		n_particles = bridge->n_particles;
-		printf("Loading bridge with %d particles\n", n_particles);
 		
 		for (int i = 0; i < n_particles; i++) {
 			particle_refs[i] = ParticleRefCompact(bridge->particle_refs[i]);
@@ -545,7 +544,7 @@ struct CompoundBridgeCompact {
 		for (int i = 0; i < n_anglebonds; i++) {
 			anglebonds[i] = bridge->anglebonds[i];
 		}
-		
+		printf("Loading bridge with %d particles %d singlebonds %d anglebonds\n", n_particles, n_singlebonds, n_anglebonds);
 	}
 	
 	

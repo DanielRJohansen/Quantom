@@ -245,7 +245,7 @@ void Engine::updateNeighborLists(Simulation* simulation, NListDataCollection* nl
 			NeighborList* nlist_candidate = &nlist_data_collection->compound_neighborlists[id_candidate];
 			float cutoff_add_candidate = simulation->compounds_host[id_self].confining_particle_sphere;
 
-
+			//printf("Distance to neighbor compound: %f")
 			if (neighborWithinCutoff(&nlist_data_collection->compound_key_positions[id_self], &nlist_data_collection->compound_key_positions[id_candidate], cutoff_add_self + cutoff_add_candidate + CUTOFF)) {
 				if (hashtable_compoundneighbors.insert(id_candidate)) {
 					//nlist_self->addId(id_candidate, NeighborList::NEIGHBOR_TYPE::COMPOUND);
@@ -455,7 +455,7 @@ __device__ Float3 calcLJForce(Float3* pos0, Float3* pos1, float* data_ptr, float
 
 	*potE += LJ_pot * 0.5;												// Log this value for energy monitoring purposes
 
-
+#ifdef LIMA_VERBOSE
 	if (verbose) {
 		//printf("Dist %f       force %f      sigma: %f         epsilon %f\n", (float)dist, (float)force, sigma, epsilon);
 	}
@@ -464,10 +464,8 @@ __device__ Float3 calcLJForce(Float3* pos0, Float3* pos1, float* data_ptr, float
 		//printf("Force %f %f %f\n", force_unit_vector.x * force, force_unit_vector.y * force, force_unit_vector.z * force);
 	}
 
+
 	{
-		//data_ptr[1] += force;
-		//data_ptr[2] = cudaMin(data_ptr[2], dist);
-		//data_ptr[2] = min(data_ptr[2], dist);
 		Float3 force_vec = force_unit_vector * force;
 		if (force_vec.x != force_vec.x) {
 			//printf("Force: %f\n", force);
@@ -480,6 +478,7 @@ __device__ Float3 calcLJForce(Float3* pos0, Float3* pos1, float* data_ptr, float
 			//printf("Self %f %f %f -> %f %f %f\n", data_ptr[0], data_ptr[1], data_ptr[2], pos0->x, pos0->y, pos0->z);
 		}
 	}
+#endif
 
 	return force_unit_vector * force;									//N/mol*v	(v is direction)
 }
@@ -500,11 +499,13 @@ __device__ void calcPairbondForces(Float3* pos_a, Float3* pos_b, double* referen
 	results[0] = difference * force_scalar;
 	results[1] = difference * force_scalar * -1;
 
+#ifdef LIMA_VERBOSE
 	if (error > 12.7f) {
 		printf("thread %d  error %f ref %f force %f\n", threadIdx.x, error, *reference_dist, force_scalar);
 		pos_a->print('a');
 		pos_b->print('b');
 	}
+#endif
 		
 }
 
@@ -531,8 +532,7 @@ __device__ void calcAnglebondForces(Float3* pos_left, Float3* pos_middle, Float3
 	results[2] = inward_force_direction2 * force_scalar;
 	results[1] = (results[0] + results[2]) * -1;
 
-	//if (abs(error) > 0.0001)
-		//printf("Error %f force %f \n", error, force_scalar);
+
 }
 
 __device__ Float3 computeLJForces(Float3* self_pos, int n_particles, Float3* positions, float* data_ptr, float* potE_sum, uint8_t atomtype_self, uint8_t* atomtypes_others) {	// Assumes all positions are 
@@ -661,15 +661,14 @@ __device__ void integratePosition(Float3* pos, Float3* pos_tsub1, Float3* force,
 
 	Float3 delta_pos = *pos - *pos_tsub1;
 	*pos = *pos_tsub1 + delta_pos * *thermostat_scalar;
-	/*
+#ifdef LIMA_VERBOSE
 	if (force->len() > 200e+6) {
 		printf("\nP_index %d Thread %d blockId %d\tForce %f \tFrom %f %f %f\tTo %f %f %f\n", p_index, threadIdx.x, blockIdx.x, force->len(), pos_tsub1->x, pos_tsub1->y, pos_tsub1->z, pos->x, pos->y, pos->z);		
 	}
 	if (verbose) {
 		printf("Mass %f Force %f %f %f\n", mass, force->x, force->y, force->z);
 	}
-	*/
-	//printf("force: %f\n", force->len());
+#endif
 }
 
 
@@ -718,7 +717,6 @@ __global__ void forceKernel(Box* box) {
 		LIMAENG::applyHyperpos(&compound_state.positions[0], &compound_state.positions[threadIdx.x]);
 		__syncthreads();	// Dunno if necessary
 		force += computePairbondForces(&compound, compound_state.positions, utility_buffer, &potE_sum);
-		//force += computeAnglebondForces(&compound, &compound_state, utility_buffer, &potE_sum);
 		force += computeAnglebondForces(&compound, compound_state.positions, utility_buffer, &potE_sum);
 		
 		for (int i = 0; i < compound.n_particles; i++) {
@@ -788,8 +786,6 @@ __global__ void forceKernel(Box* box) {
 	// ------------------------------------ PERIODIC BOUNDARY CONDITION ------------------------------------------------------------------------------------------------- // 
 	if (threadIdx.x == 0) {
 		applyPBC(&compound_state.positions[threadIdx.x]);
-		//if (blockIdx.x == 0 && ((compound_state.positions[0]-Float3(0.f)).len() > BOX_LEN))
-		//compound_state.positions[0].print('s');
 	}
 	LIMAENG::applyHyperpos(&compound_state.positions[0], &compound_state.positions[threadIdx.x]);	// So all particles follows p0
 	// ------------------------------------------------------------------------------------------------------------------------------------------------------------------ //
@@ -960,45 +956,32 @@ __global__ void compoundBridgeKernel(Box* box) {
 
 	if (threadIdx.x == 0) {
 		bridge.loadMeta(&box->bridge_bundle->compound_bridges[blockIdx.x]);
-		//printf("Bridge %d %d %d\n", bridge.n_particles, bridge.n_singlebonds, bridge.n_anglebonds);
 	}
 	__syncthreads();
 	bridge.loadData(&box->bridge_bundle->compound_bridges[blockIdx.x]);
 	positions[particle_id_bridge] = Float3(0.f);
 	if (particle_id_bridge < bridge.n_particles) {
 		ParticleRefCompact* p_ref = &bridge.particle_refs[particle_id_bridge];
-		//printf("Query particle: %d,  cid: %d    lid: %d\n",threadIdx.x, p_ref->compound_id, p_ref->local_id);
 		positions[particle_id_bridge] = box->compound_state_array[p_ref->compound_id].positions[p_ref->local_id];
-		//positions[particle_id_bridge].print('p');
 	}
 	__syncthreads();
-	//positions[particle_id_bridge].print('p');
-	if (threadIdx.x < bridge.n_anglebonds) {
-		//printf("Anglebond indexes %d %d %d\n", bridge.anglebonds[threadIdx.x].atom_indexes[0], bridge.anglebonds[threadIdx.x].atom_indexes[1], bridge.anglebonds[threadIdx.x].atom_indexes[2]);
-	}
+
 
 
 	float potE_sum = 0;
-	float data_ptr[4];
-	for (int i = 0; i < 4; i++)
-		data_ptr[i] = 0;
-	data_ptr[2] = 9999;
-	data_ptr[3] = box->step + 1;
 
 	Float3 force(0.f);
 
 	// ------------------------------------------------------------ Intramolecular Operations ------------------------------------------------------------ //
 	{											// So for the very first step, these ´should all be 0, but they are not??										TODO: Look into this at some point!!!!
-		//printf("thread %d\n", threadIdx.x);
-		//positions[threadIdx.x].print('p');
+
 		LIMAENG::applyHyperpos(&positions[0], &positions[particle_id_bridge]);
-		__syncthreads();	// Dunno if necessary
+		__syncthreads();	
 		force += computePairbondForces(&bridge, positions, utility_buffer, &potE_sum);
 		force += computeAnglebondForces(&bridge, positions, utility_buffer, &potE_sum);
 	}
 	__syncthreads();
 
-	//printf("Got here\n");
 
 	if (particle_id_bridge < bridge.n_particles) {
 		ParticleRefCompact* p_ref = &bridge.particle_refs[particle_id_bridge];

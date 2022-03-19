@@ -57,9 +57,9 @@ Molecule::Molecule() {	// Always returns a h2o molecule rn
 
 CompoundBridgeBundleCompact::CompoundBridgeBundleCompact(CompoundBridgeBundle* bundle) {
 	n_bridges = bundle->n_bridges;
-	printf("Transferring %d %d bridges\n", n_bridges, bundle->n_bridges);
+	//printf("Transferring %d %d bridges\n", n_bridges, bundle->n_bridges);
 	for (int i = 0; i < n_bridges; i++) {
 		compound_bridges[i] = CompoundBridgeCompact(&bundle->compound_bridges[i]);
-		printf("bridge %d has %d particles\n\n", i, compound_bridges[i].n_particles);
+		//printf("bridge %d has %d particles\n\n", i, compound_bridges[i].n_particles);
 	}
 }

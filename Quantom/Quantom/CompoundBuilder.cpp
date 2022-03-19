@@ -163,8 +163,6 @@ void CompoundBuilder::addGeneric(Molecule* molecule, vector<string>* record, Top
 		if (!g_bond.allParticlesExist())
 			break;
 
-		//pos_a = molecule->compounds[maps[0].compound_id].particles[maps[0].local_id].pos_tsub1;
-		//pos_b = molecule->compounds[maps[1].compound_id].particles[maps[1].local_id].pos_tsub1;
 		pos_a = molecule->compounds[maps[0].compound_id].prev_positions[maps[0].local_id];
 		pos_b = molecule->compounds[maps[1].compound_id].prev_positions[maps[1].local_id];
 		dist = (pos_a - pos_b).len();
@@ -173,16 +171,14 @@ void CompoundBuilder::addGeneric(Molecule* molecule, vector<string>* record, Top
 			Compound* compound = &molecule->compounds[maps[0].compound_id];
 			compound->singlebonds[compound->n_singlebonds++] = PairBond(dist, maps[0].local_id, maps[1].local_id);
 		}
-		else {			
+		else {
 			// First, we need to make sure all bond particles are added to the bridge.
 			// To create the single-bond we need to access bridge_local_indexes			
-			
-			//CompoundBridge* bridge = molecule->compound_bridge_bundle.getBelongingBridge(&g_bond);
+
 			CompoundBridge* bridge = compound_bridge_bundle->getBelongingBridge(&g_bond);
 			bridge->addBondParticles(&g_bond, molecule);
 			bridge->addSinglebond(PairBond(dist, maps[0].global_id, maps[1].global_id));
-
-			printf("Bond belongs in bridge!\n\n"); }
+		}
 		break;
 		
 	case CompoundBuilder::ANGLE:
@@ -191,12 +187,10 @@ void CompoundBuilder::addGeneric(Molecule* molecule, vector<string>* record, Top
 		if (!g_bond.allParticlesExist())
 			break;
 
-		//pos_a = molecule->compounds[maps[0].compound_id].particles[maps[0].local_id].pos_tsub1;	// left
-		//pos_b = molecule->compounds[maps[1].compound_id].particles[maps[1].local_id].pos_tsub1;	// middle
-		//pos_c = molecule->compounds[maps[2].compound_id].particles[maps[2].local_id].pos_tsub1;	// right
-		pos_a = molecule->compounds[maps[0].compound_id].prev_positions[maps[0].local_id];
-		pos_b = molecule->compounds[maps[1].compound_id].prev_positions[maps[1].local_id];
-		pos_c = molecule->compounds[maps[2].compound_id].prev_positions[maps[2].local_id];
+
+		pos_a = molecule->compounds[maps[0].compound_id].prev_positions[maps[0].local_id];			// left
+		pos_b = molecule->compounds[maps[1].compound_id].prev_positions[maps[1].local_id];			// middle
+		pos_c = molecule->compounds[maps[2].compound_id].prev_positions[maps[2].local_id];			// right
 
 		angle = Float3::getAngle(pos_a, pos_b, pos_c);
 
@@ -208,19 +202,12 @@ void CompoundBuilder::addGeneric(Molecule* molecule, vector<string>* record, Top
 			CompoundBridge* bridge = compound_bridge_bundle->getBelongingBridge(&g_bond);
 			//CompoundBridge* bridge = molecule->compound_bridge_bundle.getBelongingBridge(&g_bond);
 			bridge->addBondParticles(&g_bond, molecule);
-			bridge->addAnglebond(AngleBond(angle, maps[0].global_id, maps[1].global_id, maps[2].global_id));
-
-			
-			printf("Angle Bond belongs in bridge!\n\n"); }
+			bridge->addAnglebond(AngleBond(angle, maps[0].global_id, maps[1].global_id, maps[2].global_id));			
+		}
 		break;
 
-		//ParticleRef maps[] = { particle_id_maps[stoi((*record)[0])], particle_id_maps[stoi((*record)[1])],, particle_id_maps[stoi((*record)[2])] };
-		//bond = GenericBond(maps, 3);
-		//return addAngle(molecule, record);
 	case CompoundBuilder::DIHEDRAL:
-
 		break;
-		//return addDihedral(molecule, record);
 	default:
 		return;
 	}
