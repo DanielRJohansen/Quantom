@@ -447,12 +447,15 @@ struct CompoundBridge {
 		atom_types[n_particles] = molecule->compounds[particle_ref->compound_id].atom_types[particle_ref->local_id];
 		particle_refs[n_particles] = *particle_ref;
 		n_particles++;
+		//printf("Adding particle with global id: %d\n", particle_ref->global_id);
 	}
 
 	void addBondParticles(GenericBond* bond, Molecule* molecule) {
 		for (int p = 0; p < bond->n_particles; p++) {
-			if (!particleAlreadyStored(&bond->particles[p]))
+			if (!particleAlreadyStored(&bond->particles[p])) {
 				addParticle(&bond->particles[p], molecule);
+			}
+				
 		}
 	}
 

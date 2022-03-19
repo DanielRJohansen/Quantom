@@ -55,7 +55,7 @@ struct Float3 {
 	}
 	__host__ __device__ Float3 square() {return Float3(x * x, y * y, z * z);}
 	__host__ __device__ inline float len() {return (float)sqrtf(x * x + y * y + z * z); }
-	__host__ __device__ inline float lenSquared() { return (double)(x * x + y * y + z * z); }
+	__host__ __device__ inline float lenSquared() { return (float)(x * x + y * y + z * z); }
 	__host__ __device__ Float3 zeroIfAbove(float a) { return Float3(x * (x < a), y * (y < a), z * (z < a)); }
 	__host__ __device__ Float3 zeroIfBelow(float a) { return Float3(x * (x > a), y * (y > a), z * (z > a)); }
 	__host__ __device__ Float3 elementwiseModulus(float a) {
@@ -68,8 +68,8 @@ struct Float3 {
 		return *this;
 	}
 	
-	__host__ __device__ inline static double getAngle(Float3 v1, Float3 v2) {
-		double val = (v1.dot(v2)) / (v1.len() * v2.len());	// If i make this float, we get values over 1, even with the statements below! :(
+	__host__ __device__ inline static float getAngle(Float3 v1, Float3 v2) {
+		float val = (v1.dot(v2)) / (v1.len() * v2.len());	// If i make this float, we get values over 1, even with the statements below! :(
 		//if (val > 1.f || val < -1.f) { printf("Val1 %f !!\n", val);}
 		val = val > 1.f ? 1.f : val;
 		val = val < -1.f ? -1.f : val;
@@ -78,13 +78,13 @@ struct Float3 {
 		}
 		return acos(val);
 	}
-	__host__ __device__ static double getAngle(Float3 a, Float3 middle, Float3 b) {
+	__host__ __device__ static float getAngle(Float3 a, Float3 middle, Float3 b) {
 		return getAngle(a - middle, b - middle);
 	}
 
 
 	__host__ __device__ Float3 cross(Float3 a) const { return Float3(y * a.z - z * a.y, z * a.x - x * a.z, x * a.y - y * a.x); }
-	__host__ __device__ double dot(Float3 a) const { return (x * a.x + y * a.y + z * a.z); }
+	__host__ __device__ float dot(Float3 a) const { return (x * a.x + y * a.y + z * a.z); }
 	__host__ __device__ Float3 abs() const { return Float3(
 		std::abs(x),
 		std::abs(y), 

@@ -22,14 +22,9 @@ Molecule CompoundBuilder::buildMolecule(string pdb_path, string itp_path, int ma
 	//printf("%d particles added\n", compound.n_particles);
 	loadTopology(&molecule, &top_data);
 
-	printf("		%d\n", compound_bridge_bundle->compound_bridges[0].n_particles);
 	//molecule.compound_bridge_bundle
 	molecule.compound_bridge_bundle = new CompoundBridgeBundleCompact;// (&compound_bridge_bundle);		// Convert the host version to a compact device version, belonging to the molecule
 	*molecule.compound_bridge_bundle = CompoundBridgeBundleCompact(compound_bridge_bundle);
-	printf("		%d\n", molecule.compound_bridge_bundle->compound_bridges[0].n_particles);
-
-
-	printf("bridges before %d\n", molecule.compound_bridge_bundle->n_bridges);
 
 	countElements(&molecule);
 	printf("Molecule built\n\n\n");
@@ -200,7 +195,6 @@ void CompoundBuilder::addGeneric(Molecule* molecule, vector<string>* record, Top
 		}
 		else { 
 			CompoundBridge* bridge = compound_bridge_bundle->getBelongingBridge(&g_bond);
-			//CompoundBridge* bridge = molecule->compound_bridge_bundle.getBelongingBridge(&g_bond);
 			bridge->addBondParticles(&g_bond, molecule);
 			bridge->addAnglebond(AngleBond(angle, maps[0].global_id, maps[1].global_id, maps[2].global_id));			
 		}
