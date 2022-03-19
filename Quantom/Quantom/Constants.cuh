@@ -6,6 +6,8 @@
 #define LIMA_VERBOSE
 
 
+// SImulation specifics
+const int N_SOLVATE_MOLECULES = 600;	
 
 
 
@@ -32,3 +34,7 @@ const int MAX_PARTICLES_IN_BRIDGE = 32;
 const int MAX_SINGLEBONDS_IN_BRIDGE = 32;
 const int MAX_ANGLEBONDS_IN_BRIDGE = 32;
 const int MAX_DIHEDRALBONDS_IN_BRIDGE = 32;
+
+
+
+

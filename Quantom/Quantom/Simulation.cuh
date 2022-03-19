@@ -32,7 +32,6 @@ const string MOL_FOLDER = "../Compounds/t4lys/";
 const string OUT_DIR = "/home/lima/Desktop/LIMA";
 #endif
 
-const int N_SOLVATE_MOLECULES = 300;	// Must not be above 255, as that can't be represented as uint8_t5
 
 
 

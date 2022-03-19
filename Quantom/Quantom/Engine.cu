@@ -245,11 +245,11 @@ void Engine::updateNeighborLists(Simulation* simulation, NListDataCollection* nl
 			NeighborList* nlist_candidate = &nlist_data_collection->compound_neighborlists[id_candidate];
 			float cutoff_add_candidate = simulation->compounds_host[id_self].confining_particle_sphere;
 
-			//printf("Distance to neighbor compound: %f")
+			//printf("Distance to neighbor compound: %f\n", (nlist_data_collection->compound_key_positions[id_self] - nlist_data_collection->compound_key_positions[id_candidate]).len());
 			if (neighborWithinCutoff(&nlist_data_collection->compound_key_positions[id_self], &nlist_data_collection->compound_key_positions[id_candidate], cutoff_add_self + cutoff_add_candidate + CUTOFF)) {
 				if (hashtable_compoundneighbors.insert(id_candidate)) {
-					//nlist_self->addId(id_candidate, NeighborList::NEIGHBOR_TYPE::COMPOUND);
-					//nlist_candidate->addId(id_self, NeighborList::NEIGHBOR_TYPE::COMPOUND);
+					nlist_self->addId(id_candidate, NeighborList::NEIGHBOR_TYPE::COMPOUND);
+					nlist_candidate->addId(id_self, NeighborList::NEIGHBOR_TYPE::COMPOUND);
 				}
 			}
 		}
@@ -266,8 +266,8 @@ void Engine::updateNeighborLists(Simulation* simulation, NListDataCollection* nl
 			NeighborList* nlist_candidate = &nlist_data_collection->solvent_neighborlists[id_candidate];
 			if (neighborWithinCutoff(&nlist_data_collection->solvent_positions[id_self], &nlist_data_collection->solvent_positions[id_candidate], CUTOFF)) {
 				if (hashtable_solventneighbors.insert(id_candidate)) {
-					//nlist_self->addId(id_candidate, NeighborList::NEIGHBOR_TYPE::SOLVENT);
-					//nlist_candidate->addId(id_self, NeighborList::NEIGHBOR_TYPE::SOLVENT);
+					nlist_self->addId(id_candidate, NeighborList::NEIGHBOR_TYPE::SOLVENT);
+					nlist_candidate->addId(id_self, NeighborList::NEIGHBOR_TYPE::SOLVENT);
 					if (id_self == 193) {
 						//printf("Adding id %d with dist %f\n", id_candidate, (nlist_data_collection->solvent_positions[id_self] - nlist_data_collection->solvent_positions[id_candidate]).len());
 					}
