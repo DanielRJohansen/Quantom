@@ -6,6 +6,8 @@
 #include <vector>
 #include <sstream>
 
+#include "ForcefieldTypes.h"
+
 using namespace std;
 
 
@@ -69,4 +71,82 @@ vector<vector<string>> readFile(string path, int end_at = INT_MAX) {
 
 
 
+
+struct FFOutHelpers{
+	string includes = "#pragma once\n";
+
+	static string titleH1(string text) {
+		return "// ----------------################ " + text + " ################---------------- //\n\n";
+	}
+	static string titleH2(string text) {
+		return "// ---------------- " + text + " ---------------- //\n";
+	}
+	static string parserTitle(string text) {
+		return "# " + text + '\n';
+	}
+	static string endBlock() {
+		return "\n\n\n\n";
+	}
+};
+
+
+
+
+
+
+
+
+void printForcefieldSummary(string path, vector<FF_nonbonded> records_nonbonded, Map* map) {
+	ofstream file(path, ofstream::out);
+	if (!file.is_open()) {
+		printf(("Failed to open file\n"));
+		exit(0);
+	}
+
+	file << FFOutHelpers().includes;
+	file << FFOutHelpers::titleH1("Forcefield Non-bonded");
+	file << FFOutHelpers::titleH2("Mappings");
+	file << FFOutHelpers::parserTitle("mappings");
+	for (int i = 0; i < map->n_mappings; i++) {
+		file << map->mappings[i].left << ";" << map->mappings[i].right << endl;
+	}
+	file << FFOutHelpers::endBlock();
+
+	file << FFOutHelpers::titleH2("Non-bonded parameters");
+	file << FFOutHelpers::titleH2("{atom_type\tatnum\tmass [g/mol]\tsigma []\tepsilon []}");
+	file << FFOutHelpers::parserTitle("ff_nonbonded");
+	for (FF_nonbonded record : records_nonbonded) {
+		file << record.type << ';' << to_string(record.atnum_local) << ';' << to_string(record.mass) << ';' << to_string(record.sigma) << ';' << to_string(record.epsilon) << endl;
+	}
+	file << FFOutHelpers::endBlock();
+
+
+	file.close();
+}
+
+void printForcefield(string path, vector<Atom> atoms) {
+
+	ofstream file(path, ofstream::out);
+	if (!file.is_open()) {
+		printf(("Failed to open file\n"));
+		exit(0);
+	}
+
+	//file << FFOutHelpers().includes;
+	file << FFOutHelpers::titleH1("Forcefield Non-bonded");
+	file << FFOutHelpers::titleH2("Atoms {particle id [simulation specific]\tatomtype_id [simulation specific]}");
+	file << FFOutHelpers::parserTitle("atoms");
+
+	for (Atom atom : atoms) {
+		file << to_string(atom.id) << ";" << to_string(atom.atomtype_id) << endl;
+	}
+	file << FFOutHelpers::endBlock();
+
+
+
+
+
+
+	file.close();
+}
 

@@ -15,14 +15,46 @@
 
 
 int main(int argc, char* argv[]) {
-	vector<vector<string>> ffnonbonded_rows = readFile("C:\\PROJECTS\\Quantom\\charmm36-mar2019.ff\\ffnonbonded.itp", 2000);
+	vector<vector<string>> simconf_rows = readFile("C:\\PROJECTS\\Quantom\\Molecules\\t4lys_full\\conf.gro", 5000);
+	vector<string> simconf = parseConf(simconf_rows);
+	
+	
+	vector<vector<string>> ffnonbonded_rows = readFile("C:\\PROJECTS\\Quantom\\charmm36-mar2019.ff\\ffnonbonded.itp", 5000);
 	vector<FF_nonbonded> ffnonbonded = FF_nonbonded::parseNonbonded(ffnonbonded_rows);
 
 
-	vector<vector<string>> simconf_rows = readFile("C:\\PROJECTS\\Quantom\\Molecules\\t4lys_full\\conf.gro", 2000);
-	vector<FF_nonbonded> simconf = FF_nonbonded::parseConf(simconf_rows);
+	Map map;
+	vector<FF_nonbonded> ff_nonbonded_active = FF_nonbonded::filterUnusedTypes(ffnonbonded, simconf, &map);
+	
 
 
+
+
+
+	vector<vector<string>> ffbonded_rows = readFile("C:\\PROJECTS\\Quantom\\charmm36-mar2019.ff\\ffbonded.itp", 5000);
+	vector<FF_bondtype> ffbondtypes = FF_bondtype::parseFFBondtypes(ffbonded_rows);
+
+	
+
+	// Now for atoms and bonds present in topology
+	vector<vector<string>> topology_rows = readFile("C:\\PROJECTS\\Quantom\\Molecules\\t4lys_full\\topol.top", 5000);
+	vector<Atom> atoms = Atom::parseTopolAtoms(topology_rows);
+	vector<FF_bondtype> bonds = FF_bondtype::parseTopolBondtypes(topology_rows);
+
+
+	Atom::assignAtomtypeIDs(&atoms, &ff_nonbonded_active, &map);
+
+
+	
+	printForcefieldSummary(
+		(string)"C:\\Users\\Daniel\\git_repo\\Quantom\\" + (string)"ForcefieldSummary.txt",
+		ff_nonbonded_active, &map
+	);
+	printForcefield(
+		"C:\\Users\\Daniel\\git_repo\\Quantom\\" + (string)"Forcefield.txt",
+		atoms
+	);
+	
 
 	printf("Hello world!");
 
