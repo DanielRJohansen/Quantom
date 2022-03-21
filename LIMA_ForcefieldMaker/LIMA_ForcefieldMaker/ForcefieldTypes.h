@@ -16,7 +16,12 @@ using namespace std;
 
 
 
-
+bool charIsNumber(char c) {
+	return ((int)c > 47 && (int)c < 58);
+}
+bool charIsNumberAbove1(char c) {
+	return ((int)c > 49 && (int)c < 58);
+}
 
 
 
@@ -181,6 +186,102 @@ struct FF_nonbonded {
 	
 };
 
+
+// This is for bonded atoms!!!!!!!!!!!
+struct Atom {
+	Atom() {}
+	Atom(int id, string type_b, string type_nb) : id(id), atomtype_bond(type_b), atomtype(type_nb) {
+		//convertToZeroindexed();
+	}
+	int id;										// Come from topol.top file
+	string atomtype;
+	string atomtype_bond;
+	int atomtype_id = -1;				// Asigned later
+	//float charge;
+
+
+	void convertToZeroindexed() { id--; }
+
+	enum STATE { INACTIVE, ATOMS, FINISHED };
+	static STATE setState(string s, STATE current_state) {
+		if (s == "atoms")
+			return ATOMS;
+		if (s == "bonds")
+			return FINISHED;
+		return current_state;
+	}
+
+	static vector<Atom> parseTopolAtoms(vector<vector<string>> rows) {
+		STATE current_state = INACTIVE;
+
+		vector<Atom> records;
+
+		for (vector<string> row : rows) {
+
+			if (row.size() == 3) {
+				current_state = setState(row[1], current_state);
+				continue;
+			}
+
+
+
+			switch (current_state)
+			{
+			case INACTIVE:
+				break;
+			case ATOMS:
+				records.push_back(Atom(stoi(row[0]), row[1], row[4]));
+				break;
+			default:
+				break;
+			}
+
+			if (current_state == FINISHED)
+				break;
+		}
+		printf("%d atoms found in topology file\n", records.size());
+		return records;
+	}
+
+	//void assignAtomtypeID()
+	static void assignAtomtypeIDs(vector<Atom>* atoms, vector<FF_nonbonded>* forcefield, Map* map) {
+
+
+		for (int i = 0; i < atoms->size(); i++) {
+			Atom* atom = &((*atoms).at(i));
+			string alias = map->mapRight(atom->atomtype);
+
+			for (FF_nonbonded force_parameters : *forcefield) {
+				if (force_parameters.type == alias) {
+					atom->atomtype_id = force_parameters.atnum_local;
+				}
+			}
+		}
+
+		/*
+		for (Atom atom : *atoms) {
+			string alias = map->mapRight(atom.atomtype);
+
+			for (FF_nonbonded force_parameters : *forcefield) {
+				if (force_parameters.type == alias) {
+					atom.atomtype_id = force_parameters.simulation_specific_id;
+				}
+			}
+		}
+		*/
+
+		for (Atom atom : *atoms) {
+			if (atom.atomtype_id == -1) {
+				cout << atom.atomtype << "   ";
+				printf("atom id %d\n", atom.atomtype_id);
+				exit(0);
+			}
+		}
+	}
+};
+
+
+
 struct FF_bondtype {
 	FF_bondtype() {}
 	FF_bondtype(string t1, string t2) : type1(t1), type2(t2) {
@@ -204,8 +305,19 @@ struct FF_bondtype {
 	}
 	void sort() {
 		int ptr = 0; 
+		//cout << "Sorting " << type1 << "    " << type2 << endl;
 		while (type1.length() > ptr && type2.length() > ptr) {
-			if ((int)type1[ptr] > (int)type2[ptr]) {
+
+			if ((int)type1[ptr] < (int)type2[ptr]) {
+				return;
+			}
+			else if ((int)type1[ptr] == (int)type2[ptr]) {
+				// Do nothing, move ptr to the right
+			}
+			else {
+				//printf("Swapping %d %d   ", (int) type1[ptr], (int) type2[ptr]);
+				//cout << type1[ptr] << "   " << type2[ptr] << endl;
+				//cout << type1 << "    " << type2 << endl << endl;
 				swap(type1, type2);
 				return;
 			}
@@ -214,6 +326,7 @@ struct FF_bondtype {
 		if (type1.length() > type2.length()) {
 			swap(type1, type2);
 		}
+		//printf("\n");
 	}
 
 	enum STATE { INACTIVE, BONDTYPES, ANGLETYPES, DIHEDRALTYPES };
@@ -292,106 +405,68 @@ struct FF_bondtype {
 		return records;	
 	}
 
-	static void assignTypesFromAtomIDs(vector<FF_bondtype>* topol_bonds, vector<FF_bondtype> FF_bondtypes, vector<Atom> atoms) {
+	static void assignTypesFromAtomIDs(vector<FF_bondtype>* topol_bonds, vector<Atom> atoms) {
 		for (int i = 0; i < topol_bonds->size(); i++) {
-			FF_bondtype* bond
+			FF_bondtype* bond = &topol_bonds->at(i);
+
+
+			bond->type1 = atoms.at(bond->id1 - 1).atomtype_bond;	// Minus 1 becuase the bonds type1 is 1-indexed, and atoms vector is 0 indexed
+			bond->type2 = atoms.at(bond->id2 - 1).atomtype_bond;
+			bond->sort();
+			//cout << bond->type1 << '\t' << bond->type2 << endl;;
 		}
 	}
-};
 
-
-// This is for bonded atoms!!!!!!!!!!!
-struct Atom {
-	Atom() {}
-	Atom(int id, string type_b, string type_nb) : id(id), atomtype_bond(type_b), atomtype(type_nb) {
-		//convertToZeroindexed();
-	}
-	int id;										// Come from topol.top file
-	string atomtype;
-	string atomtype_bond;	
-	int atomtype_id = -1;				// Asigned later
-	//float charge;
-
-
-	void convertToZeroindexed() { id--; }
-
-	enum STATE { INACTIVE, ATOMS, FINISHED};
-	static STATE setState(string s, STATE current_state) {
-		if (s == "atoms")
-			return ATOMS;
-		if (s == "bonds")
-			return FINISHED;
-		return current_state;
-	}
-
-	static vector<Atom> parseTopolAtoms(vector<vector<string>> rows) {
-		STATE current_state = INACTIVE;
-
-		vector<Atom> records;
-
-		for (vector<string> row : rows) {
-
-			if (row.size() == 3) {
-				current_state = setState(row[1], current_state);
-				continue;
+	static FF_bondtype getBondFromTypes(FF_bondtype* query_type, vector<FF_bondtype>* FF_bondtypes) { 
+		for (FF_bondtype bondtype : *FF_bondtypes) {
+			if (query_type->type1 == bondtype.type1 && query_type->type2 == bondtype.type2) {
+				return bondtype;
 			}
-
-
-
-			switch (current_state)
-			{
-			case INACTIVE:
-				break;
-			case ATOMS:
-				records.push_back(Atom(stoi(row[0]), row[1], row[4]));
-				break;
-			default:
-				break;
-			}
-
-			if (current_state == FINISHED)
-				break;
 		}
-		printf("%d atoms found in topology file\n", records.size());
-		return records;
-	}
 
-	//void assignAtomtypeID()
-	static void assignAtomtypeIDs(vector<Atom>* atoms, vector<FF_nonbonded>* forcefield, Map* map) {
+
+		// THIS IS AN INSANELY BAD AND TEMPORARY FIX	
+		if (!charIsNumber(query_type->type1.back())) {
+			query_type->type1 += '1';
+			query_type->sort();
+			return getBondFromTypes(query_type, FF_bondtypes);
+		}
+		else if (!charIsNumber(query_type->type2.back())) {
+			query_type->type2 += '1';
+			query_type->sort();
+			return getBondFromTypes(query_type, FF_bondtypes);
+		}
 		
-
-		for (int i = 0; i < atoms->size(); i++) {
-			Atom* atom = &((*atoms).at(i));
-			string alias = map->mapRight(atom->atomtype);
-
-			for (FF_nonbonded force_parameters : *forcefield) {
-				if (force_parameters.type == alias) {
-					atom->atomtype_id = force_parameters.atnum_local;
-				}
-			}
+		if (charIsNumberAbove1(query_type->type1.back())) {
+			query_type->type1.back()--;
+			query_type->sort();
+			return getBondFromTypes(query_type, FF_bondtypes);
 		}
-
-		/*
-		for (Atom atom : *atoms) {
-			string alias = map->mapRight(atom.atomtype);
-
-			for (FF_nonbonded force_parameters : *forcefield) {
-				if (force_parameters.type == alias) {
-					atom.atomtype_id = force_parameters.simulation_specific_id;
-				}
-			}
+		if (charIsNumberAbove1(query_type->type2.back())) {
+			query_type->type2.back()--;
+			query_type->sort();
+			return getBondFromTypes(query_type, FF_bondtypes);
 		}
-		*/
+		//	EMBARASSING FIX ENDS HERE
 
-		for (Atom atom : *atoms) {
-			if (atom.atomtype_id == -1) {
-				cout << atom.atomtype << "   ";
-				printf("atom id %d\n", atom.atomtype_id);
-				exit(0);
-			}
+		printf("NOT FOUND!\n");
+		cout << query_type->type1 << '\t' << query_type->type2 << endl;
+		exit(0);
+	}
+
+	static void assignFFParametersFromBondtypes(vector<FF_bondtype>* topol_bonds, vector<FF_bondtype>* FF_bondtypes) {
+		for (int i = 0; i < topol_bonds->size(); i++) {
+			FF_bondtype* bond = &topol_bonds->at(i);
+
+			FF_bondtype appropriateForcefield = getBondFromTypes(bond, FF_bondtypes);	// This might not return the correct one, as it tries to fit the atomtypes_bond to atomtypes_bond known in the CHARMM forcefield
+			
+			bond->kb = appropriateForcefield.kb;
+			bond->b0 = appropriateForcefield.b0;
 		}
 	}
 };
+
+
 
 
 

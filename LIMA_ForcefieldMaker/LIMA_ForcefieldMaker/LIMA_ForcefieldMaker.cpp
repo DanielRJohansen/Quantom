@@ -39,20 +39,25 @@ int main(int argc, char* argv[]) {
 	// Now for atoms and bonds present in topology
 	vector<vector<string>> topology_rows = readFile("C:\\PROJECTS\\Quantom\\Molecules\\t4lys_full\\topol.top", 5000);
 	vector<Atom> atoms = Atom::parseTopolAtoms(topology_rows);
-	vector<FF_bondtype> bonds = FF_bondtype::parseTopolBondtypes(topology_rows);
+	vector<FF_bondtype> topology_bonds = FF_bondtype::parseTopolBondtypes(topology_rows);
 
 
 	Atom::assignAtomtypeIDs(&atoms, &ff_nonbonded_active, &map);
 
 
-	
+	FF_bondtype::assignTypesFromAtomIDs(&topology_bonds, atoms);
+	FF_bondtype::assignFFParametersFromBondtypes(&topology_bonds, &ffbondtypes);
+
+
+
 	printForcefieldSummary(
 		(string)"C:\\Users\\Daniel\\git_repo\\Quantom\\" + (string)"ForcefieldSummary.txt",
 		ff_nonbonded_active, &map
 	);
 	printForcefield(
 		"C:\\Users\\Daniel\\git_repo\\Quantom\\" + (string)"Forcefield.txt",
-		atoms
+		atoms,
+		topology_bonds
 	);
 	
 
