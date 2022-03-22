@@ -333,7 +333,7 @@ struct FF_bondtype {
 	static STATE setState(string s, STATE current_state) {
 		if (s == "bondtypes" || s == "bonds")
 			return BONDTYPES;
-		if (s == "angletypes")
+		if (s == "angletypes" || s == "angles")
 			return ANGLETYPES;
 		if (s == "dihedraltypes")
 			return DIHEDRALTYPES;
@@ -417,15 +417,58 @@ struct FF_bondtype {
 		}
 	}
 
-	static FF_bondtype getBondFromTypes(FF_bondtype* query_type, vector<FF_bondtype>* FF_bondtypes) { 
+	static bool _getBondFromTypes(FF_bondtype* query_type, vector<FF_bondtype>* FF_bondtypes, FF_bondtype* reply) {
 		for (FF_bondtype bondtype : *FF_bondtypes) {
+			if (query_type->type1 == bondtype.type1 && query_type->type2 == bondtype.type2) {
+				*reply = bondtype;
+				return true;
+			}
+		}
+	}
+
+	static FF_bondtype getBondFromTypes(FF_bondtype* query_type, vector<FF_bondtype>* FF_bondtypes) { 		
+		/*for (FF_bondtype bondtype : *FF_bondtypes) {
 			if (query_type->type1 == bondtype.type1 && query_type->type2 == bondtype.type2) {
 				return bondtype;
 			}
-		}
+		}*/
+
+		FF_bondtype reply;
+		if (_getBondFromTypes(query_type, FF_bondtypes, &reply))
+			return reply;
 
 
 		// THIS IS AN INSANELY BAD AND TEMPORARY FIX	
+		FF_bondtype alias = *query_type;
+		if (!charIsNumber(alias.type1.back())) {
+			alias.type1 += '1';
+			alias.sort();
+			if (_getBondFromTypes(&alias, FF_bondtypes, &reply))
+				return reply;
+		}
+		alias = *query_type;
+		if (!charIsNumber(alias.type2.back())) {
+			alias.type2 += '1';
+			alias.sort();
+			if (_getBondFromTypes(&alias, FF_bondtypes, &reply))
+				return reply;
+		}
+
+		alias = *query_type;
+		if (!charIsNumberAbove1(alias.type1.back())) {
+			alias.type1.back()--;
+			alias.sort();
+			if (_getBondFromTypes(&alias, FF_bondtypes, &reply))
+				return reply;
+		}
+		alias = *query_type;
+		if (!charIsNumberAbove1(alias.type2.back())) {
+			alias.type2.back()--;
+			alias.sort();
+			if (_getBondFromTypes(&alias, FF_bondtypes, &reply))
+				return reply;
+		}
+		/*
 		if (!charIsNumber(query_type->type1.back())) {
 			query_type->type1 += '1';
 			query_type->sort();
@@ -447,6 +490,15 @@ struct FF_bondtype {
 			query_type->sort();
 			return getBondFromTypes(query_type, FF_bondtypes);
 		}
+		*/
+		/*if (query_type->type2.length() > 1) {
+			//cout << query_type->type1 << endl;
+			query_type->type2 = query_type->type2.front();
+			//cout << query_type->type1 << endl << endl;
+			query_type->sort();
+			return getBondFromTypes(query_type, FF_bondtypes);
+		}*/
+		
 		//	EMBARASSING FIX ENDS HERE
 
 		printf("NOT FOUND!\n");
@@ -467,6 +519,240 @@ struct FF_bondtype {
 };
 
 
+
+
+
+
+struct Angletype {
+	Angletype() {}
+	Angletype(string t1, string t2, string t3) : type1(t1), type2(t2), type3(t3) {
+		sort();
+	}
+	Angletype(string t1, string t2, string t3, float t0, float kt) : type1(t1), type2(t2), type3(t3), theta0(t0), ktheta(kt) {
+		sort();
+	}
+	Angletype(int id1, int id2, int id3) : id1(id1), id2(id2), id3(id3) {
+	}
+
+	string type1, type2, type3;			// left, middle, right
+	int id1, id2, id3;			// bonds from .top only has these values! 
+	float theta0;
+	float ktheta;
+
+
+	void sort(string* leftmost, string* rightmost) {
+		int ptr = 0;
+		while (leftmost->length() > ptr && rightmost->length() > ptr) {
+			if ((int)(*leftmost)[ptr] < (int)(*rightmost)[ptr]) {
+				return;
+			}
+			else if ((int)(*leftmost)[ptr] > (int)(*rightmost)[ptr]) {
+				swap(*leftmost, *rightmost);
+				return;
+			}
+			ptr++;
+		}
+		if (leftmost->length() > rightmost->length()) {
+			swap(*leftmost, *rightmost);
+		}
+	}
+	void sort() {
+		sort(&type1, &type3);
+		sort(&type1, &type2);
+		sort(&type2, &type3);
+	}
+
+
+	enum STATE { INACTIVE, BONDTYPES, ANGLETYPES, DIHEDRALTYPES };
+	static STATE setState(string s, STATE current_state) {
+		if (s == "bondtypes" || s == "bonds")
+			return BONDTYPES;
+		if (s == "angletypes" || s == "angles")
+			return ANGLETYPES;
+		if (s == "dihedraltypes" || s == "dihedrals")
+			return DIHEDRALTYPES;
+		return current_state;
+	}
+
+	static vector<Angletype> parseFFAngletypes(vector<vector<string>> rows) {
+		STATE current_state = INACTIVE;
+		vector<Angletype> angletypes;
+
+		for (vector<string> row : rows) {
+
+			if (row.size() == 3) {
+				current_state = setState(row[1], current_state);
+				continue;
+			}
+
+
+
+			switch (current_state)
+			{
+			case INACTIVE:
+				break;
+			case ANGLETYPES:
+				if (row.size() < 8) {
+					continue;													// TODO: dont just run from your problems, man...
+				}
+				angletypes.push_back(Angletype(row[0], row[1], row[2], stof(row[4]), stof(row[5])));
+				break;
+			case DIHEDRALTYPES:
+				break;
+			default:
+				break;
+			}
+
+
+			if (current_state == DIHEDRALTYPES)
+				break;
+		}
+		printf("%d angletypes read from file\n", angletypes.size());
+		return angletypes;
+	}
+
+	static vector<FF_bondtype> parseTopolBondtypes(vector<vector<string>> rows) {
+		STATE current_state = INACTIVE;
+		vector<FF_bondtype> records;
+
+		for (vector<string> row : rows) {
+			if (row.size() == 3) {
+				if (row[0][0] == '[') {
+					current_state = setState(row[1], current_state);
+					continue;
+				}
+			}
+
+
+
+			switch (current_state)
+			{
+			case BONDTYPES:
+				records.push_back(FF_bondtype(stoi(row[0]), stoi(row[1])));
+				break;
+			default:
+				break;
+			}
+
+			if (current_state == ANGLETYPES)
+				break;
+		}
+		printf("%d bonds found in topology file\n", records.size());
+		return records;
+	}
+
+	static void assignTypesFromAtomIDs(vector<FF_bondtype>* topol_bonds, vector<Atom> atoms) {
+		for (int i = 0; i < topol_bonds->size(); i++) {
+			FF_bondtype* bond = &topol_bonds->at(i);
+
+
+			bond->type1 = atoms.at(bond->id1 - 1).atomtype_bond;	// Minus 1 becuase the bonds type1 is 1-indexed, and atoms vector is 0 indexed
+			bond->type2 = atoms.at(bond->id2 - 1).atomtype_bond;
+			bond->sort();
+			//cout << bond->type1 << '\t' << bond->type2 << endl;;
+		}
+	}
+
+	static bool _getBondFromTypes(FF_bondtype* query_type, vector<FF_bondtype>* FF_bondtypes, FF_bondtype* reply) {
+		for (FF_bondtype bondtype : *FF_bondtypes) {
+			if (query_type->type1 == bondtype.type1 && query_type->type2 == bondtype.type2) {
+				*reply = bondtype;
+				return true;
+			}
+		}
+	}
+
+	static FF_bondtype getBondFromTypes(FF_bondtype* query_type, vector<FF_bondtype>* FF_bondtypes) {
+		/*for (FF_bondtype bondtype : *FF_bondtypes) {
+			if (query_type->type1 == bondtype.type1 && query_type->type2 == bondtype.type2) {
+				return bondtype;
+			}
+		}*/
+
+		FF_bondtype reply;
+		if (_getBondFromTypes(query_type, FF_bondtypes, &reply))
+			return reply;
+
+
+		// THIS IS AN INSANELY BAD AND TEMPORARY FIX	
+		FF_bondtype alias = *query_type;
+		if (!charIsNumber(alias.type1.back())) {
+			alias.type1 += '1';
+			alias.sort();
+			if (_getBondFromTypes(&alias, FF_bondtypes, &reply))
+				return reply;
+		}
+		alias = *query_type;
+		if (!charIsNumber(alias.type2.back())) {
+			alias.type2 += '1';
+			alias.sort();
+			if (_getBondFromTypes(&alias, FF_bondtypes, &reply))
+				return reply;
+		}
+
+		alias = *query_type;
+		if (!charIsNumberAbove1(alias.type1.back())) {
+			alias.type1.back()--;
+			alias.sort();
+			if (_getBondFromTypes(&alias, FF_bondtypes, &reply))
+				return reply;
+		}
+		alias = *query_type;
+		if (!charIsNumberAbove1(alias.type2.back())) {
+			alias.type2.back()--;
+			alias.sort();
+			if (_getBondFromTypes(&alias, FF_bondtypes, &reply))
+				return reply;
+		}
+		/*
+		if (!charIsNumber(query_type->type1.back())) {
+			query_type->type1 += '1';
+			query_type->sort();
+			return getBondFromTypes(query_type, FF_bondtypes);
+		}
+		else if (!charIsNumber(query_type->type2.back())) {
+			query_type->type2 += '1';
+			query_type->sort();
+			return getBondFromTypes(query_type, FF_bondtypes);
+		}
+
+		if (charIsNumberAbove1(query_type->type1.back())) {
+			query_type->type1.back()--;
+			query_type->sort();
+			return getBondFromTypes(query_type, FF_bondtypes);
+		}
+		if (charIsNumberAbove1(query_type->type2.back())) {
+			query_type->type2.back()--;
+			query_type->sort();
+			return getBondFromTypes(query_type, FF_bondtypes);
+		}
+		*/
+		/*if (query_type->type2.length() > 1) {
+			//cout << query_type->type1 << endl;
+			query_type->type2 = query_type->type2.front();
+			//cout << query_type->type1 << endl << endl;
+			query_type->sort();
+			return getBondFromTypes(query_type, FF_bondtypes);
+		}*/
+
+		//	EMBARASSING FIX ENDS HERE
+
+		printf("NOT FOUND!\n");
+		cout << query_type->type1 << '\t' << query_type->type2 << endl;
+		exit(0);
+	}
+
+	static void assignFFParametersFromBondtypes(vector<FF_bondtype>* topol_bonds, vector<FF_bondtype>* FF_bondtypes) {
+		for (int i = 0; i < topol_bonds->size(); i++) {
+			FF_bondtype* bond = &topol_bonds->at(i);
+
+			FF_bondtype appropriateForcefield = getBondFromTypes(bond, FF_bondtypes);	// This might not return the correct one, as it tries to fit the atomtypes_bond to atomtypes_bond known in the CHARMM forcefield
+
+			bond->kb = appropriateForcefield.kb;
+			bond->b0 = appropriateForcefield.b0;
+		}
+	}
+};
 
 
 
