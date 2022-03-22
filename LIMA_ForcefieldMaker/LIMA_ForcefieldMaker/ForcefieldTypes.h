@@ -35,6 +35,46 @@ float calcLikeness(string a, string b) {
 	return likeness;
 }
 
+bool isSorted(string* leftmost, string* rightmost) {
+	int ptr = 0;
+	while (leftmost->length() > ptr && rightmost->length() > ptr) {
+		if ((int)(*leftmost)[ptr] < (int)(*rightmost)[ptr]) {
+			return true;
+		}
+		else if ((int)(*leftmost)[ptr] > (int)(*rightmost)[ptr]) {
+			return false;
+		}
+		ptr++;
+	}
+	if (leftmost->length() > rightmost->length()) {
+		return false;
+	}
+}
+
+static vector<string> parseConf(vector<vector<string>> rows) {		// KNOWN ERROR HERE. SOMETIMES SPACES IN FILES ARE TABS, AND IT DOESN'T RECOGNISE A ROW AS A PROPER ENTRY!!
+	vector<string> atom_types;
+
+	for (vector<string> row : rows) {
+		if (row.size() != 6) {
+			continue;
+		}
+
+		bool type_already_found = false;
+		for (string atom_type : atom_types) {
+			if (atom_type == row[1]) {
+				type_already_found = true;
+				break;
+			}
+		}
+		if (!type_already_found)
+			atom_types.push_back(row[1]);
+	}
+
+	printf("%d atom types in conf\n", atom_types.size());
+
+	return atom_types;
+}
+
 
 struct Map {
 	struct Mapping {
@@ -453,7 +493,7 @@ struct Bondtype {
 	static void assignFFParametersFromBondtypes(vector<Bondtype>* topol_bonds, vector<Bondtype>* FF_bondtypes) {
 		for (int i = 0; i < topol_bonds->size(); i++) {
 			if (!(i%10))
-			printf("\rAssigning FF parameters to bond %d", i);
+			printf("\rAssigning FF parameters to bond %06d of %06d", i, topol_bonds->size());
 			Bondtype* bond = &topol_bonds->at(i);
 
 			Bondtype appropriateForcefield = getBondFromTypes(bond, FF_bondtypes);	// This might not return the correct one, as it tries to fit the atomtypes_bond to atomtypes_bond known in the CHARMM forcefield
@@ -464,8 +504,6 @@ struct Bondtype {
 		printf("\n");
 	}
 };
-
-
 
 
 
@@ -627,7 +665,7 @@ struct Angletype {
 	
 	static void assignFFParametersFromAngletypes(vector<Angletype>* topol_angles, vector<Angletype>* FF_angletypes) {
 		for (int i = 0; i < topol_angles->size(); i++) {
-			printf("\rAssigning FF parameters to angle %d", i);
+			printf("\rAssigning FF parameters to angle %06d of %06d", i, topol_angles->size());
 
 			Angletype* angle = &topol_angles->at(i);
 
@@ -645,30 +683,169 @@ struct Angletype {
 
 
 
+struct Dihedraltype {
+	Dihedraltype() {}
+	Dihedraltype(string t1, string t2, string t3, string t4) : type1(t1), type2(t2), type3(t3), type4(t4) {
+		sort();
+	}
+	Dihedraltype(string t1, string t2, string t3, string t4, float phi0, float kphi) : type1(t1), type2(t2), type3(t3), type4(t4), phi0(phi0), kphi(kphi) {
+		sort();
+	}
+	Dihedraltype(int id1, int id2, int id3, int id4) : id1(id1), id2(id2), id3(id3), id4(id4) {
+	}
 
-static vector<string> parseConf(vector<vector<string>> rows) {		// KNOWN ERROR HERE. SOMETIMES SPACES IN FILES ARE TABS, AND IT DOESN'T RECOGNISE A ROW AS A PROPER ENTRY!!
-	vector<string> atom_types;
+	string type1, type2, type3, type4;			// left, lm, rm, right
+	int id1, id2, id3, id4;			// bonds from .top only has these values! 
+	float phi0;
+	float kphi;
 
-	for (vector<string> row : rows) {
-		if (row.size() != 6) {
-			continue;
+
+	void flip() {
+		swap(type1, type4);
+		swap(type2, type3);
+	}
+	void sort() {		
+		if (type1 != type4) {
+			if (!isSorted(&type1, &type4)) {
+				flip();
+			}
 		}
+		else {			// In case the outer two is identical, we check the inner two.
+			if (!isSorted(&type2, &type3)) {
+				flip();
+			}
+		}
+	}
 
-		bool type_already_found = false;
-		for (string atom_type : atom_types) {
-			if (atom_type == row[1]) {
-				type_already_found = true;
+
+	enum STATE { INACTIVE, BONDTYPES, ANGLETYPES, DIHEDRALTYPES, CMAP };
+	static STATE setState(string s, STATE current_state) {
+		if (s == "bondtypes" || s == "bonds")
+			return BONDTYPES;
+		if (s == "angletypes" || s == "angles")
+			return ANGLETYPES;
+		if (s == "dihedraltypes" || s == "dihedrals")
+			return DIHEDRALTYPES;
+		if (s == "cmap")
+			return CMAP;
+		return current_state;
+	}
+
+	static vector<Dihedraltype> parseFFDihedraltypes(vector<vector<string>> rows) {
+		STATE current_state = INACTIVE;
+		vector<Dihedraltype> dihedraltypes;
+
+		for (vector<string> row : rows) {
+
+			if (row.size() == 3) {
+				current_state = setState(row[1], current_state);
+				continue;
+			}
+
+
+
+			switch (current_state)
+			{
+			case DIHEDRALTYPES:
+				if (row.size() < 7) {
+					continue;													// TODO: dont just run from your problems, man...
+				}
+				dihedraltypes.push_back(Dihedraltype(row[0], row[1], row[2], row[3], stof(row[5]), stof(row[6])));
+				break;
+			default:
+				break;
+			}
+
+		}
+		printf("%d dihedraltypes in forcefield\n", dihedraltypes.size());
+		return dihedraltypes;
+	}
+
+	static vector<Dihedraltype> parseTopolDihedraltypes(vector<vector<string>> rows) {
+		STATE current_state = INACTIVE;
+		vector<Dihedraltype> records;
+
+		for (vector<string> row : rows) {
+			if (row.size() == 3) {
+				if (row[0][0] == '[') {
+					current_state = setState(row[1], current_state);
+					continue;
+				}
+			}
+
+
+
+			switch (current_state)
+			{
+			case DIHEDRALTYPES:
+				records.push_back(Dihedraltype(stoi(row[0]), stoi(row[1]), stoi(row[2]), stoi(row[3])));
+				break;
+			default:
 				break;
 			}
 		}
-		if (!type_already_found)
-			atom_types.push_back(row[1]);
+		printf("%d dihedrals found in topology file\n", records.size());
+		return records;
 	}
 
-	printf("%d atom types in conf\n", atom_types.size());
+	static void assignTypesFromAtomIDs(vector<Dihedraltype>* topol_dihedrals, vector<Atom> atoms) {
+		//printf("GOt here!\n");
+		for (int i = 0; i < topol_dihedrals->size(); i++) {
+			Dihedraltype* dihedral = &topol_dihedrals->at(i);
 
-	return atom_types;
-}
+			//printf("Accessing atoms %d %d %d %d\n", dihedral->id1, dihedral->id2, dihedral->id3, dihedral->id4);
+			dihedral->type1 = atoms.at(dihedral->id1 - 1).atomtype_bond;	// Minus 1 becuase the bonds type1 is 1-indexed, and atoms vector is 0 indexed
+			dihedral->type2 = atoms.at(dihedral->id2 - 1).atomtype_bond;
+			dihedral->type3 = atoms.at(dihedral->id3 - 1).atomtype_bond;
+			dihedral->type4 = atoms.at(dihedral->id4 - 1).atomtype_bond;
+			dihedral->sort();
+			//cout << bond->type1 << '\t' << bond->type2 << endl;;
+		}
+	}
+
+
+
+	static Dihedraltype getDihedralFromTypes(Dihedraltype* query_type, vector<Dihedraltype>* forcefield) {
+		float best_likeness = 0;
+		Dihedraltype best_match;
+		for (Dihedraltype dihedral : *forcefield) {
+			float likeness = calcLikeness(query_type->type1, dihedral.type1) * calcLikeness(query_type->type2, dihedral.type2) * calcLikeness(query_type->type3, dihedral.type3) * calcLikeness(query_type->type4, dihedral.type4);
+			if (likeness > best_likeness) {
+				best_likeness = likeness;
+				best_match = dihedral;
+			}
+			if (likeness == 1)
+				break;
+		}
+		if (best_likeness > 0.01f)
+			return best_match;
+
+		cout << "\n\n\nFailed to match angle types.\n Closest match " << best_match.type1 << "    " << best_match.type2 << "    " << best_match.type3 << "    " << best_match.type4 << endl;
+		printf("Likeness %f\n", best_likeness);
+		printf("Topol ids: %d %d %d\n", query_type->id1, query_type->id2, query_type->id3, query_type->id4);
+		cout << query_type->type1 << '\t' << query_type->type2 << '\t' << query_type->type3 << '\t' << query_type->type4 << endl;
+		exit(0);
+	}
+
+	static void assignFFParametersFromDihedraltypes(vector<Dihedraltype>* topol_dihedrals, vector<Dihedraltype>* forcefield) {
+		for (int i = 0; i < topol_dihedrals->size(); i++) {
+			printf("\rAssigning FF parameters to dihedral %06d of %06d", i, topol_dihedrals->size());
+
+			Dihedraltype* dihedral = &topol_dihedrals->at(i);
+
+			Dihedraltype appropriateForcefield = getDihedralFromTypes(dihedral, forcefield);	// This might not return the correct one, as it tries to fit the atomtypes_bond to atomtypes_bond known in the CHARMM forcefield
+
+			dihedral->phi0 = appropriateForcefield.phi0;
+			dihedral->kphi = appropriateForcefield.kphi;
+		}
+		printf("\n");
+	}
+};
+
+
+
+
+
 
 
 

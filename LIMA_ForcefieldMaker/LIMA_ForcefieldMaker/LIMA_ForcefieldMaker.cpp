@@ -47,14 +47,29 @@ vector<Angletype> makeTopologyAngles(vector<vector<string>>* ffbonded_rows, vect
 	return topology_angles;
 }
 
+vector<Dihedraltype> makeTopologyDihedrals(vector<vector<string>> ffbonded_rows, vector<vector<string>> topology_rows, vector<Atom> atoms) {
+	vector<Dihedraltype> forcefield = Dihedraltype::parseFFDihedraltypes(ffbonded_rows);
+	vector<Dihedraltype> topology_dihedrals = Dihedraltype::parseTopolDihedraltypes(topology_rows);
+
+	Dihedraltype::assignTypesFromAtomIDs(&topology_dihedrals, atoms);
+	Dihedraltype::assignFFParametersFromDihedraltypes(&topology_dihedrals, &forcefield);
+
+	return topology_dihedrals;
+}
+
 int main(int argc, char* argv[]) {
+	// 95% of runtime is spent matching topologies to forcefield. 
+	// To speedup, split the topology_x_types and run multithreaded?
+	//
+
+
 	Map map;
 	vector<FF_nonbonded> ff_nonbonded_active = makeFilteredNonbondedFF(&map);		// The map is made here, so this function must come first
 	
 
 
-	// Now for atoms and bonds present in topology
-	vector<vector<string>> ffbonded_rows = readFile("C:\\PROJECTS\\Quantom\\charmm36-mar2019.ff\\ffbonded.itp");
+	// These two vectors contain information about all types, but are parsed individually. This is very slightly slower, but MUCH more readable!
+	vector<vector<string>> ffbonded_rows = readFile("C:\\PROJECTS\\Quantom\\charmm36-mar2019.ff\\ffbonded.itp");		
 	vector<vector<string>> topology_rows = readFile("C:\\PROJECTS\\Quantom\\Molecules\\t4lys_full\\topol.top");
 
 
@@ -64,7 +79,7 @@ int main(int argc, char* argv[]) {
 
 	vector<Angletype> topology_angles = makeTopologyAngles(&ffbonded_rows, &topology_rows, &atoms);
 
-
+	vector<Dihedraltype> topology_dihedrals = makeTopologyDihedrals(ffbonded_rows, topology_rows, atoms);
 
 
 
@@ -84,11 +99,13 @@ int main(int argc, char* argv[]) {
 		(string)"C:\\Users\\Daniel\\git_repo\\Quantom\\" + (string)"ForcefieldSummary.txt",
 		ff_nonbonded_active, &map
 	);
+	
 	printForcefield(
 		"C:\\Users\\Daniel\\git_repo\\Quantom\\" + (string)"Forcefield.txt",
 		atoms,
 		topology_bonds,
-		&topology_angles
+		topology_angles,
+		topology_dihedrals
 	);
 	
 

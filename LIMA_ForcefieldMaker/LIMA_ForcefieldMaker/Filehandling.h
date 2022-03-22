@@ -81,6 +81,9 @@ struct FFOutHelpers{
 	static string titleH2(string text) {
 		return "// ---------------- " + text + " ---------------- //\n";
 	}
+	static string titleH3(string text) {
+		return "// " + text + " //\n";
+	}
 	static string parserTitle(string text) {
 		return "# " + text + '\n';
 	}
@@ -124,7 +127,7 @@ void printForcefieldSummary(string path, vector<FF_nonbonded> records_nonbonded,
 	file.close();
 }
 
-void printForcefield(string path, vector<Atom> atoms, vector<Bondtype> bonds, vector<Angletype>* angles) {
+void printForcefield(string path, vector<Atom> atoms, vector<Bondtype> bonds, vector<Angletype> angles, vector<Dihedraltype> dihedrals) {
 
 	ofstream file(path, ofstream::out);
 	if (!file.is_open()) {
@@ -132,7 +135,6 @@ void printForcefield(string path, vector<Atom> atoms, vector<Bondtype> bonds, ve
 		exit(0);
 	}
 
-	//file << FFOutHelpers().includes;
 	file << FFOutHelpers::titleH1("Forcefield Non-bonded");
 	file << FFOutHelpers::titleH2("Atoms {particle id [simulation specific]\tatomtype_id [simulation specific]}");
 	file << FFOutHelpers::parserTitle("atoms");
@@ -146,7 +148,8 @@ void printForcefield(string path, vector<Atom> atoms, vector<Bondtype> bonds, ve
 
 
 
-	file << FFOutHelpers::titleH2("Bonds {particle_1 id \t particle_2 id \t b0 \t kb}");
+	file << FFOutHelpers::titleH2("Bonds");
+	file << FFOutHelpers::titleH3("{ID_p1 \t ID_p2 \t b_0 \t k_b}");
 	file << FFOutHelpers::parserTitle("bonds");
 	for (Bondtype bond : bonds) {
 		file << to_string(bond.id1) << ';' << to_string(bond.id2) << ';'
@@ -157,15 +160,27 @@ void printForcefield(string path, vector<Atom> atoms, vector<Bondtype> bonds, ve
 
 
 
-	file << FFOutHelpers::titleH2("Angles {particle_1 id \t particle_2 id \t particle_3 id \t theta_0 \t k_theta}");
+	file << FFOutHelpers::titleH2("Angles");
+	file << FFOutHelpers::titleH3("{ID_p1 \t ID_p2 \t ID_p3 \t theta_0 \t k_theta}");
 	file << FFOutHelpers::parserTitle("angles");
-	for (Angletype angle : *angles) {
+	for (Angletype angle : angles) {
 		file << to_string(angle.id1) << ';' << to_string(angle.id2) << ';' << to_string(angle.id3) << ';'
 			<< angle.type1 << ';' << angle.type2 << ';' << angle.type3 << ';'
 			<< to_string(angle.theta0) << ';' << to_string(angle.ktheta) << endl;
 	}
 	file << FFOutHelpers::endBlock();
 
+
+
+	file << FFOutHelpers::titleH2("Dihedrals");
+	file << FFOutHelpers::titleH3("{ID_p1 \t ID_p2 \t ID_p3 \t ID_p4 \t phi_0 \t k_phi}");
+	file << FFOutHelpers::parserTitle("dihedrals");
+	for (Dihedraltype dihedral: dihedrals) {
+		file << to_string(dihedral.id1) << ';' << to_string(dihedral.id2) << ';' << to_string(dihedral.id3) << ';' << to_string(dihedral.id4) << ';'
+			<< dihedral.type1 << ';' << dihedral.type2 << ';' << dihedral.type3 << ';' << dihedral.type4 << ';'
+			<< to_string(dihedral.phi0) << ';' << to_string(dihedral.kphi) << endl;
+	}
+	file << FFOutHelpers::endBlock();
 
 	file.close();
 }
