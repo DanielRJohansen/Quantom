@@ -817,12 +817,12 @@ struct Dihedraltype {
 			if (likeness == 1)
 				break;
 		}
-		if (best_likeness > 0.01f)
+		if (best_likeness > 0.001f)
 			return best_match;
 
-		cout << "\n\n\nFailed to match angle types.\n Closest match " << best_match.type1 << "    " << best_match.type2 << "    " << best_match.type3 << "    " << best_match.type4 << endl;
+		cout << "\n\n\nFailed to match angle types.\nClosest match: " << best_match.type1 << "    " << best_match.type2 << "    " << best_match.type3 << "    " << best_match.type4 << endl;
 		printf("Likeness %f\n", best_likeness);
-		printf("Topol ids: %d %d %d\n", query_type->id1, query_type->id2, query_type->id3, query_type->id4);
+		printf("Topol ids: %d %d %d %d\n", query_type->id1, query_type->id2, query_type->id3, query_type->id4);
 		cout << query_type->type1 << '\t' << query_type->type2 << '\t' << query_type->type3 << '\t' << query_type->type4 << endl;
 		exit(0);
 	}
