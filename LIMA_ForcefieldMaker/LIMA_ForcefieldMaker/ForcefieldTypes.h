@@ -22,7 +22,18 @@ bool charIsNumber(char c) {
 bool charIsNumberAbove1(char c) {
 	return ((int)c > 49 && (int)c < 58);
 }
+float calcLikeness(string a, string b) {
+	float likeness = 0;
+	float point_scale = 1.f / max(a.length(), b.length());
 
+	for (int i = 0; i < min(a.length(), b.length()); i++) {
+		if (a[i] == b[i])
+			likeness += point_scale;
+		else
+			break;
+	}
+	return likeness;
+}
 
 
 struct Map {
@@ -282,15 +293,15 @@ struct Atom {
 
 
 
-struct FF_bondtype {
-	FF_bondtype() {}
-	FF_bondtype(string t1, string t2) : type1(t1), type2(t2) {
+struct Bondtype {
+	Bondtype() {}
+	Bondtype(string t1, string t2) : type1(t1), type2(t2) {
 		sort();
 	}
-	FF_bondtype(string t1, string t2, float b0, float kb) : type1(t1), type2(t2), b0(b0), kb(kb) {
+	Bondtype(string t1, string t2, float b0, float kb) : type1(t1), type2(t2), b0(b0), kb(kb) {
 		sort();
 	}
-	FF_bondtype(int id1, int id2) : id1(id1), id2(id2) {
+	Bondtype(int id1, int id2) : id1(id1), id2(id2) {
 		//convertToZeroIndexed();
 	}
 	
@@ -299,10 +310,7 @@ struct FF_bondtype {
 	float b0;
 	float kb;
 
-	void convertToZeroIndexed() {
-		id1--;
-		id2--;
-	}
+	
 	void sort() {
 		int ptr = 0; 
 		//cout << "Sorting " << type1 << "    " << type2 << endl;
@@ -329,7 +337,7 @@ struct FF_bondtype {
 		//printf("\n");
 	}
 
-	enum STATE { INACTIVE, BONDTYPES, ANGLETYPES, DIHEDRALTYPES };
+	enum STATE { INACTIVE, BONDTYPES, ANGLETYPES, DIHEDRALTYPES, PAIRTYPES };
 	static STATE setState(string s, STATE current_state) {
 		if (s == "bondtypes" || s == "bonds")
 			return BONDTYPES;
@@ -337,12 +345,14 @@ struct FF_bondtype {
 			return ANGLETYPES;
 		if (s == "dihedraltypes")
 			return DIHEDRALTYPES;
+		if (s == "pairs")
+			return PAIRTYPES;
 		return current_state;
 	}
-	static vector<FF_bondtype> parseFFBondtypes(vector<vector<string>> rows) {
+	static vector<Bondtype> parseFFBondtypes(vector<vector<string>> rows) {
 		STATE current_state = INACTIVE;
 
-		vector<FF_bondtype> records;
+		vector<Bondtype> records;
 
 		for (vector<string> row : rows) {
 
@@ -361,7 +371,7 @@ struct FF_bondtype {
 				if (row.size() != 5) {
 					continue;													// TODO: dont just run from your problems, man...
 				}
-				records.push_back(FF_bondtype(row[0], row[1], stof(row[3]), stof(row[4])));
+				records.push_back(Bondtype(row[0], row[1], stof(row[3]), stof(row[4])));
 				break;
 			case ANGLETYPES:
 				break;
@@ -375,9 +385,9 @@ struct FF_bondtype {
 		return records;
 	}
 
-	static vector<FF_bondtype> parseTopolBondtypes(vector<vector<string>> rows) {
+	static vector<Bondtype> parseTopolBondtypes(vector<vector<string>> rows) {
 		STATE current_state = INACTIVE;
-		vector<FF_bondtype> records;
+		vector<Bondtype> records;
 
 		for (vector<string> row : rows) {
 			if (row.size() == 3) {
@@ -392,22 +402,22 @@ struct FF_bondtype {
 			switch (current_state)
 			{
 			case BONDTYPES:
-				records.push_back(FF_bondtype(stoi(row[0]), stoi(row[1])));
+				records.push_back(Bondtype(stoi(row[0]), stoi(row[1])));
 				break;
 			default:
 				break;
 			}
 
-			if (current_state == ANGLETYPES)
+			if (current_state == PAIRTYPES)
 				break;
 		}
 		printf("%d bonds found in topology file\n", records.size());
 		return records;	
 	}
 
-	static void assignTypesFromAtomIDs(vector<FF_bondtype>* topol_bonds, vector<Atom> atoms) {
+	static void assignTypesFromAtomIDs(vector<Bondtype>* topol_bonds, vector<Atom> atoms) {
 		for (int i = 0; i < topol_bonds->size(); i++) {
-			FF_bondtype* bond = &topol_bonds->at(i);
+			Bondtype* bond = &topol_bonds->at(i);
 
 
 			bond->type1 = atoms.at(bond->id1 - 1).atomtype_bond;	// Minus 1 becuase the bonds type1 is 1-indexed, and atoms vector is 0 indexed
@@ -417,100 +427,34 @@ struct FF_bondtype {
 		}
 	}
 
-	static bool _getBondFromTypes(FF_bondtype* query_type, vector<FF_bondtype>* FF_bondtypes, FF_bondtype* reply) {
-		for (FF_bondtype bondtype : *FF_bondtypes) {
-			if (query_type->type1 == bondtype.type1 && query_type->type2 == bondtype.type2) {
-				*reply = bondtype;
-				return true;
+
+
+
+	static Bondtype getBondFromTypes(Bondtype* query_type, vector<Bondtype>* FF_bondtypes) { 		
+		float best_likeness = 0;
+		Bondtype best_bond;
+		for (Bondtype bond : *FF_bondtypes) {
+			float likeness = calcLikeness(query_type->type1, bond.type1) * calcLikeness(query_type->type2, bond.type2);
+			if (likeness > best_likeness) {
+				best_likeness = likeness;
+				best_bond = bond;
 			}
 		}
-	}
+		if (best_likeness > 0.01f)
+			return best_bond;
 
-	static FF_bondtype getBondFromTypes(FF_bondtype* query_type, vector<FF_bondtype>* FF_bondtypes) { 		
-		/*for (FF_bondtype bondtype : *FF_bondtypes) {
-			if (query_type->type1 == bondtype.type1 && query_type->type2 == bondtype.type2) {
-				return bondtype;
-			}
-		}*/
-
-		FF_bondtype reply;
-		if (_getBondFromTypes(query_type, FF_bondtypes, &reply))
-			return reply;
-
-
-		// THIS IS AN INSANELY BAD AND TEMPORARY FIX	
-		FF_bondtype alias = *query_type;
-		if (!charIsNumber(alias.type1.back())) {
-			alias.type1 += '1';
-			alias.sort();
-			if (_getBondFromTypes(&alias, FF_bondtypes, &reply))
-				return reply;
-		}
-		alias = *query_type;
-		if (!charIsNumber(alias.type2.back())) {
-			alias.type2 += '1';
-			alias.sort();
-			if (_getBondFromTypes(&alias, FF_bondtypes, &reply))
-				return reply;
-		}
-
-		alias = *query_type;
-		if (!charIsNumberAbove1(alias.type1.back())) {
-			alias.type1.back()--;
-			alias.sort();
-			if (_getBondFromTypes(&alias, FF_bondtypes, &reply))
-				return reply;
-		}
-		alias = *query_type;
-		if (!charIsNumberAbove1(alias.type2.back())) {
-			alias.type2.back()--;
-			alias.sort();
-			if (_getBondFromTypes(&alias, FF_bondtypes, &reply))
-				return reply;
-		}
-		/*
-		if (!charIsNumber(query_type->type1.back())) {
-			query_type->type1 += '1';
-			query_type->sort();
-			return getBondFromTypes(query_type, FF_bondtypes);
-		}
-		else if (!charIsNumber(query_type->type2.back())) {
-			query_type->type2 += '1';
-			query_type->sort();
-			return getBondFromTypes(query_type, FF_bondtypes);
-		}
-		
-		if (charIsNumberAbove1(query_type->type1.back())) {
-			query_type->type1.back()--;
-			query_type->sort();
-			return getBondFromTypes(query_type, FF_bondtypes);
-		}
-		if (charIsNumberAbove1(query_type->type2.back())) {
-			query_type->type2.back()--;
-			query_type->sort();
-			return getBondFromTypes(query_type, FF_bondtypes);
-		}
-		*/
-		/*if (query_type->type2.length() > 1) {
-			//cout << query_type->type1 << endl;
-			query_type->type2 = query_type->type2.front();
-			//cout << query_type->type1 << endl << endl;
-			query_type->sort();
-			return getBondFromTypes(query_type, FF_bondtypes);
-		}*/
-		
-		//	EMBARASSING FIX ENDS HERE
-
-		printf("NOT FOUND!\n");
+		cout << "Failed to match bond types.\n Closest match " << best_bond.type1 << "    " << best_bond.type2;
+		printf("Likeness %f\n", best_likeness);		
+		printf("Topol ids: %d %d\n", query_type->id1, query_type->id2);
 		cout << query_type->type1 << '\t' << query_type->type2 << endl;
 		exit(0);
 	}
 
-	static void assignFFParametersFromBondtypes(vector<FF_bondtype>* topol_bonds, vector<FF_bondtype>* FF_bondtypes) {
+	static void assignFFParametersFromBondtypes(vector<Bondtype>* topol_bonds, vector<Bondtype>* FF_bondtypes) {
 		for (int i = 0; i < topol_bonds->size(); i++) {
-			FF_bondtype* bond = &topol_bonds->at(i);
+			Bondtype* bond = &topol_bonds->at(i);
 
-			FF_bondtype appropriateForcefield = getBondFromTypes(bond, FF_bondtypes);	// This might not return the correct one, as it tries to fit the atomtypes_bond to atomtypes_bond known in the CHARMM forcefield
+			Bondtype appropriateForcefield = getBondFromTypes(bond, FF_bondtypes);	// This might not return the correct one, as it tries to fit the atomtypes_bond to atomtypes_bond known in the CHARMM forcefield
 			
 			bond->kb = appropriateForcefield.kb;
 			bond->b0 = appropriateForcefield.b0;
@@ -611,9 +555,9 @@ struct Angletype {
 		return angletypes;
 	}
 
-	static vector<FF_bondtype> parseTopolBondtypes(vector<vector<string>> rows) {
+	static vector<Bondtype> parseTopolBondtypes(vector<vector<string>> rows) {
 		STATE current_state = INACTIVE;
-		vector<FF_bondtype> records;
+		vector<Bondtype> records;
 
 		for (vector<string> row : rows) {
 			if (row.size() == 3) {
@@ -628,7 +572,7 @@ struct Angletype {
 			switch (current_state)
 			{
 			case BONDTYPES:
-				records.push_back(FF_bondtype(stoi(row[0]), stoi(row[1])));
+				records.push_back(Bondtype(stoi(row[0]), stoi(row[1])));
 				break;
 			default:
 				break;
@@ -641,9 +585,9 @@ struct Angletype {
 		return records;
 	}
 
-	static void assignTypesFromAtomIDs(vector<FF_bondtype>* topol_bonds, vector<Atom> atoms) {
+	static void assignTypesFromAtomIDs(vector<Bondtype>* topol_bonds, vector<Atom> atoms) {
 		for (int i = 0; i < topol_bonds->size(); i++) {
-			FF_bondtype* bond = &topol_bonds->at(i);
+			Bondtype* bond = &topol_bonds->at(i);
 
 
 			bond->type1 = atoms.at(bond->id1 - 1).atomtype_bond;	// Minus 1 becuase the bonds type1 is 1-indexed, and atoms vector is 0 indexed
@@ -653,95 +597,14 @@ struct Angletype {
 		}
 	}
 
-	static bool _getBondFromTypes(FF_bondtype* query_type, vector<FF_bondtype>* FF_bondtypes, FF_bondtype* reply) {
-		for (FF_bondtype bondtype : *FF_bondtypes) {
-			if (query_type->type1 == bondtype.type1 && query_type->type2 == bondtype.type2) {
-				*reply = bondtype;
-				return true;
-			}
-		}
+	static bool _getBondFromTypes(Bondtype* query_type, vector<Bondtype>* FF_bondtypes, Angletype* reply) {
+
 	}
 
-	static FF_bondtype getBondFromTypes(FF_bondtype* query_type, vector<FF_bondtype>* FF_bondtypes) {
-		/*for (FF_bondtype bondtype : *FF_bondtypes) {
-			if (query_type->type1 == bondtype.type1 && query_type->type2 == bondtype.type2) {
-				return bondtype;
-			}
-		}*/
+	static Angletype getBondFromTypes(Angletype* query_type, vector<Angletype>* FF_bondtypes) {
 
-		FF_bondtype reply;
-		if (_getBondFromTypes(query_type, FF_bondtypes, &reply))
-			return reply;
-
-
-		// THIS IS AN INSANELY BAD AND TEMPORARY FIX	
-		FF_bondtype alias = *query_type;
-		if (!charIsNumber(alias.type1.back())) {
-			alias.type1 += '1';
-			alias.sort();
-			if (_getBondFromTypes(&alias, FF_bondtypes, &reply))
-				return reply;
-		}
-		alias = *query_type;
-		if (!charIsNumber(alias.type2.back())) {
-			alias.type2 += '1';
-			alias.sort();
-			if (_getBondFromTypes(&alias, FF_bondtypes, &reply))
-				return reply;
-		}
-
-		alias = *query_type;
-		if (!charIsNumberAbove1(alias.type1.back())) {
-			alias.type1.back()--;
-			alias.sort();
-			if (_getBondFromTypes(&alias, FF_bondtypes, &reply))
-				return reply;
-		}
-		alias = *query_type;
-		if (!charIsNumberAbove1(alias.type2.back())) {
-			alias.type2.back()--;
-			alias.sort();
-			if (_getBondFromTypes(&alias, FF_bondtypes, &reply))
-				return reply;
-		}
-		/*
-		if (!charIsNumber(query_type->type1.back())) {
-			query_type->type1 += '1';
-			query_type->sort();
-			return getBondFromTypes(query_type, FF_bondtypes);
-		}
-		else if (!charIsNumber(query_type->type2.back())) {
-			query_type->type2 += '1';
-			query_type->sort();
-			return getBondFromTypes(query_type, FF_bondtypes);
-		}
-
-		if (charIsNumberAbove1(query_type->type1.back())) {
-			query_type->type1.back()--;
-			query_type->sort();
-			return getBondFromTypes(query_type, FF_bondtypes);
-		}
-		if (charIsNumberAbove1(query_type->type2.back())) {
-			query_type->type2.back()--;
-			query_type->sort();
-			return getBondFromTypes(query_type, FF_bondtypes);
-		}
-		*/
-		/*if (query_type->type2.length() > 1) {
-			//cout << query_type->type1 << endl;
-			query_type->type2 = query_type->type2.front();
-			//cout << query_type->type1 << endl << endl;
-			query_type->sort();
-			return getBondFromTypes(query_type, FF_bondtypes);
-		}*/
-
-		//	EMBARASSING FIX ENDS HERE
-
-		printf("NOT FOUND!\n");
-		cout << query_type->type1 << '\t' << query_type->type2 << endl;
-		exit(0);
 	}
-
+	/*
 	static void assignFFParametersFromBondtypes(vector<FF_bondtype>* topol_bonds, vector<FF_bondtype>* FF_bondtypes) {
 		for (int i = 0; i < topol_bonds->size(); i++) {
 			FF_bondtype* bond = &topol_bonds->at(i);
@@ -752,6 +615,7 @@ struct Angletype {
 			bond->b0 = appropriateForcefield.b0;
 		}
 	}
+	*/
 };
 
 

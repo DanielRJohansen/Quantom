@@ -32,21 +32,27 @@ int main(int argc, char* argv[]) {
 
 
 	vector<vector<string>> ffbonded_rows = readFile("C:\\PROJECTS\\Quantom\\charmm36-mar2019.ff\\ffbonded.itp");
-	vector<FF_bondtype> ffbondtypes = FF_bondtype::parseFFBondtypes(ffbonded_rows);
+	vector<Bondtype> ffbondtypes = Bondtype::parseFFBondtypes(ffbonded_rows);
 
 	
 
 	// Now for atoms and bonds present in topology
 	vector<vector<string>> topology_rows = readFile("C:\\PROJECTS\\Quantom\\Molecules\\t4lys_full\\topol.top");
 	vector<Atom> atoms = Atom::parseTopolAtoms(topology_rows);
-	vector<FF_bondtype> topology_bonds = FF_bondtype::parseTopolBondtypes(topology_rows);
+	vector<Bondtype> topology_bonds = Bondtype::parseTopolBondtypes(topology_rows);
 
 
 	Atom::assignAtomtypeIDs(&atoms, &ff_nonbonded_active, &map);
 
 
-	FF_bondtype::assignTypesFromAtomIDs(&topology_bonds, atoms);
-	FF_bondtype::assignFFParametersFromBondtypes(&topology_bonds, &ffbondtypes);
+
+
+	for (Bondtype bond : ffbondtypes) {
+		//printf("%f\t%f\n", bond.kb, bond.b0);
+	}
+	//exit(0);
+	Bondtype::assignTypesFromAtomIDs(&topology_bonds, atoms);
+	Bondtype::assignFFParametersFromBondtypes(&topology_bonds, &ffbondtypes);
 
 
 

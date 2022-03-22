@@ -124,7 +124,7 @@ void printForcefieldSummary(string path, vector<FF_nonbonded> records_nonbonded,
 	file.close();
 }
 
-void printForcefield(string path, vector<Atom> atoms, vector<FF_bondtype> bondtypes) {
+void printForcefield(string path, vector<Atom> atoms, vector<Bondtype> bondtypes) {
 
 	ofstream file(path, ofstream::out);
 	if (!file.is_open()) {
@@ -148,8 +148,10 @@ void printForcefield(string path, vector<Atom> atoms, vector<FF_bondtype> bondty
 
 	file << FFOutHelpers::titleH2("Bonds {particle_1 id \t particle_2 id \t b0 \t kb}");
 	file << FFOutHelpers::parserTitle("bondtypes");
-	for (FF_bondtype bondtype : bondtypes) {
-		file << to_string(bondtype.id1) << ';' << to_string(bondtype.id2) << ';' << to_string(bondtype.b0) << ';' << to_string(bondtype.kb) << endl;	
+	for (Bondtype bondtype : bondtypes) {
+		file << to_string(bondtype.id1) << ';' << to_string(bondtype.id2) << ';' 
+			<< bondtype.type1 << ';' << bondtype.type2 << ';'
+			<< to_string(bondtype.b0) << ';' << to_string(bondtype.kb) << endl;	
 	}
 	file << FFOutHelpers::endBlock();
 
