@@ -10,49 +10,73 @@
 
 
 
-
-
-
-
-int main(int argc, char* argv[]) {
+vector<FF_nonbonded> makeFilteredNonbondedFF(Map* map) {
 	vector<vector<string>> simconf_rows = readFile("C:\\PROJECTS\\Quantom\\Molecules\\t4lys_full\\conf.gro");
 	vector<string> simconf = parseConf(simconf_rows);
-	
-	
+
+
 	vector<vector<string>> ffnonbonded_rows = readFile("C:\\PROJECTS\\Quantom\\charmm36-mar2019.ff\\ffnonbonded.itp");
 	vector<FF_nonbonded> ffnonbonded = FF_nonbonded::parseNonbonded(ffnonbonded_rows);
 
+	return FF_nonbonded::filterUnusedTypes(ffnonbonded, simconf, map);
+}
 
+vector<Atom> makeTopologyAtoms(vector<vector<string>> topology_rows, vector<FF_nonbonded>* ff_nonbonded_active, Map* map) {
+	vector<Atom> atoms = Atom::parseTopolAtoms(topology_rows);
+	Atom::assignAtomtypeIDs(&atoms, ff_nonbonded_active, map);
+	return atoms;
+}
+
+vector<Bondtype> makeTopologyBonds(vector<vector<string>>* ffbonded_rows, vector<vector<string>>* topology_rows, vector<Atom>* atoms) {
+	vector<Bondtype> ffbondtypes = Bondtype::parseFFBondtypes(*ffbonded_rows);
+	vector<Bondtype> topology_bonds = Bondtype::parseTopolBondtypes(*topology_rows);
+
+	Bondtype::assignTypesFromAtomIDs(&topology_bonds, *atoms);
+	Bondtype::assignFFParametersFromBondtypes(&topology_bonds, &ffbondtypes);
+	
+	return topology_bonds;
+}
+
+vector<Angletype> makeTopologyAngles(vector<vector<string>>* ffbonded_rows, vector<vector<string>>* topology_rows, vector<Atom>* atoms) {
+	vector<Angletype> ffangletypes = Angletype::parseFFAngletypes(*ffbonded_rows);
+	vector<Angletype> topology_angles = Angletype::parseTopolAngletypes(*topology_rows);
+
+	Angletype::assignTypesFromAtomIDs(&topology_angles, *atoms);
+	Angletype::assignFFParametersFromAngletypes(&topology_angles, &ffangletypes);
+
+	return topology_angles;
+}
+
+int main(int argc, char* argv[]) {
 	Map map;
-	vector<FF_nonbonded> ff_nonbonded_active = FF_nonbonded::filterUnusedTypes(ffnonbonded, simconf, &map);
+	vector<FF_nonbonded> ff_nonbonded_active = makeFilteredNonbondedFF(&map);		// The map is made here, so this function must come first
 	
 
-
-
-
-
-	vector<vector<string>> ffbonded_rows = readFile("C:\\PROJECTS\\Quantom\\charmm36-mar2019.ff\\ffbonded.itp");
-	vector<Bondtype> ffbondtypes = Bondtype::parseFFBondtypes(ffbonded_rows);
-
-	
 
 	// Now for atoms and bonds present in topology
+	vector<vector<string>> ffbonded_rows = readFile("C:\\PROJECTS\\Quantom\\charmm36-mar2019.ff\\ffbonded.itp");
 	vector<vector<string>> topology_rows = readFile("C:\\PROJECTS\\Quantom\\Molecules\\t4lys_full\\topol.top");
-	vector<Atom> atoms = Atom::parseTopolAtoms(topology_rows);
-	vector<Bondtype> topology_bonds = Bondtype::parseTopolBondtypes(topology_rows);
 
 
-	Atom::assignAtomtypeIDs(&atoms, &ff_nonbonded_active, &map);
+	vector<Atom> atoms = makeTopologyAtoms(topology_rows, &ff_nonbonded_active, &map);
+
+	vector<Bondtype> topology_bonds = makeTopologyBonds(&ffbonded_rows, &topology_rows, &atoms);
+
+	vector<Angletype> topology_angles = makeTopologyAngles(&ffbonded_rows, &topology_rows, &atoms);
 
 
 
 
-	for (Bondtype bond : ffbondtypes) {
-		//printf("%f\t%f\n", bond.kb, bond.b0);
-	}
-	//exit(0);
-	Bondtype::assignTypesFromAtomIDs(&topology_bonds, atoms);
-	Bondtype::assignFFParametersFromBondtypes(&topology_bonds, &ffbondtypes);
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -63,7 +87,8 @@ int main(int argc, char* argv[]) {
 	printForcefield(
 		"C:\\Users\\Daniel\\git_repo\\Quantom\\" + (string)"Forcefield.txt",
 		atoms,
-		topology_bonds
+		topology_bonds,
+		&topology_angles
 	);
 	
 

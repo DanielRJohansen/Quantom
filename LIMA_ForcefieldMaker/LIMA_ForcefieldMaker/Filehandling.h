@@ -124,7 +124,7 @@ void printForcefieldSummary(string path, vector<FF_nonbonded> records_nonbonded,
 	file.close();
 }
 
-void printForcefield(string path, vector<Atom> atoms, vector<Bondtype> bondtypes) {
+void printForcefield(string path, vector<Atom> atoms, vector<Bondtype> bonds, vector<Angletype>* angles) {
 
 	ofstream file(path, ofstream::out);
 	if (!file.is_open()) {
@@ -147,15 +147,24 @@ void printForcefield(string path, vector<Atom> atoms, vector<Bondtype> bondtypes
 
 
 	file << FFOutHelpers::titleH2("Bonds {particle_1 id \t particle_2 id \t b0 \t kb}");
-	file << FFOutHelpers::parserTitle("bondtypes");
-	for (Bondtype bondtype : bondtypes) {
-		file << to_string(bondtype.id1) << ';' << to_string(bondtype.id2) << ';' 
-			<< bondtype.type1 << ';' << bondtype.type2 << ';'
-			<< to_string(bondtype.b0) << ';' << to_string(bondtype.kb) << endl;	
+	file << FFOutHelpers::parserTitle("bonds");
+	for (Bondtype bond : bonds) {
+		file << to_string(bond.id1) << ';' << to_string(bond.id2) << ';'
+			<< bond.type1 << ';' << bond.type2 << ';'
+			<< to_string(bond.b0) << ';' << to_string(bond.kb) << endl;
 	}
 	file << FFOutHelpers::endBlock();
 
 
+
+	file << FFOutHelpers::titleH2("Angles {particle_1 id \t particle_2 id \t particle_3 id \t theta_0 \t k_theta}");
+	file << FFOutHelpers::parserTitle("angles");
+	for (Angletype angle : *angles) {
+		file << to_string(angle.id1) << ';' << to_string(angle.id2) << ';' << to_string(angle.id3) << ';'
+			<< angle.type1 << ';' << angle.type2 << ';' << angle.type3 << ';'
+			<< to_string(angle.theta0) << ';' << to_string(angle.ktheta) << endl;
+	}
+	file << FFOutHelpers::endBlock();
 
 
 	file.close();

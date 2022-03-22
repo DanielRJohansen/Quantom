@@ -452,6 +452,8 @@ struct Bondtype {
 
 	static void assignFFParametersFromBondtypes(vector<Bondtype>* topol_bonds, vector<Bondtype>* FF_bondtypes) {
 		for (int i = 0; i < topol_bonds->size(); i++) {
+			if (!(i%10))
+			printf("\rAssigning FF parameters to bond %d", i);
 			Bondtype* bond = &topol_bonds->at(i);
 
 			Bondtype appropriateForcefield = getBondFromTypes(bond, FF_bondtypes);	// This might not return the correct one, as it tries to fit the atomtypes_bond to atomtypes_bond known in the CHARMM forcefield
@@ -459,6 +461,7 @@ struct Bondtype {
 			bond->kb = appropriateForcefield.kb;
 			bond->b0 = appropriateForcefield.b0;
 		}
+		printf("\n");
 	}
 };
 
@@ -501,9 +504,9 @@ struct Angletype {
 		}
 	}
 	void sort() {
-		sort(&type1, &type3);
-		sort(&type1, &type2);
-		sort(&type2, &type3);
+		sort(&type1, &type3);		// We can ONLY sort these two, as type2 MUSTTT be in the middle!!
+		//sort(&type1, &type2);
+		//sort(&type2, &type3);
 	}
 
 
@@ -551,13 +554,13 @@ struct Angletype {
 			if (current_state == DIHEDRALTYPES)
 				break;
 		}
-		printf("%d angletypes read from file\n", angletypes.size());
+		printf("%d angletypes in forcefield\n", angletypes.size());
 		return angletypes;
 	}
 
-	static vector<Bondtype> parseTopolBondtypes(vector<vector<string>> rows) {
+	static vector<Angletype> parseTopolAngletypes(vector<vector<string>> rows) {
 		STATE current_state = INACTIVE;
-		vector<Bondtype> records;
+		vector<Angletype> records;
 
 		for (vector<string> row : rows) {
 			if (row.size() == 3) {
@@ -571,51 +574,72 @@ struct Angletype {
 
 			switch (current_state)
 			{
-			case BONDTYPES:
-				records.push_back(Bondtype(stoi(row[0]), stoi(row[1])));
+			case ANGLETYPES:
+				records.push_back(Angletype(stoi(row[0]), stoi(row[1]), stoi(row[2])));
 				break;
 			default:
 				break;
 			}
 
-			if (current_state == ANGLETYPES)
+
+			if (current_state == DIHEDRALTYPES)
 				break;
 		}
-		printf("%d bonds found in topology file\n", records.size());
+		printf("%d angles found in topology file\n", records.size());
 		return records;
 	}
 
-	static void assignTypesFromAtomIDs(vector<Bondtype>* topol_bonds, vector<Atom> atoms) {
-		for (int i = 0; i < topol_bonds->size(); i++) {
-			Bondtype* bond = &topol_bonds->at(i);
+	static void assignTypesFromAtomIDs(vector<Angletype>* topol_angles, vector<Atom> atoms) {
+		for (int i = 0; i < topol_angles->size(); i++) {
+			Angletype* angle = &topol_angles->at(i);
 
-
-			bond->type1 = atoms.at(bond->id1 - 1).atomtype_bond;	// Minus 1 becuase the bonds type1 is 1-indexed, and atoms vector is 0 indexed
-			bond->type2 = atoms.at(bond->id2 - 1).atomtype_bond;
-			bond->sort();
+			angle->type1 = atoms.at(angle->id1 - 1).atomtype_bond;	// Minus 1 becuase the bonds type1 is 1-indexed, and atoms vector is 0 indexed
+			angle->type2 = atoms.at(angle->id2 - 1).atomtype_bond;
+			angle->type3 = atoms.at(angle->id3 - 1).atomtype_bond;
+			angle->sort();
 			//cout << bond->type1 << '\t' << bond->type2 << endl;;
 		}
 	}
 
-	static bool _getBondFromTypes(Bondtype* query_type, vector<Bondtype>* FF_bondtypes, Angletype* reply) {
 
-	}
 
-	static Angletype getBondFromTypes(Angletype* query_type, vector<Angletype>* FF_bondtypes) {
-
-	}
-	/*
-	static void assignFFParametersFromBondtypes(vector<FF_bondtype>* topol_bonds, vector<FF_bondtype>* FF_bondtypes) {
-		for (int i = 0; i < topol_bonds->size(); i++) {
-			FF_bondtype* bond = &topol_bonds->at(i);
-
-			FF_bondtype appropriateForcefield = getBondFromTypes(bond, FF_bondtypes);	// This might not return the correct one, as it tries to fit the atomtypes_bond to atomtypes_bond known in the CHARMM forcefield
-
-			bond->kb = appropriateForcefield.kb;
-			bond->b0 = appropriateForcefield.b0;
+	static Angletype getAngleFromTypes(Angletype* query_type, vector<Angletype>* FF_angletypes) {
+		float best_likeness = 0;
+		Angletype best_angle;
+		for (Angletype angle : *FF_angletypes) {
+			float likeness = calcLikeness(query_type->type1, angle.type1) * calcLikeness(query_type->type2, angle.type2) * calcLikeness(query_type->type3, angle.type3);
+			if (likeness > best_likeness) {
+				best_likeness = likeness;
+				best_angle = angle;
+			}
+			if (likeness == 1)
+				break;
 		}
+		if (best_likeness > 0.01f)
+			return best_angle;
+
+		cout << "\n\n\nFailed to match angle types.\n Closest match " << best_angle.type1 << "    " << best_angle.type2 << "    " << best_angle.type3 << endl;
+		printf("Likeness %f\n", best_likeness);
+		printf("Topol ids: %d %d %d\n", query_type->id1, query_type->id2, query_type->id3);
+		cout << query_type->type1 << '\t' << query_type->type2 << '\t' << query_type->type3 << endl;
+		exit(0);
 	}
-	*/
+	
+	static void assignFFParametersFromAngletypes(vector<Angletype>* topol_angles, vector<Angletype>* FF_angletypes) {
+		for (int i = 0; i < topol_angles->size(); i++) {
+			printf("\rAssigning FF parameters to angle %d", i);
+
+			Angletype* angle = &topol_angles->at(i);
+
+			Angletype appropriateForcefield = getAngleFromTypes(angle, FF_angletypes);	// This might not return the correct one, as it tries to fit the atomtypes_bond to atomtypes_bond known in the CHARMM forcefield
+
+			angle->theta0 = appropriateForcefield.theta0;
+			angle->ktheta = appropriateForcefield.ktheta;
+		}
+		printf("\n");
+
+	}
+	
 };
 
 
