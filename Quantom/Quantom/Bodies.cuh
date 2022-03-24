@@ -49,41 +49,60 @@ struct ParticleRef {		 // Maybe call map instead?
 
 };
 
+struct NBAtomtype {
+	NBAtomtype(){}
+	NBAtomtype(float m, float s, float e) : mass(m), sigma(s), epsilon(e) {}
+	float mass, sigma, epsilon;
+};
+
 
 struct PairBond {	// IDS and indexes are used interchangeably here!
 	PairBond(){}
+	PairBond(int id1, int id2, float b0, float kb) : b0(b0), kb(kb) {
+		// This is only for loading the forcefield, so the ID's refers to id's given in .conf file!
+		atom_indexes[0] = id1;
+		atom_indexes[1] = id2;
+	}
+
 	PairBond( uint32_t particleindex_a, uint32_t particleindex_b) {
 		atom_indexes[0] = particleindex_a;
 		atom_indexes[1] = particleindex_b;
 	}
-	PairBond(double ref_dist, uint32_t particleindex_a, uint32_t particleindex_b) : 
-		reference_dist(ref_dist) {
+	PairBond(float ref_dist, uint32_t particleindex_a, uint32_t particleindex_b) : 
+		//reference_dist(ref_dist) {
+		b0(ref_dist) {
 		atom_indexes[0] = particleindex_a;
 		atom_indexes[1] = particleindex_b;
 	}
 	
 	//uint32_t bond_index;	
-	double reference_dist;
+	//double reference_dist;
+	float b0, kb;
 	uint32_t atom_indexes[2];	// Relative to the compund - NOT ABSOLUTE INDEX. Used in global table with compunds start-index
 	const static int n_atoms = 2;
 };
 
 struct AngleBond {
 	AngleBond() {}
+	AngleBond(float theta_0, float k_theta) : theta_0(theta_0), k_theta(k_theta){}
 	AngleBond(double ref_t, uint32_t particleindex_l, uint32_t particleindex_m, uint32_t particleindex_r) :
 		reference_angle(ref_t) {
 		atom_indexes[0] = particleindex_l;
 		atom_indexes[1] = particleindex_m;
 		atom_indexes[2] = particleindex_r;
 	}
-
+	float theta_0, k_theta;
 	double reference_angle;
 	uint32_t atom_indexes[3]; // i,j,k angle between i and k
 	const static int n_atoms = 3;
 };
 
 struct DihedralBond {
+	DihedralBond() {}
+	DihedralBond(float phi_0, float k_phi) : phi_0(phi_0), k_phi(k_phi) {}
 
+
+	float phi_0, k_phi;
 };
 
 struct GenericBond {					// ONLY used during creation, never on device!

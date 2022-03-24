@@ -17,6 +17,11 @@ Molecule CompoundBuilder::buildMolecule(string pdb_path, string itp_path, int ma
 	//Compound compound;													// position of particles stored in compund.particles.pos_tsub1
 	Molecule molecule;
 
+	FFM.buildForcefield();
+	//exit(0);
+
+
+
 	//loadParticles(&compound, &atom_data, max_residue_id, true);
 	loadParticles(&molecule, &atom_data, max_residue_id, min_residue_id, true);
 	//printf("%d particles added\n", compound.n_particles);

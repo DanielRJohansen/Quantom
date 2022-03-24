@@ -473,3 +473,19 @@ private:
 };
 
 */
+/*
+class StringMap {
+	struct Mapping {
+		Mapping() {}
+		Mapping(string l, string r) : left(l), right(r) {}
+		string left, right;
+	};
+	
+
+	vector<Mapping> mappings;
+	string mapToRight(string left) {
+		for (Mapping mapping : mappings)
+			if (mapping.left == left)
+				return mapping.right;
+	}
+};*/

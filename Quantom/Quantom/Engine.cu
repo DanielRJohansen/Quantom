@@ -484,7 +484,7 @@ __device__ Float3 calcLJForce(Float3* pos0, Float3* pos1, float* data_ptr, float
 }
 
 constexpr double kb = 17.5 * 1e+6;		//	J/(mol*nm^2)
-__device__ void calcPairbondForces(Float3* pos_a, Float3* pos_b, double* reference_dist, Float3* results, float* potE) {
+__device__ void calcPairbondForces(Float3* pos_a, Float3* pos_b, float* reference_dist, Float3* results, float* potE) {
 	// Calculates bond force on both particles					//
 	// Calculates forces as J/mol*M								//
 
@@ -596,7 +596,8 @@ __device__ Float3 computePairbondForces(T* entity, Float3* positions, Float3* ut
 			calcPairbondForces(
 				&positions[pb->atom_indexes[0]],
 				&positions[pb->atom_indexes[1]],
-				&pb->reference_dist,
+				//&pb->reference_dist,
+				&pb->b0,
 				forces, potE
 			);
 		}

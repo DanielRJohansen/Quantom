@@ -1,7 +1,13 @@
 #pragma once
 
-//#include "Bodies.cuh"
+#include "Bodies.cuh"
 //#include "Simulation.cuh"
+#include "Filehandling.h"
+#include <string>
+#include <vector>
+
+using std::string;
+
 
 const int MAX_ATOM_TYPES = 16;
 
@@ -71,6 +77,13 @@ public:
 		printf("Forcefield size: %d bytes\n", sizeof(ForceField));
 	}
 
+
+	void buildForcefield();
+	void attachForcefield(PairBond* pairbond);
+
+
+
+
 	void make(char atom, int index, float m, float s, float e) {
 		forcefield.particle_parameters[index].mass = m;
 		forcefield.particle_parameters[index].sigma = s;
@@ -108,5 +121,43 @@ public:
 
 private:
 	ForceField forcefield;
+
+	//enum STATE { INACTIVE, NB_ATOMTYPE_MAPPINGS, FF_NONBONDED, NB_ATOMTYPES, PAIRTYPES };
+	enum STATE { INACTIVE, FF_NONBONDED, NB_ATOMTYPES, BONDS, ANGLES, DIHEDRALS };
+	static STATE setState(string s, STATE current_state) {
+		if (s == "ff_nonbonded")
+			return FF_NONBONDED;
+		if (s == "atoms")
+			return NB_ATOMTYPES;
+		if (s == "bonds")
+			return BONDS;
+		if (s == "angles")
+			return ANGLES;
+		if (s == "dihedrals")
+			return DIHEDRALS;
+		return current_state;
+	}
+
+	bool newParseTitle(vector<string> row) {
+		return (row[0][0] == '#');
+	}
+
+	//StringMap parseNBAtomtypeMaps(vector<vector<string>> forcefield_rows) {}
+
+
+	
+	NBAtomtype* parseAtomTypes(vector<vector<string>> summary_rows);
+
+	int* parseAtomTypeIDs(vector<vector<string>> forcefield_rows);
+
+	PairBond* parseBonds(vector<vector<string>> forcefield_rows);
+	AngleBond* parseAngles(vector<vector<string>> forcefield_rows);
+	DihedralBond* parseDihedrals(vector<vector<string>> forcefield_rows);
+	
 };
+
+
+
+
+
 

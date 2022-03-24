@@ -91,6 +91,7 @@
     <ClCompile Include="CompoundBuilder.cpp" />
     <ClCompile Include="DisplayV2.cpp" />
     <ClCompile Include="Environment.cpp" />
+    <ClCompile Include="Filehandling.cpp" />
     <ClCompile Include="Interface.cpp" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="VirtualPathMaker.cpp" />
@@ -104,6 +105,7 @@
     <ClInclude Include="DisplayV2.h" />
     <ClInclude Include="Engine.cuh" />
     <ClInclude Include="Environment.h" />
+    <ClInclude Include="Filehandling.h" />
     <ClInclude Include="Forcefield.cuh" />
     <ClInclude Include="Interface.h" />
     <ClInclude Include="QuantomTypes.cuh" />
@@ -115,6 +117,7 @@
     <CudaCompile Include="Analyzer.cu" />
     <CudaCompile Include="Bodies.cu" />
     <CudaCompile Include="Engine.cu" />
+    <CudaCompile Include="Forcefield.cu" />
     <CudaCompile Include="QuantomTypes.cu" />
     <CudaCompile Include="Rasterizer.cu" />
   </ItemGroup>
