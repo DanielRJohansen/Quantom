@@ -535,9 +535,38 @@ __device__ void calcAnglebondForces(Float3* pos_left, Float3* pos_middle, Float3
 	results[0] = inward_force_direction1 * force_scalar;
 	results[2] = inward_force_direction2 * force_scalar;
 	results[1] = (results[0] + results[2]) * -1;
-
-
 }
+
+__device__ void calcDihedralbondForces(Float3* pos_left, Float3* pos_lm, Float3* pos_rm, Float3* pos_right, DihedralBond* dihedral, Float3* results, float* potE) {
+	Float3 normal1 = (*pos_left-*pos_lm).cross((*pos_rm-*pos_lm));
+	Float3 normal2 = (*pos_lm-*pos_rm).cross((*pos_right-*pos_rm));
+
+
+	float torsion = Float3::getAngle(normal1, normal2);
+	float error = torsion - dihedral->phi_0;
+
+	//error = (error / (2.f * PI)) * 360.f;
+
+	*potE += 0.5 * ktheta * error * error * 0.5;
+	double force_scalar = dihedral->k_phi * (error);
+
+
+	results[0] = normal1 * force_scalar * -1.f;
+	results[3] = normal2 * force_scalar;
+	// Not sure about the final two forces, for now we'll jsut split the sum of opposite forces between them.
+	results[1] = (results[0] + results[3]) * -1.f * 0.5;
+	results[2] = (results[0] + results[3]) * -1.f * 0.5;
+
+	/*
+	if (blockIdx.x == 0 && threadIdx.x == 30) {
+		printf("Torsion %f error %f force_scalar %f, phi0 %f kphi %f\n", torsion, error, force_scalar, dihedral->phi_0, dihedral->k_phi);
+		results[0].print('0');
+		results[1].print('1');
+		results[3].print('3');
+	}
+	*/
+}
+
 
 __device__ Float3 computeLJForces(Float3* self_pos, int n_particles, Float3* positions, float* data_ptr, float* potE_sum, uint8_t atomtype_self, uint8_t* atomtypes_others) {	// Assumes all positions are 
 	Float3 force(0, 0, 0);
@@ -654,6 +683,43 @@ __device__ Float3 computeAnglebondForces(T* entity, Float3* positions, Float3* u
 	return utility_buffer[threadIdx.x];
 }
 
+template <typename T>	// Can either be Compound or CompoundBridgeCompact
+__device__ Float3 computeDihedralForces(T* entity, Float3* positions, Float3* utility_buffer, float* potE) {
+	utility_buffer[threadIdx.x] = Float3(0, 0, 0);
+	for (int bond_offset = 0; (bond_offset * blockDim.x) < entity->n_anglebonds; bond_offset++) {
+		DihedralBond* db = nullptr;
+		Float3 forces[4];
+		int bond_index = threadIdx.x + bond_offset * blockDim.x;
+
+		if (bond_index < entity->n_anglebonds) {
+			db = &entity->dihedrals[bond_index];
+
+			calcDihedralbondForces(
+				&positions[db->atom_indexes[0]],
+				&positions[db->atom_indexes[1]],
+				&positions[db->atom_indexes[2]],
+				&positions[db->atom_indexes[3]],
+				db,
+				forces, 
+				potE
+			);
+		}
+
+
+		for (int i = 0; i < blockDim.x; i++) {
+			if (threadIdx.x == i && db != nullptr) {
+				utility_buffer[db->atom_indexes[0]] += forces[0];
+				utility_buffer[db->atom_indexes[1]] += forces[1];
+				utility_buffer[db->atom_indexes[2]] += forces[2];
+				utility_buffer[db->atom_indexes[3]] += forces[3];
+			}
+			__syncthreads();
+		}
+	}
+
+	return utility_buffer[threadIdx.x];
+}
+
 
 __device__ void integratePosition(Float3* pos, Float3* pos_tsub1, Float3* force, const double mass, const double dt, float* thermostat_scalar, int p_index, bool verbose=false) {
 	// Force is in ??Newton, [kg * nm /(mol*ns^2)] //
@@ -723,7 +789,8 @@ __global__ void forceKernel(Box* box) {
 		__syncthreads();	// Dunno if necessary
 		force += computePairbondForces(&compound, compound_state.positions, utility_buffer, &potE_sum);
 		force += computeAnglebondForces(&compound, compound_state.positions, utility_buffer, &potE_sum);
-		
+		force += computeDihedralForces(&compound, compound_state.positions, utility_buffer, &potE_sum);
+		//box->critical_error_encountered = true;
 		for (int i = 0; i < compound.n_particles; i++) {
 			if (i != threadIdx.x) {
 				force += calcLJForce(&compound_state.positions[threadIdx.x], &compound_state.positions[i], data_ptr, &potE_sum,

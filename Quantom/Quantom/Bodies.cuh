@@ -97,8 +97,13 @@ struct AngleBond {
 
 struct DihedralBond {
 	DihedralBond() {}
-	DihedralBond(float phi_0, float k_phi) : phi_0(phi_0), k_phi(k_phi) {}
-
+	//DihedralBond(float phi_0, float k_phi) : phi_0(phi_0), k_phi(k_phi) {}
+	DihedralBond(int id1, int id2, int id3, int id4, float phi_0, float k_phi) : phi_0(phi_0), k_phi(k_phi) {
+		atom_indexes[0] = id1;
+		atom_indexes[1] = id2;
+		atom_indexes[2] = id3;
+		atom_indexes[3] = id4;
+	}
 	float phi_0, k_phi;
 	uint32_t atom_indexes[4];
 	const static int n_atoms = 4;
@@ -265,7 +270,7 @@ public:
 
 const int MAX_PAIRBONDS = 128;
 const int MAX_ANGLEBONDS = 256;
-
+const int MAX_DIHEDRALS = 256;
 struct CompoundState {							// Maybe delete this soon?
 	__device__ void setMeta(int n_p) {
 		n_particles = n_p;
@@ -300,6 +305,8 @@ struct Compound {
 	uint16_t n_anglebonds = 0;
 	AngleBond anglebonds[MAX_ANGLEBONDS];
 
+	uint16_t n_dihedrals = 0;
+	DihedralBond dihedrals[MAX_DIHEDRALS];
 
 	int key_particle_index = 404;		// particle which started at center. Used for PBC, applyhyperpos, and neighborlist search.
 	float confining_particle_sphere = 0;		// All particles in compound are PROBABLY within this radius
@@ -378,6 +385,7 @@ struct Compound {
 		n_particles = compound->n_particles;
 		n_singlebonds = compound->n_singlebonds;
 		n_anglebonds = compound->n_anglebonds;
+		n_dihedrals = compound->n_dihedrals;
 	}
 	__device__ void loadData(Compound* compound) {
 		if (threadIdx.x < n_particles) {
@@ -397,6 +405,11 @@ struct Compound {
 			int index = i * blockDim.x + threadIdx.x;
 			if (index < n_anglebonds)
 				anglebonds[index] = compound->anglebonds[index];
+		}
+		for (int i = 0; (i * blockDim.x) < n_dihedrals; i++) {
+			int index = i * blockDim.x + threadIdx.x;
+			if (index < n_dihedrals)
+				dihedrals[index] = compound->dihedrals[index];
 		}
 	}
 
@@ -457,8 +470,8 @@ struct CompoundBridge {
 	int n_singlebonds = 0;
 	AngleBond anglebonds[MAX_ANGLEBONDS_IN_BRIDGE];
 	int n_anglebonds = 0;
-
-
+	DihedralBond dihedrals[MAX_DIHEDRALBONDS_IN_BRIDGE];
+	int n_dihedrals = 0;
 
 	bool bondBelongsInBridge(GenericBond* bond) {
 		return (compound_id_left == bond->compound_ids[0] && compound_id_right == bond->compound_ids[1]);
@@ -511,13 +524,28 @@ struct CompoundBridge {
 		//printf("Anglebond added %d %d %d\n", anglebonds[n_anglebonds - 1].atom_indexes[0], anglebonds[n_anglebonds - 1].atom_indexes[1], anglebonds[n_anglebonds - 1].atom_indexes[2]);
 	}*/
 	void addGenericBond(PairBond pb) {
+		if (n_singlebonds == MAX_SINGLEBONDS_IN_BRIDGE) {
+			printf("Cannot add bond to bridge\n");
+			exit(0);
+		}
 		localizeIDs(&pb, 2);
 		singlebonds[n_singlebonds++] = pb;
 	}
 	void addGenericBond(AngleBond ab) {
+		if (n_anglebonds == MAX_ANGLEBONDS_IN_BRIDGE) {
+			printf("Cannot add angle to bridge\n");
+			exit(0);
+		}
 		localizeIDs(&ab, 3);
 		anglebonds[n_anglebonds++] = ab;
-		//printf("Anglebond added %d %d %d\n", anglebonds[n_anglebonds - 1].atom_indexes[0], anglebonds[n_anglebonds - 1].atom_indexes[1], anglebonds[n_anglebonds - 1].atom_indexes[2]);
+	}
+	void addGenericBond(DihedralBond db) {
+		if (n_dihedrals == MAX_DIHEDRALBONDS_IN_BRIDGE) {
+			printf("Cannot add dihedral to bridge\n");
+			exit(0);
+		}
+		localizeIDs(&db, 4);
+		dihedrals[n_dihedrals++] = db;
 	}
 
 };
@@ -598,6 +626,8 @@ struct CompoundBridgeCompact {
 	uint16_t n_anglebonds = 0;
 	AngleBond anglebonds[MAX_ANGLEBONDS_IN_BRIDGE];
 
+	uint16_t n_dihedrals = 0;
+	DihedralBond dihedrals[MAX_DIHEDRALBONDS_IN_BRIDGE];
 
 
 	// -------------- Device functions ------------- //
@@ -605,6 +635,7 @@ struct CompoundBridgeCompact {
 		n_particles = bridge->n_particles;
 		n_singlebonds = bridge->n_singlebonds;
 		n_anglebonds = bridge->n_anglebonds;
+		n_dihedrals = bridge->n_dihedrals;
 	}
 	__device__ void loadData(CompoundBridgeCompact* bridge) {
 		if (threadIdx.x < n_particles) {
@@ -622,7 +653,11 @@ struct CompoundBridgeCompact {
 			if (index < n_anglebonds)
 				anglebonds[index] = bridge->anglebonds[index];
 		}
-		
+		for (int i = 0; (i * blockDim.x) < n_dihedrals; i++) {
+			int index = i * blockDim.x + threadIdx.x;
+			if (index < n_dihedrals)
+				dihedrals[index] = bridge->dihedrals[index];
+		}
 	}
 
 

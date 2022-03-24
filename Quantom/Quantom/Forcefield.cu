@@ -62,6 +62,15 @@ AngleBond* ForceFieldMaker::getAngleType(int id1, int id2, int id3) {
 	exit(0);
 }
 
+DihedralBond* ForceFieldMaker::getDihedralType(int id1, int id2, int id3, int id4) {
+	for (int i = 0; i < n_topol_dihedrals; i++) {
+		if (topol_dihedrals[i].atom_indexes[0] == id1 && topol_dihedrals[i].atom_indexes[1] == id2 && topol_dihedrals[i].atom_indexes[2] == id3 && topol_dihedrals[i].atom_indexes[3] == id4) {
+			return &topol_dihedrals[i];
+		}
+	}
+	printf("Dihedral not found with ids %d %d %d %d\n", id1, id2, id3, id4);
+	exit(0);
+}
 
 
 
@@ -172,9 +181,8 @@ DihedralBond* ForceFieldMaker::parseDihedrals(vector<vector<string>> forcefield_
 		}
 
 		if (current_state == DIHEDRALS) {
-			dihedrals[ptr++] = DihedralBond(stof(row[8]), stof(row[9]));
+			dihedrals[ptr++] = DihedralBond(stoi(row[0]), stoi(row[1]), stoi(row[2]), stoi(row[3]), stof(row[8]), stof(row[9]));			// MIGHT HAVE TO DO AN ABS() ON K_PHI, SINCE IT IS NEGATIVE SOMETIMES??? WHAT THE FUCKKKKKKKKKK CHEMISTS?????!?!?!
 		}
-
 	}
 	n_topol_dihedrals = ptr;
 	printf("%d dihedrals loaded\n", ptr);

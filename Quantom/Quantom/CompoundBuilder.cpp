@@ -175,7 +175,7 @@ void CompoundBuilder::addGeneric(Molecule* molecule, vector<string>* record, Top
 		break;
 
 	case CompoundBuilder::DIHEDRAL:
-
+		addDihedral(molecule, maps, record);
 
 		break;
 	default:
@@ -229,12 +229,15 @@ void CompoundBuilder::addAngle(Molecule* molecule, ParticleRef* maps, vector<str
 
 void CompoundBuilder::addDihedral(Molecule* molecule, ParticleRef* maps, vector<string>* record) {
 	loadMaps(maps, record, 4);
+
+	//if (maps[0].global_id == 1)
+
 	GenericBond g_bond = GenericBond(maps, 4);
 	if (!g_bond.allParticlesExist())
 		return;
 
 
-	DihedralBond* dihedraltype = FFM->getDihedralType(maps[0].global_id, maps[1].global_id, maps[2].global_id, maps[2].global_id);
+	DihedralBond* dihedraltype = FFM->getDihedralType(maps[0].global_id, maps[1].global_id, maps[2].global_id, maps[3].global_id);
 
 	if (!g_bond.spansTwoCompounds()) {
 		Compound* compound = &molecule->compounds[maps[0].compound_id];

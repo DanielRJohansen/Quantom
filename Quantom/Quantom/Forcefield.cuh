@@ -39,6 +39,7 @@ public:
 	int getAtomtypeID(int global_id);
 	PairBond* getBondType(int id1, int id2);
 	AngleBond* getAngleType(int id1, int id2, int id3);
+	DihedralBond* getDihedralType(int id1, int id2, int id3, int id4);
 
 
 
