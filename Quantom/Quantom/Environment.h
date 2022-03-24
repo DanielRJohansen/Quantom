@@ -64,8 +64,9 @@ private:
 	DisplayV2* display;
 	Interface* interface;
 	Engine* engine;
+	ForceFieldMaker* forcefieldmaker;
 	Analyzer analyzer;
-	CompoundBuilder compoundbuilder;
+	CompoundBuilder* compoundbuilder;
 	BoxBuilder boxbuilder;
 
 

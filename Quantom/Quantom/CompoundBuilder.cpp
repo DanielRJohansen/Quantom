@@ -17,7 +17,7 @@ Molecule CompoundBuilder::buildMolecule(string pdb_path, string itp_path, int ma
 	//Compound compound;													// position of particles stored in compund.particles.pos_tsub1
 	Molecule molecule;
 
-	FFM.buildForcefield();
+	FFM->buildForcefield();
 	//exit(0);
 
 
@@ -101,7 +101,15 @@ void CompoundBuilder::loadParticles(Molecule* molecule, vector<CompoundBuilder::
 		//particle_id_maps[record.atom_serial_number] = IDMap(record.atom_serial_number, current_compound_id, molecule->compounds[current_compound_id].n_particles);
 		particle_id_maps[record.atom_serial_number] = ParticleRef(record.atom_serial_number, current_compound_id, molecule->compounds[current_compound_id].n_particles);
 		//current_compound->addParticle(FFM.atomTypeToIndex(record.atom_name[0]), CompactParticle(record.coordinate));
-		current_compound->addParticle(FFM.atomTypeToIndex(record.atom_name[0]), record.coordinate);
+
+
+		//ParticleParameters pp1 = FFM.getForcefield().particle_parameters[FFM.atomTypeToIndex(record.atom_name[0])];
+		//ParticleParameters pp2 = FFM.getNBForcefield().particle_parameters[FFM.getAtomtypeID(record.atom_serial_number)];
+		//printf("Change: %f %f %f\n\n", pp2.mass / pp1.mass, pp2.sigma / pp1.sigma, pp2.epsilon / pp1.epsilon);
+
+		//current_compound->addParticle(FFM->atomTypeToIndex(record.atom_name[0]), record.coordinate);
+		//current_compound->addParticle(FFM->getAtomtypeID(record.atom_serial_number), record.coordinate);
+		current_compound->addParticle(FFM->getAtomtypeID(record.atom_serial_number), record.coordinate, FFM->atomTypeToIndex(record.atom_name[0]));
 		molecule->n_atoms_total++;
 	}
 }
@@ -165,7 +173,7 @@ void CompoundBuilder::addGeneric(Molecule* molecule, vector<string>* record, Top
 		if (!g_bond.allParticlesExist())
 			break;
 
-		bondtype = FFM.getBondType(maps[0].global_id, maps[1].global_id);
+		bondtype = FFM->getBondType(maps[0].global_id, maps[1].global_id);
 		//printf("Bond parameters: %f %f\n", bondtype->b0, bondtype->kb);
 
 		if (!g_bond.spansTwoCompounds()) {			
@@ -190,7 +198,7 @@ void CompoundBuilder::addGeneric(Molecule* molecule, vector<string>* record, Top
 			break;
 
 
-		angletype = FFM.getAngleType(maps[0].global_id, maps[1].global_id, maps[2].global_id);
+		angletype = FFM->getAngleType(maps[0].global_id, maps[1].global_id, maps[2].global_id);
 
 		if (!g_bond.spansTwoCompounds()) {
 			Compound* compound = &molecule->compounds[maps[0].compound_id];

@@ -9,7 +9,7 @@
 using std::string;
 
 
-const int MAX_ATOM_TYPES = 16;
+const int MAX_ATOM_TYPES = 32;
 
 
 #define ATOMTYPE_SOL 0
@@ -66,6 +66,7 @@ public:
 
 
 	void buildForcefield();
+	int getAtomtypeID(int global_id);
 	PairBond* getBondType(int id1, int id2);
 	AngleBond* getAngleType(int id1, int id2, int id3);
 
@@ -82,6 +83,10 @@ public:
 	ForceField getForcefield() {
 		return forcefield;
 	}
+	ForceField getNBForcefield() {
+		return forcefield1;
+	}
+
 
 	int atomTypeToIndex(char atom) {
 		if (atom == 'C')
@@ -104,6 +109,9 @@ private:
 	ForceField forcefield;
 	ForceField forcefield1;
 
+
+	int* nb_atomtype_ids;
+	int n_atoms = 0;
 
 	NBAtomtype* nb_atomtypes;
 	int n_nb_atomtypes = 0;

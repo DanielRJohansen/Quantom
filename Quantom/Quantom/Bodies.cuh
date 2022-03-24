@@ -295,6 +295,7 @@ struct Compound {
 	Float3 prev_positions[MAX_COMPOUND_PARTICLES];;			// Should this really belong to the compound and not the box?
 	Float3 forces[MAX_COMPOUND_PARTICLES];					// Carries forces from bridge_kernels
 	uint8_t atom_types[MAX_COMPOUND_PARTICLES];
+	uint8_t atom_color_types[MAX_COMPOUND_PARTICLES];	// For drawing pretty spheres :)
 
 	Float3 center_of_mass = Float3(0, 0, 0);
 	//double radius = 0;
@@ -344,6 +345,17 @@ struct Compound {
 
 		atom_types[n_particles] = atomtype_id;
 		prev_positions[n_particles] = pos;
+		n_particles++;
+	}
+	__host__ void addParticle(int atomtype_id, Float3 pos, int atomtype_color_id) {
+		if (n_particles == MAX_COMPOUND_PARTICLES) {
+			printf("ERROR: Cannot add particle to compound!\n");
+			exit(1);
+		}
+
+		atom_types[n_particles] = atomtype_id;
+		prev_positions[n_particles] = pos;
+		atom_color_types[n_particles] = atomtype_color_id;
 		n_particles++;
 	}
 	__host__ bool hasRoomForRes() {					// TODO: Implement, that it checks n atoms in res

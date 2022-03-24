@@ -102,7 +102,7 @@ struct NListDataCollection {
 class Engine {
 public:
 	Engine();
-	Engine(Simulation* simulation);
+	Engine(Simulation* simulation, ForceField forcefield);
 
 
 	void deviceMaster();
@@ -131,7 +131,7 @@ public:
 	}
 private:
 	Simulation* simulation;
-	ForceFieldMaker FFM;
+	//ForceFieldMaker FFM;
 
 	// -------------------------------------- GPU LOAD -------------------------------------- //
 	void step();

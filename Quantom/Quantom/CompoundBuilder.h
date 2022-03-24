@@ -38,13 +38,14 @@ class CompoundBuilder
 	};
 public:
 	CompoundBuilder() {}
+	CompoundBuilder(ForceFieldMaker* ffm) { FFM = ffm; }
 	Molecule buildMolecule(string pdb_path, string itp_path, int max_residue_id=INT16_MAX, int min_residue_id=0);
 
 
 
 
 private:
-	ForceFieldMaker FFM;
+	ForceFieldMaker* FFM;
 	//IDMap* particle_id_maps;
 	ParticleRef* particle_id_maps;
 	CompoundBridgeBundle* compound_bridge_bundle;

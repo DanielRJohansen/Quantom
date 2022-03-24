@@ -14,8 +14,11 @@ void ForceFieldMaker::buildForcefield() {
 	nb_atomtypes = parseAtomTypes(summary_rows);					// 1 entry per type in compressed forcefield
 	loadAtomypesIntoForcefield();
 
+	
+	printf("%f %f %f\n", forcefield.particle_parameters[1].mass, forcefield.particle_parameters[1].sigma, forcefield.particle_parameters[1].epsilon);
+	printf("%f %f %f\n", forcefield1.particle_parameters[1].mass, forcefield1.particle_parameters[1].sigma, forcefield1.particle_parameters[1].epsilon);
 
-	int* nb_atomtype_ids = parseAtomTypeIDs(forcefield_rows);				// 1 entry per atom in conf
+	nb_atomtype_ids = parseAtomTypeIDs(forcefield_rows);				// 1 entry per atom in conf
 
 	topol_bonds = parseBonds(forcefield_rows);
 	topol_angles = parseAngles(forcefield_rows);
@@ -25,6 +28,13 @@ void ForceFieldMaker::buildForcefield() {
 }
 
 
+int ForceFieldMaker::getAtomtypeID(int global_id) {
+	if (global_id > n_atoms || global_id == 0) {	// 0 is an error, as atoms are 1-indexed
+		printf("Attempting to fetch atomtype of non-loaded atom with global_id %d\n", global_id);
+		exit(0);
+	}
+	return nb_atomtype_ids[global_id];
+}
 
 PairBond* ForceFieldMaker::getBondType(int id1, int id2) {
 	for (int i = 0; i < n_topol_bonds; i++) {
@@ -75,16 +85,16 @@ NBAtomtype* ForceFieldMaker::parseAtomTypes(vector<vector<string>> summary_rows)
 			for (string e : row)
 				cout << e << '\t';
 			printf("\n");
-			atomtypes[ptr++] = NBAtomtype(stof(row[2]), stof(row[3]), stof(row[4]));
+			atomtypes[ptr++] = NBAtomtype(stof(row[2]) * 1e-3, stof(row[3]), stof(row[4]) * 1e+3);
 		}			
 	}
 	n_nb_atomtypes = ptr;
 	printf("%d NB_Atomtypes loaded\n", ptr);
+	return atomtypes;
 }
 
 int* ForceFieldMaker::parseAtomTypeIDs(vector<vector<string>> forcefield_rows) {	// returns the nonbonded atomtype
 	int* atomtype_ids = new int[10000];
-	int ptr = 0;
 	STATE current_state = INACTIVE;
 
 	for (vector<string> row : forcefield_rows) {
@@ -93,10 +103,14 @@ int* ForceFieldMaker::parseAtomTypeIDs(vector<vector<string>> forcefield_rows) {
 			continue;
 		}
 
-		if (current_state == NB_ATOMTYPES)
-			atomtype_ids[ptr++] = stoi(row[1]);
+		if (current_state == NB_ATOMTYPES) {
+			atomtype_ids[stoi(row[0])] = stoi(row[1]);
+			n_atoms++;
+		}
+			
 	}
-	printf("%d NB_Atomtype_IDs loaded\n", ptr);
+	printf("%d NB_Atomtype_IDs loaded\n", n_atoms);
+	return atomtype_ids;
 }
 
 PairBond* ForceFieldMaker::parseBonds(vector<vector<string>> forcefield_rows) {
@@ -112,7 +126,7 @@ PairBond* ForceFieldMaker::parseBonds(vector<vector<string>> forcefield_rows) {
 
 		if (current_state == BONDS) {
 			bonds[ptr++] = PairBond(stoi(row[0]), stoi(row[1]), stof(row[4]), stof(row[5]));
-		}			
+		}
 	}
 	n_topol_bonds = ptr;
 	printf("%d bonds loaded\n", ptr);

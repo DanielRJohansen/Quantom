@@ -2,11 +2,11 @@
 
 
 __constant__ ForceField forcefield_device;
-
+//__constant__ ForceField forcefield_nb_device;
 
 
 Engine::Engine() {}
-Engine::Engine(Simulation* simulation) {
+Engine::Engine(Simulation* simulation, ForceField forcefield_host) {
 	LIMAENG::genericErrorCheck("Error before engine initialization.\n");
 
 	this->simulation = simulation;
@@ -24,8 +24,12 @@ Engine::Engine(Simulation* simulation) {
 
 
 
-	ForceField forcefield_host = FFM.getForcefield();
+	//ForceField forcefield_host = FFM.getForcefield();
+	//ForceField forcefield_host = FFM.getNBForcefield();
 	cudaMemcpyToSymbol(forcefield_device, &forcefield_host, sizeof(ForceField), 0, cudaMemcpyHostToDevice);
+
+	//ForceField forcefield_nb_host = FFM.getNBForcefield();
+	//cudaMemcpyToSymbol(forcefield_nb_device, &forcefield_nb_host, sizeof(ForceField), 0, cudaMemcpyHostToDevice);
 	cudaDeviceSynchronize();
 	LIMAENG::genericErrorCheck("Error while moving forcefield to device\n");
 
