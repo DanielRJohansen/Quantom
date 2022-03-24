@@ -75,12 +75,14 @@ int main(int argc, char* argv[]) {
 
 	vector<Atom> atoms = makeTopologyAtoms(topology_rows, &ff_nonbonded_active, &map);
 
+
+	
 	vector<Bondtype> topology_bonds = makeTopologyBonds(&ffbonded_rows, &topology_rows, &atoms);
 
 	vector<Angletype> topology_angles = makeTopologyAngles(&ffbonded_rows, &topology_rows, &atoms);
 
 	vector<Dihedraltype> topology_dihedrals = makeTopologyDihedrals(ffbonded_rows, topology_rows, atoms);
-
+	
 
 
 
@@ -99,6 +101,7 @@ int main(int argc, char* argv[]) {
 		(string)"C:\\Users\\Daniel\\git_repo\\Quantom\\" + (string)"ForcefieldSummary.txt",
 		ff_nonbonded_active, &map
 	);
+	
 	
 	printForcefield(
 		"C:\\Users\\Daniel\\git_repo\\Quantom\\" + (string)"Forcefield.txt",

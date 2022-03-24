@@ -11,7 +11,10 @@ void ForceFieldMaker::buildForcefield() {
 	vector<vector<string>> summary_rows = Filehandler::readFile("C:\\Users\\Daniel\\git_repo\\Quantom\\ForcefieldSummary.txt", INT_MAX, true);
 	vector<vector<string>> forcefield_rows = Filehandler::readFile("C:\\Users\\Daniel\\git_repo\\Quantom\\Forcefield.txt", INT_MAX, true);
 
-	NBAtomtype* nb_atomtypes = parseAtomTypes(summary_rows);					// 1 entry per type in compressed forcefield
+	nb_atomtypes = parseAtomTypes(summary_rows);					// 1 entry per type in compressed forcefield
+	loadAtomypesIntoForcefield();
+
+
 	int* nb_atomtype_ids = parseAtomTypeIDs(forcefield_rows);				// 1 entry per atom in conf
 
 	topol_bonds = parseBonds(forcefield_rows);
@@ -75,6 +78,7 @@ NBAtomtype* ForceFieldMaker::parseAtomTypes(vector<vector<string>> summary_rows)
 			atomtypes[ptr++] = NBAtomtype(stof(row[2]), stof(row[3]), stof(row[4]));
 		}			
 	}
+	n_nb_atomtypes = ptr;
 	printf("%d NB_Atomtypes loaded\n", ptr);
 }
 
@@ -155,4 +159,17 @@ DihedralBond* ForceFieldMaker::parseDihedrals(vector<vector<string>> forcefield_
 	n_topol_dihedrals = ptr;
 	printf("%d dihdrals loaded\n", ptr);
 	return dihedrals;
+}
+
+
+
+
+
+
+void ForceFieldMaker::loadAtomypesIntoForcefield() {
+	for (int i = 0; i < n_nb_atomtypes; i++) {
+		forcefield1.particle_parameters[i].mass = nb_atomtypes[i].mass;
+		forcefield1.particle_parameters[i].sigma = nb_atomtypes[i].sigma;
+		forcefield1.particle_parameters[i].epsilon = nb_atomtypes[i].epsilon;
+	}
 }

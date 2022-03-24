@@ -14,6 +14,9 @@
 
 using namespace std;
 
+const float water_mass = 15.999000 + 2 * 1.008000;
+const float water_sigma = 0.302905564168 + 2 * 0.040001352445;
+const float water_epsilon = (0.50208f + 2.f * 0.19246f);// *1000.f;		// Convert kJ->J
 
 
 bool charIsNumber(char c) {
@@ -115,16 +118,18 @@ struct Map {
 struct FF_nonbonded {
 	FF_nonbonded() {}
 	FF_nonbonded(string t) : type(t){}		// This is for loading form the conf file, for easy comparisons
-	FF_nonbonded(string t, int a, double m, double s, double e) : type(t), atnum(a), mass(m), sigma(s), epsilon(e) {}
+	FF_nonbonded(string t, int a, float m, float s, float e) : type(t), atnum(a), mass(m), sigma(s), epsilon(e) {}
 	// Official parameters
 	string type;
 	int atnum = -1;		// atnum given by CHARMM
-	int atnum_local;	// atnum specific to simulation
-	double mass, sigma, epsilon;
+	int atnum_local = 0;	// atnum specific to simulation
+	float mass, sigma, epsilon;
 
 	// LIMA parameters
 	bool is_present_in_simulation = false;
 	int simulation_specific_id;
+
+
 
 
 
@@ -145,6 +150,8 @@ struct FF_nonbonded {
 		STATE current_state = INACTIVE;
 
 		vector<FF_nonbonded> records;
+
+		records.push_back(FF_nonbonded("WATER", 0, water_mass, water_sigma, water_epsilon));		// Solvent type always first!
 
 		for (vector<string> row : rows) {
 
@@ -189,6 +196,8 @@ struct FF_nonbonded {
 	}
 	static vector<FF_nonbonded> filterUnusedTypes(vector<FF_nonbonded> records, vector<string> active_types, Map* map) {
 		vector<FF_nonbonded> filtered_list;
+
+		filtered_list.push_back(records[0]);				// Solvent is not present in topology, so we force it to be added here!
 		//string* mappings = new string[10000];
 		for (string type : active_types) {
 			bool found = false;

@@ -30,19 +30,6 @@ struct ParticleParameters {
 	float sigma = -1;
 	float epsilon = -1;
 
-	// Bonded
-	float b0 = -1;		// ref_dist
-	float kb = -1;
-
-	// Angles
-	float theta_0 = -1;
-	float ktheta = -1;
-	//const float ub_0;		// ???
-	//const float kub;		// ???
-
-	// Dihedrals
-	float phi_0 = -1;		// Ref torsion. Is always 0 or 180, could be a binary
-	float k_phi = -1;		// 
 };
 
 
@@ -90,13 +77,7 @@ public:
 		forcefield.particle_parameters[index].epsilon = e;
 	}
 
-	void make(char atom, int index, float m, float s, float e, float b0, float kb) {
-		forcefield.particle_parameters[index].mass = m;
-		forcefield.particle_parameters[index].sigma = s;
-		forcefield.particle_parameters[index].epsilon = e;
-		forcefield.particle_parameters[index].b0 = b0;
-		forcefield.particle_parameters[index].kb = kb;
-	}
+
 
 	ForceField getForcefield() {
 		return forcefield;
@@ -121,6 +102,11 @@ public:
 
 private:
 	ForceField forcefield;
+	ForceField forcefield1;
+
+
+	NBAtomtype* nb_atomtypes;
+	int n_nb_atomtypes = 0;
 
 	PairBond* topol_bonds;
 	int n_topol_bonds = 0;
@@ -163,6 +149,8 @@ private:
 	AngleBond* parseAngles(vector<vector<string>> forcefield_rows);
 	DihedralBond* parseDihedrals(vector<vector<string>> forcefield_rows);
 	
+	void loadAtomypesIntoForcefield();
+
 };
 
 
