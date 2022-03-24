@@ -14,12 +14,43 @@ void ForceFieldMaker::buildForcefield() {
 	NBAtomtype* nb_atomtypes = parseAtomTypes(summary_rows);					// 1 entry per type in compressed forcefield
 	int* nb_atomtype_ids = parseAtomTypeIDs(forcefield_rows);				// 1 entry per atom in conf
 
-	PairBond* bonds = parseBonds(forcefield_rows);
-	AngleBond* angles = parseAngles(forcefield_rows);
-	DihedralBond* dihedrals = parseDihedrals(forcefield_rows);
+	topol_bonds = parseBonds(forcefield_rows);
+	topol_angles = parseAngles(forcefield_rows);
+	topol_dihedrals = parseDihedrals(forcefield_rows);
 
 	//exit(0);
 }
+
+
+
+PairBond* ForceFieldMaker::getBondType(int id1, int id2) {
+	for (int i = 0; i < n_topol_bonds; i++) {
+		if (topol_bonds[i].atom_indexes[0] == id1 && topol_bonds[i].atom_indexes[1] == id2) {
+			return &topol_bonds[i];
+		}
+	}
+	printf("Bond not found with ids %d %d\n", id1, id2);
+	exit(0);
+}
+
+AngleBond* ForceFieldMaker::getAngleType(int id1, int id2, int id3) {
+	for (int i = 0; i < n_topol_angles; i++) {
+		if (topol_angles[i].atom_indexes[0] == id1 && topol_angles[i].atom_indexes[1] == id2 && topol_angles[i].atom_indexes[2] == id3) {
+			return &topol_angles[i];
+		}
+	}
+	printf("Angle not found with ids %d %d %d\n", id1, id2, id3);
+	exit(0);
+}
+
+
+
+
+
+
+
+
+
 
 
 
@@ -77,9 +108,9 @@ PairBond* ForceFieldMaker::parseBonds(vector<vector<string>> forcefield_rows) {
 
 		if (current_state == BONDS) {
 			bonds[ptr++] = PairBond(stoi(row[0]), stoi(row[1]), stof(row[4]), stof(row[5]));
-		}
-			
+		}			
 	}
+	n_topol_bonds = ptr;
 	printf("%d bonds loaded\n", ptr);
 	return bonds;
 }
@@ -96,10 +127,11 @@ AngleBond* ForceFieldMaker::parseAngles(vector<vector<string>> forcefield_rows) 
 		}
 
 		if (current_state == ANGLES) {
-			angles[ptr++] = AngleBond(stof(row[6]), stof(row[7]));
+			angles[ptr++] = AngleBond(stoi(row[0]), stoi(row[1]), stoi(row[2]), stof(row[6]) * (2*PI)/360.f , stof(row[7]));		// Convert degree to radians here!
 		}
 
 	}
+	n_topol_angles = ptr;
 	printf("%d angles loaded\n", ptr);
 	return angles;
 }
@@ -120,6 +152,7 @@ DihedralBond* ForceFieldMaker::parseDihedrals(vector<vector<string>> forcefield_
 		}
 
 	}
+	n_topol_dihedrals = ptr;
 	printf("%d dihdrals loaded\n", ptr);
 	return dihedrals;
 }

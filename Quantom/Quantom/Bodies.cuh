@@ -68,9 +68,9 @@ struct PairBond {	// IDS and indexes are used interchangeably here!
 		atom_indexes[0] = particleindex_a;
 		atom_indexes[1] = particleindex_b;
 	}
-	PairBond(float ref_dist, uint32_t particleindex_a, uint32_t particleindex_b) : 
+	PairBond(float ref_dist, float kb, uint32_t particleindex_a, uint32_t particleindex_b) : 
 		//reference_dist(ref_dist) {
-		b0(ref_dist) {
+		b0(ref_dist), kb(kb) {
 		atom_indexes[0] = particleindex_a;
 		atom_indexes[1] = particleindex_b;
 	}
@@ -84,15 +84,20 @@ struct PairBond {	// IDS and indexes are used interchangeably here!
 
 struct AngleBond {
 	AngleBond() {}
-	AngleBond(float theta_0, float k_theta) : theta_0(theta_0), k_theta(k_theta){}
-	AngleBond(double ref_t, uint32_t particleindex_l, uint32_t particleindex_m, uint32_t particleindex_r) :
-		reference_angle(ref_t) {
+	AngleBond(int id1, int id2, int id3, float theta_0, float k_theta) : theta_0(theta_0), k_theta(k_theta){
+		atom_indexes[0] = id1;
+		atom_indexes[1] = id2;
+		atom_indexes[2] = id3;
+	}
+	/*
+	AngleBond(float ref_theta, float k_t, uint32_t particleindex_l, uint32_t particleindex_m, uint32_t particleindex_r) :
+		theta_0(ref_theta), k_theta(k_t) {
 		atom_indexes[0] = particleindex_l;
 		atom_indexes[1] = particleindex_m;
 		atom_indexes[2] = particleindex_r;
-	}
+	}*/
 	float theta_0, k_theta;
-	double reference_angle;
+	//double reference_angle;
 	uint32_t atom_indexes[3]; // i,j,k angle between i and k
 	const static int n_atoms = 3;
 };

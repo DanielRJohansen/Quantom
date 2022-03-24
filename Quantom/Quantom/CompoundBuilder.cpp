@@ -150,8 +150,10 @@ void CompoundBuilder::addGeneric(Molecule* molecule, vector<string>* record, Top
 	AngleBond a_bond;
 	ParticleRef maps[4];
 
-	Float3 pos_a, pos_b, pos_c, pos_d;
-	float dist, angle, torsion_angle;
+	PairBond* bondtype;
+	AngleBond* angletype;
+	DihedralBond* dihedraltype;
+
 
 	switch (mode)
 	{
@@ -163,13 +165,12 @@ void CompoundBuilder::addGeneric(Molecule* molecule, vector<string>* record, Top
 		if (!g_bond.allParticlesExist())
 			break;
 
-		pos_a = molecule->compounds[maps[0].compound_id].prev_positions[maps[0].local_id];
-		pos_b = molecule->compounds[maps[1].compound_id].prev_positions[maps[1].local_id];
-		dist = (pos_a - pos_b).len();
+		bondtype = FFM.getBondType(maps[0].global_id, maps[1].global_id);
+		//printf("Bond parameters: %f %f\n", bondtype->b0, bondtype->kb);
 
 		if (!g_bond.spansTwoCompounds()) {			
 			Compound* compound = &molecule->compounds[maps[0].compound_id];
-			compound->singlebonds[compound->n_singlebonds++] = PairBond(dist, maps[0].local_id, maps[1].local_id);
+			compound->singlebonds[compound->n_singlebonds++] = PairBond(bondtype->b0, bondtype->kb, maps[0].local_id, maps[1].local_id);
 		}
 		else {
 			// First, we need to make sure all bond particles are added to the bridge.
@@ -177,7 +178,8 @@ void CompoundBuilder::addGeneric(Molecule* molecule, vector<string>* record, Top
 
 			CompoundBridge* bridge = compound_bridge_bundle->getBelongingBridge(&g_bond);
 			bridge->addBondParticles(&g_bond, molecule);
-			bridge->addSinglebond(PairBond(dist, maps[0].global_id, maps[1].global_id));
+			//bridge->addSinglebond(PairBond(dist, maps[0].global_id, maps[1].global_id));
+			bridge->addSinglebond(PairBond(bondtype->b0, bondtype->kb, maps[0].global_id, maps[1].global_id));
 		}
 		break;
 		
@@ -188,20 +190,18 @@ void CompoundBuilder::addGeneric(Molecule* molecule, vector<string>* record, Top
 			break;
 
 
-		pos_a = molecule->compounds[maps[0].compound_id].prev_positions[maps[0].local_id];			// left
-		pos_b = molecule->compounds[maps[1].compound_id].prev_positions[maps[1].local_id];			// middle
-		pos_c = molecule->compounds[maps[2].compound_id].prev_positions[maps[2].local_id];			// right
-
-		angle = Float3::getAngle(pos_a, pos_b, pos_c);
+		angletype = FFM.getAngleType(maps[0].global_id, maps[1].global_id, maps[2].global_id);
 
 		if (!g_bond.spansTwoCompounds()) {
 			Compound* compound = &molecule->compounds[maps[0].compound_id];
-			compound->anglebonds[compound->n_anglebonds++] = AngleBond(angle, maps[0].local_id, maps[1].local_id, maps[2].local_id);
+			//compound->anglebonds[compound->n_anglebonds++] = AngleBond(angle, maps[0].local_id, maps[1].local_id, maps[2].local_id);
+			compound->anglebonds[compound->n_anglebonds++] = AngleBond(maps[0].local_id, maps[1].local_id, maps[2].local_id, angletype->theta_0, angletype->k_theta);
 		}
 		else { 
 			CompoundBridge* bridge = compound_bridge_bundle->getBelongingBridge(&g_bond);
 			bridge->addBondParticles(&g_bond, molecule);
-			bridge->addAnglebond(AngleBond(angle, maps[0].global_id, maps[1].global_id, maps[2].global_id));			
+			//bridge->addAnglebond(AngleBond(angle, maps[0].global_id, maps[1].global_id, maps[2].global_id));			
+			bridge->addAnglebond(AngleBond(maps[0].global_id, maps[1].global_id, maps[2].global_id, angletype->theta_0, angletype->k_theta));
 		}
 		break;
 

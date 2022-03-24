@@ -511,7 +511,7 @@ __device__ void calcPairbondForces(Float3* pos_a, Float3* pos_b, float* referenc
 
 
 constexpr double ktheta = 65 * 1e+3;	// J/mol
-__device__ void calcAnglebondForces(Float3* pos_left, Float3* pos_middle, Float3* pos_right, double* reference_angle, Float3* results, float* potE) {
+__device__ void calcAnglebondForces(Float3* pos_left, Float3* pos_middle, Float3* pos_right, float* reference_angle, Float3* results, float* potE) {
 	Float3 v1 = *pos_left - *pos_middle;
 	Float3 v2 = *pos_right - *pos_middle;
 	Float3 normal1 = v1.cross(v2);
@@ -630,7 +630,8 @@ __device__ Float3 computeAnglebondForces(T* entity, Float3* positions, Float3* u
 				&positions[ab->atom_indexes[0]],
 				&positions[ab->atom_indexes[1]],
 				&positions[ab->atom_indexes[2]],
-				&ab->reference_angle,
+				//&ab->reference_angle,
+				&ab->theta_0,
 				forces, potE
 			);
 		}
@@ -824,7 +825,7 @@ __global__ void forceKernel(Box* box) {
 	
 	// ----------------------------------------------------------------------------- //
 
-	if (force.len() > 300e+6) {
+	if (force.len() > 200e+6) {
 		printf("Critical force %f\n\n\n", force.len());
 		box->critical_error_encountered = true;
 	}

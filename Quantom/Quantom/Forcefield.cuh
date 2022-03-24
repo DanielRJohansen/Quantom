@@ -79,8 +79,8 @@ public:
 
 
 	void buildForcefield();
-	void attachForcefield(PairBond* pairbond);
-
+	PairBond* getBondType(int id1, int id2);
+	AngleBond* getAngleType(int id1, int id2, int id3);
 
 
 
@@ -121,6 +121,15 @@ public:
 
 private:
 	ForceField forcefield;
+
+	PairBond* topol_bonds;
+	int n_topol_bonds = 0;
+	AngleBond* topol_angles;
+	int n_topol_angles = 0;
+	DihedralBond* topol_dihedrals;
+	int n_topol_dihedrals = 0; 
+
+
 
 	//enum STATE { INACTIVE, NB_ATOMTYPE_MAPPINGS, FF_NONBONDED, NB_ATOMTYPES, PAIRTYPES };
 	enum STATE { INACTIVE, FF_NONBONDED, NB_ATOMTYPES, BONDS, ANGLES, DIHEDRALS };
