@@ -8,6 +8,8 @@
 
 
 void ForceFieldMaker::buildForcefield() {
+	printf("#################################### BUILDING FORCEFIELD ####################################\n");
+
 	vector<vector<string>> summary_rows = Filehandler::readFile("C:\\Users\\Daniel\\git_repo\\Quantom\\ForcefieldSummary.txt", INT_MAX, true);
 	vector<vector<string>> forcefield_rows = Filehandler::readFile("C:\\Users\\Daniel\\git_repo\\Quantom\\Forcefield.txt", INT_MAX, true);
 
@@ -23,6 +25,10 @@ void ForceFieldMaker::buildForcefield() {
 	topol_bonds = parseBonds(forcefield_rows);
 	topol_angles = parseAngles(forcefield_rows);
 	topol_dihedrals = parseDihedrals(forcefield_rows);
+
+	printf("Nonbonded parameters size: %d bytes\n", sizeof(ForceField));
+
+	printf("############################# FINISHED BUILDING FORCEFIELD #############################\n\n\n");
 
 	//exit(0);
 }
@@ -82,9 +88,9 @@ NBAtomtype* ForceFieldMaker::parseAtomTypes(vector<vector<string>> summary_rows)
 		
 
 		if (current_state == FF_NONBONDED) {
-			for (string e : row)
-				cout << e << '\t';
-			printf("\n");
+			//for (string e : row)
+				//cout << e << '\t';
+			//printf("\n");
 			atomtypes[ptr++] = NBAtomtype(stof(row[2]) * 1e-3, stof(row[3]), stof(row[4]) * 1e+3);
 		}			
 	}
@@ -171,7 +177,7 @@ DihedralBond* ForceFieldMaker::parseDihedrals(vector<vector<string>> forcefield_
 
 	}
 	n_topol_dihedrals = ptr;
-	printf("%d dihdrals loaded\n", ptr);
+	printf("%d dihedrals loaded\n", ptr);
 	return dihedrals;
 }
 

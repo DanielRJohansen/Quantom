@@ -707,7 +707,6 @@ __global__ void forceKernel(Box* box) {
 
 
 
-
 	float potE_sum = 0;
 	float data_ptr[4];
 	for (int i = 0; i < 4; i++)

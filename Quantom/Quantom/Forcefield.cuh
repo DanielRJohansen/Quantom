@@ -32,7 +32,6 @@ class ForceFieldMaker {
 public:
 	ForceFieldMaker() {
 
-		printf("Forcefield size: %d bytes\n", sizeof(ForceField));
 	}
 
 

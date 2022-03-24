@@ -61,9 +61,9 @@ private:
 	TopologyMode setMode(string entry);
 	void loadMaps(ParticleRef* maps, vector<string>* record, int n);
 	void addGeneric(Molecule* molecule, vector<string>* record, TopologyMode mode);
-	PairBond makeBond(Molecule* molecule, vector<string>* record);
-	AngleBond makeAngle(Molecule* molecule, vector<string>* record);
-	DihedralBond makeDihedral(Molecule* molecule, vector<string>* record);
+	void addBond(Molecule* molecule, ParticleRef* maps, vector<string>* record);
+	void addAngle(Molecule* molecule, ParticleRef* maps, vector<string>* record);
+	void addDihedral(Molecule* molecule, ParticleRef* maps, vector<string>* record);
 
 
 

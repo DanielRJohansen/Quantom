@@ -89,15 +89,8 @@ struct AngleBond {
 		atom_indexes[1] = id2;
 		atom_indexes[2] = id3;
 	}
-	/*
-	AngleBond(float ref_theta, float k_t, uint32_t particleindex_l, uint32_t particleindex_m, uint32_t particleindex_r) :
-		theta_0(ref_theta), k_theta(k_t) {
-		atom_indexes[0] = particleindex_l;
-		atom_indexes[1] = particleindex_m;
-		atom_indexes[2] = particleindex_r;
-	}*/
+
 	float theta_0, k_theta;
-	//double reference_angle;
 	uint32_t atom_indexes[3]; // i,j,k angle between i and k
 	const static int n_atoms = 3;
 };
@@ -106,8 +99,9 @@ struct DihedralBond {
 	DihedralBond() {}
 	DihedralBond(float phi_0, float k_phi) : phi_0(phi_0), k_phi(k_phi) {}
 
-
 	float phi_0, k_phi;
+	uint32_t atom_indexes[4];
+	const static int n_atoms = 4;
 };
 
 struct GenericBond {					// ONLY used during creation, never on device!
@@ -506,7 +500,7 @@ struct CompoundBridge {
 			}
 		}
 	}
-	void addSinglebond(PairBond pb) {
+	/*void addSinglebond(PairBond pb) {
 		localizeIDs(&pb, 2);
 		singlebonds[n_singlebonds++] = pb;
 		//printf("Singlebond added %d %d\n", singlebonds[n_singlebonds - 1].atom_indexes[0], singlebonds[n_singlebonds - 1].atom_indexes[1]);
@@ -515,9 +509,16 @@ struct CompoundBridge {
 		localizeIDs(&ab, 3);
 		anglebonds[n_anglebonds++] = ab;
 		//printf("Anglebond added %d %d %d\n", anglebonds[n_anglebonds - 1].atom_indexes[0], anglebonds[n_anglebonds - 1].atom_indexes[1], anglebonds[n_anglebonds - 1].atom_indexes[2]);
+	}*/
+	void addGenericBond(PairBond pb) {
+		localizeIDs(&pb, 2);
+		singlebonds[n_singlebonds++] = pb;
 	}
-
-
+	void addGenericBond(AngleBond ab) {
+		localizeIDs(&ab, 3);
+		anglebonds[n_anglebonds++] = ab;
+		//printf("Anglebond added %d %d %d\n", anglebonds[n_anglebonds - 1].atom_indexes[0], anglebonds[n_anglebonds - 1].atom_indexes[1], anglebonds[n_anglebonds - 1].atom_indexes[2]);
+	}
 
 };
 
