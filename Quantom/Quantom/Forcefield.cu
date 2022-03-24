@@ -15,8 +15,8 @@ void ForceFieldMaker::buildForcefield() {
 	loadAtomypesIntoForcefield();
 
 	
-	printf("%f %f %f\n", forcefield.particle_parameters[1].mass, forcefield.particle_parameters[1].sigma, forcefield.particle_parameters[1].epsilon);
-	printf("%f %f %f\n", forcefield1.particle_parameters[1].mass, forcefield1.particle_parameters[1].sigma, forcefield1.particle_parameters[1].epsilon);
+	//printf("%f %f %f\n", forcefield.particle_parameters[1].mass, forcefield.particle_parameters[1].sigma, forcefield.particle_parameters[1].epsilon);
+	//printf("%f %f %f\n", forcefield1.particle_parameters[1].mass, forcefield1.particle_parameters[1].sigma, forcefield1.particle_parameters[1].epsilon);
 
 	nb_atomtype_ids = parseAtomTypeIDs(forcefield_rows);				// 1 entry per atom in conf
 
@@ -182,8 +182,8 @@ DihedralBond* ForceFieldMaker::parseDihedrals(vector<vector<string>> forcefield_
 
 void ForceFieldMaker::loadAtomypesIntoForcefield() {
 	for (int i = 0; i < n_nb_atomtypes; i++) {
-		forcefield1.particle_parameters[i].mass = nb_atomtypes[i].mass;
-		forcefield1.particle_parameters[i].sigma = nb_atomtypes[i].sigma;
-		forcefield1.particle_parameters[i].epsilon = nb_atomtypes[i].epsilon;
+		forcefield.particle_parameters[i].mass = nb_atomtypes[i].mass;
+		forcefield.particle_parameters[i].sigma = nb_atomtypes[i].sigma;
+		forcefield.particle_parameters[i].epsilon = nb_atomtypes[i].epsilon;
 	}
 }
