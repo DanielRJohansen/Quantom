@@ -543,7 +543,7 @@ __device__ void calcDihedralbondForces(Float3* pos_left, Float3* pos_lm, Float3*
 
 
 	float torsion = Float3::getAngle(normal1, normal2);
-	float error = torsion - dihedral->phi_0;
+	float error = (torsion - dihedral->phi_0);	// *360.f / 2.f * PI;	// Check whether k_phi is in radians or degrees
 
 	//error = (error / (2.f * PI)) * 360.f;
 
