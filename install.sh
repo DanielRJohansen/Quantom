@@ -6,7 +6,7 @@ echo "#### LIMA-Dynamics installer is now beginning ####"
 default_dir=~/Desktop/LIMA/
 
 echo "Using $default_dir as install directory"
-rm -rf "$default_dir"/
+#rm -rf "$default_dir"/
 
 
 mkdir -p "$default_dir/Applications"
@@ -71,4 +71,4 @@ cd "$Q_dir"
 chmod +x build.sh
 chmod +x mdrun.sh
 ./build.sh
-
+./mdrun.sh
