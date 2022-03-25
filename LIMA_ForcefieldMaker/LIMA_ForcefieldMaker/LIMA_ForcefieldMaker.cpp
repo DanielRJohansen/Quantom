@@ -3,7 +3,11 @@
 
 
 
-
+#ifdef __linux__
+	string sim_path = "/home/lima/Desktop/LIMA/Simulation";
+#else
+	string sim_path = "C:\\PROJECTS\\QUANTOM\\Molecules";
+#endif
 
 
 
@@ -11,11 +15,13 @@
 
 
 vector<FF_nonbonded> makeFilteredNonbondedFF(Map* map) {
-	vector<vector<string>> simconf_rows = readFile("C:\\PROJECTS\\Quantom\\Molecules\\t4lys_full\\conf.gro");
+//	vector<vector<string>> simconf_rows = readFile("C:\\PROJECTS\\Quantom\\Molecules\\t4lys_full\\conf.gro");
+	vector<vector<string>> simconf_rows = readFile(sim_path + "/Molecule/conf.gro");
 	vector<string> simconf = parseConf(simconf_rows);
 
 
-	vector<vector<string>> ffnonbonded_rows = readFile("C:\\PROJECTS\\Quantom\\charmm36-mar2019.ff\\ffnonbonded.itp");
+//	vector<vector<string>> ffnonbonded_rows = readFile("C:\\PROJECTS\\Quantom\\charmm36-mar2019.ff\\ffnonbonded.itp");
+	vector<vector<string>> ffnonbonded_rows = readFile(sim_path+"/Forcefield/ffnonbonded.itp");
 	vector<FF_nonbonded> ffnonbonded = FF_nonbonded::parseNonbonded(ffnonbonded_rows);
 
 	return FF_nonbonded::filterUnusedTypes(ffnonbonded, simconf, map);
@@ -69,8 +75,10 @@ int main(int argc, char* argv[]) {
 
 
 	// These two vectors contain information about all types, but are parsed individually. This is very slightly slower, but MUCH more readable!
-	vector<vector<string>> ffbonded_rows = readFile("C:\\PROJECTS\\Quantom\\charmm36-mar2019.ff\\ffbonded.itp");		
-	vector<vector<string>> topology_rows = readFile("C:\\PROJECTS\\Quantom\\Molecules\\t4lys_full\\topol.top");
+//	vector<vector<string>> ffbonded_rows = readFile("C:\\PROJECTS\\Quantom\\charmm36-mar2019.ff\\ffbonded.itp");
+	vector<vector<string>> ffbonded_rows = readFile(sim_path + "/Forcefield/ffbonded.itp");
+//	vector<vector<string>> topology_rows = readFile("C:\\PROJECTS\\Quantom\\Molecules\\t4lys_full\\topol.top");
+	vector<vector<string>> topology_rows = readFile(sim_path + "/Molecule/topol.top");
 
 
 	vector<Atom> atoms = makeTopologyAtoms(topology_rows, &ff_nonbonded_active, &map);
@@ -98,13 +106,15 @@ int main(int argc, char* argv[]) {
 
 
 	printForcefieldSummary(
-		(string)"C:\\Users\\Daniel\\git_repo\\Quantom\\" + (string)"ForcefieldSummary.txt",
+//		(string)"C:\\Users\\Daniel\\git_repo\\Quantom\\" + (string)"ForcefieldSummary.txt",
+		sim_path + "/ForcefieldSummary.txt",
 		ff_nonbonded_active, &map
 	);
 	
 	
 	printForcefield(
-		"C:\\Users\\Daniel\\git_repo\\Quantom\\" + (string)"Forcefield.txt",
+//		"C:\\Users\\Daniel\\git_repo\\Quantom\\" + (string)"Forcefield.txt",
+		sim_path + "/Forcefield.txt",
 		atoms,
 		topology_bonds,
 		topology_angles,

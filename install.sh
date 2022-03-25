@@ -16,11 +16,11 @@ mkdir -p "$default_dir/Simulation"
 
 ## Now make Quantom
 Q_dir="$default_dir"/Applications/Quantom
-mkdir -p "$Q_dir"/includes
+mkdir -p "$Q_dir"/include
 mkdir "$Q_dir"/src
 mkdir "$Q_dir"/build
 
-cp ./Quantom/Quantom/*.*h "$Q_dir"/includes/
+cp ./Quantom/Quantom/*.*h "$Q_dir"/include/
 cp ./Quantom/Quantom/*.cu "$Q_dir"/src/
 cp ./Quantom/Quantom/*.cpp "$Q_dir"/src/
 
@@ -30,22 +30,22 @@ cp -r ~/Downloads/glfw-3.3.6/* "$default_dir"/Dependencies/GLFW/
 
 ## Now make FFM
 FFM_dir="$default_dir"/Applications/Forcefieldmaker
-mkdir -p "$FFM_dir"/includes
+mkdir -p "$FFM_dir"/include
 mkdir "$FFM_dir"/src
 mkdir "$FFM_dir"/build
 
-cp ./LIMA_ForcefieldMaker/LIMA_ForcefieldMaker/*.h "$FFM_dir"/includes/
+cp ./LIMA_ForcefieldMaker/LIMA_ForcefieldMaker/*.h "$FFM_dir"/include/
 cp ./LIMA_ForcefieldMaker/LIMA_ForcefieldMaker/*.cpp "$FFM_dir"/src/
 cp ./LIMA/Applications/Forcefieldmaker/* "$FFM_dir"/				# CMakeLists.txt and build.sh
 
 
 ## Now make SimPostprocessor
 SPP_dir="$default_dir"/Applications/SimPreprocessor
-mkdir -p "$SPP_dir"/includes
+mkdir -p "$SPP_dir"/include
 mkdir "$SPP_dir"/src
 mkdir "$SPP_dir"/build
 
-cp ./LIMA_services/LIMA_services/*.h "$SPP_dir"/includes/
+cp ./LIMA_services/LIMA_services/*.h "$SPP_dir"/include/
 cp ./LIMA_services/LIMA_services/*.cpp "$SPP_dir"/src/
 
 
@@ -59,7 +59,8 @@ cp ~/Downloads/QnD/*/* "$s_dir"/Molecule/	# conf and topol
 
 ## Compile all applications
 cd "$FFM_dir"
-#./build.sh
+chmod +x build.sh
+./build.sh
 
 
 

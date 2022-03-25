@@ -6,6 +6,8 @@
 #include <vector>
 #include <sstream>
 
+#include <climits>		// INT_MAX
+
 #include "ForcefieldTypes.h"
 
 using namespace std;
