@@ -14,7 +14,7 @@ mkdir -p "$default_dir/Simulation"
 
 
 
-## Now make Quantom
+######### Now make Quantom
 Q_dir="$default_dir"/Applications/Quantom
 mkdir -p "$Q_dir"/include
 mkdir "$Q_dir"/src
@@ -24,11 +24,16 @@ cp ./Quantom/Quantom/*.*h "$Q_dir"/include/
 cp ./Quantom/Quantom/*.cu "$Q_dir"/src/
 cp ./Quantom/Quantom/*.cpp "$Q_dir"/src/
 
+cp ./LIMA/Applications/Quantom/* "$Q_dir"/
+
 # Handle GLFW for Quantom. This is a quite bad way...
 mkdir -p "$default_dir"/Dependencies/GLFW/
 cp -r ~/Downloads/glfw-3.3.6/* "$default_dir"/Dependencies/GLFW/
 
-## Now make FFM
+
+
+
+######### Now make FFM
 FFM_dir="$default_dir"/Applications/Forcefieldmaker
 mkdir -p "$FFM_dir"/include
 mkdir "$FFM_dir"/src
@@ -62,6 +67,9 @@ cd "$FFM_dir"
 chmod +x build.sh
 ./build.sh
 
+cd "$Q_dir"
+chmod +x build.sh
+#./build.sh
 
 
 
