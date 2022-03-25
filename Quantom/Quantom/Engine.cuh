@@ -172,6 +172,8 @@ private:
 
 	int testval = 0;
 
+	ForceField forcefield_host;
+
 
 	// Simulation variables
 	//cudaStream_t stream[N_STREAMS];

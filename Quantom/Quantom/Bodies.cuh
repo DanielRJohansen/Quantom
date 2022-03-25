@@ -8,7 +8,7 @@
 
 
 
-const int MAX_COMPOUND_PARTICLES = 128;
+
 
 
 
@@ -210,7 +210,6 @@ public:
 				if (neighborsolvent_ids[i] == neighbor_id) {
 					neighborsolvent_ids[i] = neighborsolvent_ids[n_solvent_neighbors - 1];
 					n_solvent_neighbors--;
-					//neighborsolvent_ids[n_solvent_neighbors] = 0;
 					return;
 				}
 			}

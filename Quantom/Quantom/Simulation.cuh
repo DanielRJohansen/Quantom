@@ -10,20 +10,6 @@ constexpr float BOX_LEN = 8.f;		// Must be > twice the len of largest compound
 constexpr float BOX_LEN_HALF = BOX_LEN/2.f;
 
 
-
-const int STEPS_PER_NLIST_UPDATE = 100;
-const int STEPS_PER_LOGTRANSFER = 500;
-//const int STEPS_PER_TRAJTRANSFER = 100;
-const int STEPS_PER_THERMOSTAT = 500;
-const int STEPS_PER_TRAINDATATRANSFER = 500;
-
-
-
-const int STEPS_PER_RENDER = 500;
-
-
-const bool APPLY_THERMOSTAT = false;										// Switch to using forcefield_host first
-
 #ifndef __linux__
 const string MOL_FOLDER = "C:\\PROJECTS\\Quantom\\molecules\\t4lys_full\\";
 const string OUT_DIR = "C:\\PROJECTS\\Quantom\\LIMANET\\sim_out";
@@ -60,9 +46,9 @@ const int THREADS_PER_COMPOUNDBLOCK = 128; // Must be >= max comp particles
 
 const int SIMULATION_STEPS = 100000;
 
-//constexpr double SOLVENT_MASS = 18.01528f * 1e-3;	// kg/mol
-constexpr double SOLVENT_MASS = 12.0107 * 1e-3;	// kg/mol
-constexpr double COMPOUNDPARTICLE_MASS = 12.0107 * 1e-3;
+constexpr double SOLVENT_MASS = 18.01528f * 1e-3;	// kg/mol
+//constexpr double SOLVENT_MASS = 12.0107 * 1e-3;	// kg/mol
+//constexpr double COMPOUNDPARTICLE_MASS = 12.0107 * 1e-3;
 
 // This goes on Device
 class Box {

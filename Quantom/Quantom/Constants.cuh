@@ -12,6 +12,23 @@ const int N_SOLVATE_MOLECULES = 600;
 
 
 
+const int MAX_COMPOUND_PARTICLES = 64;
+
+
+
+const int STEPS_PER_NLIST_UPDATE = 100;
+const int STEPS_PER_LOGTRANSFER = 500;
+//const int STEPS_PER_TRAJTRANSFER = 100;
+const int STEPS_PER_THERMOSTAT = 500;
+const int STEPS_PER_TRAINDATATRANSFER = 500;
+
+
+
+const int STEPS_PER_RENDER = 500;
+
+
+const bool APPLY_THERMOSTAT = false;										// Switch to using forcefield_host first
+
 
 
 const int MAX_COMPOUNDS = 0xFF;
