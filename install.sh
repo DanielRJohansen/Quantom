@@ -6,6 +6,8 @@ echo "#### LIMA-Dynamics installer is now beginning ####"
 default_dir=~/Desktop/LIMA/
 
 echo "Using $default_dir as install directory"
+rm -rf "$default_dir"/
+
 
 mkdir -p "$default_dir/Applications"
 mkdir -p "$default_dir/Simulation"
@@ -16,7 +18,7 @@ mkdir -p "$default_dir/Simulation"
 Q_dir="$default_dir"/Applications/Quantom
 mkdir -p "$Q_dir"/includes
 mkdir "$Q_dir"/src
-mkdir "Q_dir"/build
+mkdir "$Q_dir"/build
 
 cp ./Quantom/Quantom/*.*h "$Q_dir"/includes/
 cp ./Quantom/Quantom/*.cu "$Q_dir"/src/
@@ -34,6 +36,7 @@ mkdir "$FFM_dir"/build
 
 cp ./LIMA_ForcefieldMaker/LIMA_ForcefieldMaker/*.h "$FFM_dir"/includes/
 cp ./LIMA_ForcefieldMaker/LIMA_ForcefieldMaker/*.cpp "$FFM_dir"/src/
+cp ./LIMA/Applications/Forcefieldmaker/* "$FFM_dir"/				# CMakeLists.txt and build.sh
 
 
 ## Now make SimPostprocessor
@@ -44,5 +47,20 @@ mkdir "$SPP_dir"/build
 
 cp ./LIMA_services/LIMA_services/*.h "$SPP_dir"/includes/
 cp ./LIMA_services/LIMA_services/*.cpp "$SPP_dir"/src/
+
+
+## Make test sim
+s_dir="$default_dir"/Simulation
+mkdir -p "$s_dir/"Molecule
+mkdir "$s_dir"/Forcefield
+cp ~/Downloads/QnD/* "$s_dir"/Forcefield/	# nb and b ff
+cp ~/Downloads/QnD/*/* "$s_dir"/Molecule/	# conf and topol
+
+
+## Compile all applications
+cd "$FFM_dir"
+#./build.sh
+
+
 
 
