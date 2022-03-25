@@ -82,7 +82,7 @@ private:
 	DihedralBond* topol_dihedrals;
 	int n_topol_dihedrals = 0; 
 
-
+	string ff_dir = "../../Simulation/Forcefield/";
 
 	//enum STATE { INACTIVE, NB_ATOMTYPE_MAPPINGS, FF_NONBONDED, NB_ATOMTYPES, PAIRTYPES };
 	enum STATE { INACTIVE, FF_NONBONDED, NB_ATOMTYPES, BONDS, ANGLES, DIHEDRALS };

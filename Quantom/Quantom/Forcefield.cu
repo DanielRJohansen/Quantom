@@ -10,8 +10,11 @@
 void ForceFieldMaker::buildForcefield() {
 	printf("#################################### BUILDING FORCEFIELD ####################################\n");
 
-	vector<vector<string>> summary_rows = Filehandler::readFile("C:\\Users\\Daniel\\git_repo\\Quantom\\ForcefieldSummary.txt", INT_MAX, true);
-	vector<vector<string>> forcefield_rows = Filehandler::readFile("C:\\Users\\Daniel\\git_repo\\Quantom\\Forcefield.txt", INT_MAX, true);
+//	vector<vector<string>> summary_rows = Filehandler::readFile("C:\\Users\\Daniel\\git_repo\\Quantom\\ForcefieldSummary.txt", INT_MAX, true);
+//	vector<vector<string>> forcefield_rows = Filehandler::readFile("C:\\Users\\Daniel\\git_repo\\Quantom\\Forcefield.txt", INT_MAX, true);
+
+	vector<vector<string>> summary_rows = Filehandler::readFile(ff_dir" + "ForcefieldSummary.txt", INT_MAX, true);
+	vector<vector<string>> forcefield_rows = Filehandler::readFile(ff_dir + "Forcefield.txt", INT_MAX, true);
 
 	nb_atomtypes = parseAtomTypes(summary_rows);					// 1 entry per type in compressed forcefield
 	loadAtomypesIntoForcefield();
