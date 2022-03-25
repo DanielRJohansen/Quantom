@@ -3,7 +3,7 @@
 
 if [ ! -d ./build ];
 then
-	echo "Build directory not found
+	echo "Build directory not found"
 	return
 fi
 

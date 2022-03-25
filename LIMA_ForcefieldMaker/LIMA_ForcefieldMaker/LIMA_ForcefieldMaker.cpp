@@ -107,14 +107,14 @@ int main(int argc, char* argv[]) {
 
 	printForcefieldSummary(
 //		(string)"C:\\Users\\Daniel\\git_repo\\Quantom\\" + (string)"ForcefieldSummary.txt",
-		sim_path + "/ForcefieldSummary.txt",
+		sim_path + "/Forcefield/ForcefieldSummary.txt",
 		ff_nonbonded_active, &map
 	);
 	
 	
 	printForcefield(
 //		"C:\\Users\\Daniel\\git_repo\\Quantom\\" + (string)"Forcefield.txt",
-		sim_path + "/Forcefield.txt",
+		sim_path + "/Forcefield/Forcefield.txt",
 		atoms,
 		topology_bonds,
 		topology_angles,

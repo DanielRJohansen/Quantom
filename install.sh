@@ -69,7 +69,6 @@ chmod +x build.sh
 
 cd "$Q_dir"
 chmod +x build.sh
-#./build.sh
-
-
+chmod +x mdrun.sh
+./build.sh
 

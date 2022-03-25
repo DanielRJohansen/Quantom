@@ -1,20 +1,22 @@
 #!/bin/bash
 
 
-ff=../../Simulation/Forcefield.txt
-ffs=../../Simulation/ForcefieldSummary.txt
+ff=../../Simulation/Forcefield/Forcefield.txt
+ffs=../../Simulation/Forcefield/ForcefieldSummary.txt
 
-conf=../../Simulation/conf.gro
-topol=../../Simulation/topol.top
+conf=../../Simulation/Molecule/conf.gro
+topol=../../Simulation/Molecule/topol.top
 
-if [! [-f "$ff"] && [-f"$ffs"]];
+
+if [[ ! -f "$conf" || ! -f "$topol" ]];
 then
-	if [! [-f "$conf"] && [-f "$topol"]];
-	then
-		echo "Failed to make forcefield, missing conf.gro or topol.top file."
-		return
-	fi
+	echo "Conf or Topol file is missing"
+	exit 1
+fi
 
+
+if [[ ! -f "$ff" || !  -f "$ffs" ]];
+then
 	echo "Making forcefield files now"
 	../Forcefieldmaker/ffm
 fi
