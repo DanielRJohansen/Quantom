@@ -203,23 +203,19 @@ public:
 		return false;
 	}
 	__host__ void removeId(uint16_t neighbor_id, NEIGHBOR_TYPE nt) {
-		uint16_t* ids;
-		uint16_t* n;
-		switch (nt)
-		{
-		case NeighborList::COMPOUND:
+
+		switch (nt) {
+		case NeighborList::SOLVENT:
 			for (int i = 0; i < n_solvent_neighbors; i++) {
 				if (neighborsolvent_ids[i] == neighbor_id) {
 					neighborsolvent_ids[i] = neighborsolvent_ids[n_solvent_neighbors - 1];
 					n_solvent_neighbors--;
-					neighborsolvent_ids[n_solvent_neighbors] = 0;
+					//neighborsolvent_ids[n_solvent_neighbors] = 0;
 					return;
 				}
 			}
-			ids = neighborcompound_ids;
-			n = &n_compound_neighbors;
 			break;
-		case NeighborList::SOLVENT:
+		case NeighborList::COMPOUND:
 			for (int i = 0; i < n_compound_neighbors; i++) {
 				if (neighborcompound_ids[i] == neighbor_id) {
 					neighborcompound_ids[i] = neighborcompound_ids[n_compound_neighbors - 1];
@@ -227,18 +223,11 @@ public:
 					return;
 				}
 			}
-			ids = neighborsolvent_ids;
-			n = &n_solvent_neighbors;
+
 			break;
 		}
-		for (int i = 0; i < *n; i++) {
-			if (ids[i] == neighbor_id) {
-				ids[i] = ids[*n - 1];
-				*n = *n - 1;
-				//printf("Remove id %d, nlist size: %d\n", (int)neighbor_id, (int)*n);
-				return;
-			}
-		}
+
+		printf("Failed to remove neighbor %d!!!\n", neighbor_id);
 	}
 
 	__device__ void loadMeta(NeighborList* nl_ptr) {	// Called from thread 0

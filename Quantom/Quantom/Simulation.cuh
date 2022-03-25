@@ -19,7 +19,7 @@ const int STEPS_PER_TRAINDATATRANSFER = 500;
 
 
 
-const int STEPS_PER_RENDER = 50;
+const int STEPS_PER_RENDER = 500;
 
 
 const bool APPLY_THERMOSTAT = false;										// Switch to using forcefield_host first
@@ -50,7 +50,7 @@ constexpr float CUTOFF = 1.f;	//nm/
 
 
 
-const int THREADS_PER_SOLVENTBLOCK = 256;	// Must be >= N_SOLVATE_MOLECULES
+const int THREADS_PER_SOLVENTBLOCK = 32;	// Must be >= N_SOLVATE_MOLECULES
 const int BLOCKS_PER_SOLVENTKERNEL = ceil((float)N_SOLVATE_MOLECULES/(float)THREADS_PER_SOLVENTBLOCK);
 
 
@@ -58,7 +58,7 @@ const int THREADS_PER_COMPOUNDBLOCK = 128; // Must be >= max comp particles
 
 
 
-const int SIMULATION_STEPS = 20000;
+const int SIMULATION_STEPS = 100000;
 
 //constexpr double SOLVENT_MASS = 18.01528f * 1e-3;	// kg/mol
 constexpr double SOLVENT_MASS = 12.0107 * 1e-3;	// kg/mol

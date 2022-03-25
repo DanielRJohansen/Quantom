@@ -18,7 +18,7 @@ Engine::Engine(Simulation* simulation, ForceField forcefield_host) {
 
 
 	int Ckernel_shared_mem = sizeof(Compound) + sizeof(CompoundState) + sizeof(NeighborList) + sizeof(Float3) * NEIGHBORLIST_MAX_SOLVENTS + sizeof(uint8_t) * NEIGHBORLIST_MAX_SOLVENTS;	
-	int Skernel_shared_mem = sizeof(Float3) * MAX_COMPOUND_PARTICLES + sizeof(uint8_t) * MAX_COMPOUND_PARTICLES;
+	int Skernel_shared_mem = sizeof(Float3) * MAX_COMPOUND_PARTICLES + sizeof(uint8_t) * MAX_COMPOUND_PARTICLES + sizeof(Solvent) * THREADS_PER_SOLVENTBLOCK;
 	printf("Compoundkernel shared mem. size: %d B\n", Ckernel_shared_mem);
 	printf("Solventkernel shared mem. size: %d B\n", Skernel_shared_mem);
 
@@ -445,19 +445,24 @@ __device__ Float3 calcLJForce(Float3* pos0, Float3* pos1, float* data_ptr, float
 	// epsilon
 	//	Returns force in J/mol*M		?????????????!?!?//
 
-	double dist = (*pos0 - *pos1).len();								// [nm]
-	
+	// Before
+	Float3 v = (*pos1 - *pos0);
+	float dist = v.len();					// [nm]
+	float fraction = sigma / dist;										// [nm/nm], so unitless
+	float f6 = fraction * fraction * fraction * fraction * fraction * fraction;
+	float force = 24.f * 1e-9 * epsilon / dist * f6 * (1.f - 2.f * f6);
 
-	double fraction = sigma / dist;										// [nm/nm], so unitless
-	double f2 = fraction * fraction;
-	double f6 = f2 * f2 * f2;
 
-	double force = 24.f * (epsilon / (dist)) * f6 * (1.f - 2.f * f6) * 1e-9;	//	1e+9 * [kg*m/(mol*s^2)] * 1e-9 => [kg*nm/(mol * ns^2)]										wrong: [J/mol]/[nm] [N/mol] 
+	//Float3 v = *pos1 - *pos0;
+	//float dist_sq = v.lenSquared();								// [nm]
+	//float f2 = sigma*sigma / dist_sq;										// [nm/nm], so unitless
+	//float f6 = f2 * f2 * f2;
+	//float force = (epsilon * epsilon / (dist_sq)) * f6 * (1.f - 2.f * f6) * 24.f * 1e-9;	//	1e+9 * [kg*m/(mol*s^2)] * 1e-9 => [kg*nm/(mol * ns^2)]										wrong: [J/mol]/[nm] [N/mol] 
+	//*potE = force;
+	//Float3 force_unit_vector = (*pos1 - *pos0).norm();
 
-	double LJ_pot = 4.f * epsilon * (f6 * f6 - f6);						// [J/mol]
-	Float3 force_unit_vector = (*pos1 - *pos0).norm();
-
-	*potE += LJ_pot * 0.5;												// Log this value for energy monitoring purposes
+	//float LJ_pot = 4.f * epsilon * (f6 * f6 - f6);						// [J/mol]
+	*potE += 2.f * epsilon * (f6 * f6 - f6);												// Log this value for energy monitoring purposes, half here, half on other particle
 
 #ifdef LIMA_VERBOSE
 	if (verbose) {
@@ -468,23 +473,21 @@ __device__ Float3 calcLJForce(Float3* pos0, Float3* pos1, float* data_ptr, float
 		//printf("Force %f %f %f\n", force_unit_vector.x * force, force_unit_vector.y * force, force_unit_vector.z * force);
 	}
 
-
 	{
-		Float3 force_vec = force_unit_vector * force;
-		if (force_vec.x != force_vec.x) {
+		//Float3 force_vec = force_unit_vector * force;
+		/*if (force_vec.x != force_vec.x) {
 			//printf("Force: %f\n", force);
 			//force_unit_vector.print('u');
 			printf("Thread %d Block %d self %f %f %f other %f %f %f\n", threadIdx.x, blockIdx.x, pos0->x, pos0->y, pos0->z, pos1->x, pos1->y, pos1->z);
 
-		}
-		if (dist < 0.1f) {
-			//printf("\nThread %d Block %d step %d dist %f force %f\n", threadIdx.x, blockIdx.x, (int)data_ptr[3], (*pos0 - *pos1).len(), force);
-			//printf("Self %f %f %f -> %f %f %f\n", data_ptr[0], data_ptr[1], data_ptr[2], pos0->x, pos0->y, pos0->z);
-		}
+		}*/
 	}
 #endif
 
-	return force_unit_vector * force;									//N/mol*v	(v is direction)
+	return v.norm_fast() * force;
+	//return v.norm_fast() * force;
+	//return v.norm() * force;
+	//return force_unit_vector * force;									//N/mol*v	(v is direction)
 }
 
 constexpr double kb = 17.5 * 1e+6;		//	J/(mol*nm^2)
@@ -569,14 +572,15 @@ __device__ void calcDihedralbondForces(Float3* pos_left, Float3* pos_lm, Float3*
 
 
 __device__ Float3 computeLJForces(Float3* self_pos, int n_particles, Float3* positions, float* data_ptr, float* potE_sum, uint8_t atomtype_self, uint8_t* atomtypes_others) {	// Assumes all positions are 
-	Float3 force(0, 0, 0);
+	Float3 force(0.f);
 	for (int i = 0; i < n_particles; i++) {
-		force += calcLJForce(self_pos, &positions[i], data_ptr, potE_sum, 
+		force += calcLJForce(self_pos, &positions[i], data_ptr, potE_sum,
+
 			forcefield_device.particle_parameters[atomtype_self].sigma + forcefield_device.particle_parameters[atomtypes_others[i]].sigma,
 			forcefield_device.particle_parameters[atomtype_self].epsilon + forcefield_device.particle_parameters[atomtypes_others[i]].epsilon
 		);
 	}
-	return force;
+	return force;// *24.f * 1e-9;
 }
 
 __device__ Float3 computeSolventToSolventLJForces(Float3* self_pos, NeighborList* nlist, Solvent* solvents, float* data_ptr, float* potE_sum) {	// Specific to solvent kernel
@@ -590,7 +594,7 @@ __device__ Float3 computeSolventToSolventLJForces(Float3* self_pos, NeighborList
 			printf("F %f %f %f n %d  solvent_id %d neighbor_id %d\n", force.x, force.y, force.z, nlist->n_solvent_neighbors, threadIdx.x + blockIdx.x*blockDim.x, nlist->neighborsolvent_ids[i]);
 		}*/
 	}
-	return force;
+	return force;// *24.f * 1e-9;
 }
 __device__ Float3 computeSolventToCompoundLJForces(Float3* self_pos, int n_particles, Float3* positions, float* data_ptr, float* potE_sum, uint8_t atomtype_self) {	// Specific to solvent kernel
 	Float3 force(0, 0, 0);
@@ -600,7 +604,7 @@ __device__ Float3 computeSolventToCompoundLJForces(Float3* self_pos, int n_parti
 			forcefield_device.particle_parameters[atomtype_self].epsilon + forcefield_device.particle_parameters[ATOMTYPE_SOL].epsilon
 		);
 	}
-	return force;
+	return force;// *24.f * 1e-9;
 }
 
 
@@ -797,7 +801,7 @@ __global__ void forceKernel(Box* box) {
 					(forcefield_device.particle_parameters[compound.atom_types[threadIdx.x]].sigma + forcefield_device.particle_parameters[compound.atom_types[i]].sigma),
 					(forcefield_device.particle_parameters[compound.atom_types[threadIdx.x]].epsilon + forcefield_device.particle_parameters[compound.atom_types[i]].epsilon),
 					true
-					);
+				);// *24.f * 1e-9;
 			}
 		}
 	}
@@ -921,6 +925,7 @@ __global__ void solventForceKernel(Box* box) {
 	//__shared__ Float3 solvent_positions[THREADS_PER_SOLVENTBLOCK];
 	__shared__ Float3 utility_buffer[MAX_COMPOUND_PARTICLES];
 	__shared__ uint8_t utility_buffer_small[MAX_COMPOUND_PARTICLES];
+	__shared__ Solvent solvents[THREADS_PER_SOLVENTBLOCK];
 
 	float potE_sum = 0;
 	float data_ptr[4];	// Pot, force, closest particle, ?
@@ -932,16 +937,16 @@ __global__ void solventForceKernel(Box* box) {
 	//printf("mass %f\n", forcefield_device.particle_parameters[ATOMTYPE_SOL].mass);
 
 
-	Solvent solvent;
-	Float3 solvent_pos;
+	Solvent* solvent = &solvents[threadIdx.x];
+	//Float3 solvent_pos;
 	if (thread_active) {
-		solvent = box->solvents[solvent_index];
-		solvent_pos = solvent.pos;									// Use this when applying hyperpos, NOT SOLVENT.POS as others acess this concurrently on other kernels!
-	}
+		*solvent = box->solvents[solvent_index];
+		//solvent_pos = solvent.pos;									// Use this when applying hyperpos, NOT SOLVENT.POS as others acess this concurrently on other kernels!
+	}	
 	
-	data_ptr[0] = solvent.pos_tsub1.x;
-	data_ptr[1] = solvent.pos_tsub1.y;
-	data_ptr[2] = solvent.pos_tsub1.z;
+	//data_ptr[0] = solvent.pos_tsub1.x;
+	//data_ptr[1] = solvent.pos_tsub1.y;
+	//data_ptr[2] = solvent.pos_tsub1.z;
 
 
 	
@@ -961,9 +966,8 @@ __global__ void solventForceKernel(Box* box) {
 		//force += computeLJForces(&solvent_positions[threadIdx.x], n_particles, utility_buffer, data_ptr, &potE_sum);
 
 		if (thread_active) {
-			LIMAENG::applyHyperpos(&utility_buffer[0], &solvent_pos);									// Move own particle in relation to compound-key-position
-			//force += computeLJForces(&solvent_pos, n_compound_particles, utility_buffer, data_ptr, &potE_sum);
-			force += computeLJForces(&solvent_pos, n_compound_particles, utility_buffer, data_ptr, &potE_sum, ATOMTYPE_SOL, utility_buffer_small);
+			LIMAENG::applyHyperpos(&utility_buffer[0], &solvent->pos);									// Move own particle in relation to compound-key-position
+			force += computeLJForces(&solvent->pos, n_compound_particles, utility_buffer, data_ptr, &potE_sum, ATOMTYPE_SOL, utility_buffer_small);
 		}
 		__syncthreads();
 
@@ -972,8 +976,7 @@ __global__ void solventForceKernel(Box* box) {
 	// ----------------------------------------------------------------------------------------------------------------------------------------------------- //
 
 	if (thread_active) {
-		//force += computeSolventToSolventLJForces(&solvent.pos, threadIdx.x, box->n_solvents, solvent_positions, data_ptr, &potE_sum);
-		force += computeSolventToSolventLJForces(&solvent_pos, &box->solvent_neighborlists[solvent_index], box->solvents, data_ptr, &potE_sum);
+		force += computeSolventToSolventLJForces(&solvent->pos, &box->solvent_neighborlists[solvent_index], box->solvents, data_ptr, &potE_sum);
 	}
 
 
@@ -983,8 +986,8 @@ __global__ void solventForceKernel(Box* box) {
 	if (thread_active) {
 		int p_index = MAX_COMPOUND_PARTICLES + solvent_index;
 		//integratePosition(&solvent.pos, &solvent.pos_tsub1, &force, SOLVENT_MASS, box->dt, &box->thermostat_scalar, p_index);
-		integratePosition(&solvent.pos, &solvent.pos_tsub1, &force, forcefield_device.particle_parameters[ATOMTYPE_SOL].mass, box->dt, &box->thermostat_scalar, p_index);
-		applyPBC(&solvent.pos);	// forcePositionToInsideBox	// This break the integration, as that doesn't accound for PBC in the vel conservation
+		integratePosition(&solvent->pos, &solvent->pos_tsub1, &force, forcefield_device.particle_parameters[ATOMTYPE_SOL].mass, box->dt, &box->thermostat_scalar, p_index);
+		applyPBC(&solvent->pos);	// forcePositionToInsideBox	// This break the integration, as that doesn't accound for PBC in the vel conservation
 
 	}
 
@@ -997,14 +1000,14 @@ __global__ void solventForceKernel(Box* box) {
 
 		box->potE_buffer[compounds_offset + solvent_index + step_offset] = potE_sum;	//  data_ptr[0];
 		//printf("pot: %f\n", box->potE_buffer[compounds_offset + solvent_index + (box->step) * box->total_particles]);
-		box->traj_buffer[compounds_offset + solvent_index + step_offset] = solvent.pos;
+		box->traj_buffer[compounds_offset + solvent_index + step_offset] = solvent->pos;
 	}
 
 	// ----------------------------------------------------------------------------- //
 
 
 	if (thread_active) {
-		box->solvents_next[solvent_index] = solvent;
+		box->solvents_next[solvent_index] = *solvent;
 	}
 
 

@@ -82,7 +82,11 @@ private:
 	DihedralBond* topol_dihedrals;
 	int n_topol_dihedrals = 0; 
 
+#ifdef __linux__
 	string ff_dir = "../../Simulation/Forcefield/";
+#else
+	string ff_dir = "C:\\Users\\Daniel\\git_repo\\Quantom\\";
+#endif
 
 	//enum STATE { INACTIVE, NB_ATOMTYPE_MAPPINGS, FF_NONBONDED, NB_ATOMTYPES, PAIRTYPES };
 	enum STATE { INACTIVE, FF_NONBONDED, NB_ATOMTYPES, BONDS, ANGLES, DIHEDRALS };
