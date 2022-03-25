@@ -28,8 +28,10 @@ const bool APPLY_THERMOSTAT = false;										// Switch to using forcefield_host
 const string MOL_FOLDER = "C:\\PROJECTS\\Quantom\\molecules\\t4lys_full\\";
 const string OUT_DIR = "C:\\PROJECTS\\Quantom\\LIMANET\\sim_out";
 #else
-const string MOL_FOLDER = "../Compounds/t4lys/";
-const string OUT_DIR = "/home/lima/Desktop/LIMA";
+//const string MOL_FOLDER = "../Compounds/t4lys/";
+const string MOL_FOLDER = "../../Simulation/Molecule/";
+//const string OUT_DIR = "/home/lima/Desktop/LIMA";
+const string OUT_DIR = "../../Simulation/";
 #endif
 
 
