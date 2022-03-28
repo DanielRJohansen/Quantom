@@ -377,11 +377,11 @@ void Engine::applyThermostat() {
 void Engine::step() {
 	auto t0 = std::chrono::high_resolution_clock::now();
 
-	compoundBridgeKernel <<< simulation->box->bridge_bundle->n_bridges, MAX_PARTICLES_IN_BRIDGE >>> (simulation->box);	// Must come before forceKernel()
+	//compoundBridgeKernel <<< simulation->box->bridge_bundle->n_bridges, MAX_PARTICLES_IN_BRIDGE >>> (simulation->box);	// Must come before forceKernel()
 	cudaDeviceSynchronize();
 	//printf("\n\n");
 	forceKernel <<< simulation->box->n_compounds, THREADS_PER_COMPOUNDBLOCK >>> (simulation->box);
-	solventForceKernel <<< BLOCKS_PER_SOLVENTKERNEL, THREADS_PER_SOLVENTBLOCK >>> (simulation->box);
+	//solventForceKernel <<< BLOCKS_PER_SOLVENTKERNEL, THREADS_PER_SOLVENTBLOCK >>> (simulation->box);
 	cudaDeviceSynchronize();
 	//printf("\n\n");
 
@@ -439,20 +439,28 @@ constexpr double sigma = 0.3923f;										// nm, point at which d/dE or force i
 constexpr double epsilon = 0.5986 * 1'000.f;							// J/mol
 */
 
-__device__ Float3 calcLJForce(Float3* pos0, Float3* pos1, float* data_ptr, float* potE, float sigma, float epsilon, bool verbose=false) {
-	// Calculates LJ force on p0	//
+__device__ Float3 calcLJForce(Float3* pos0, Float3* pos1, float* data_ptr, float* potE, float sigma, float epsilon, int type1=-1, int type2=-1) {
+	// Calculates LJ force on p0	(attractive to p1. Negative values = repulsion )//
 	// input positions in cartesian coordinates [nm]
 	// sigma [nm]
-	// epsilon
+	// epsilon [J/mol]
 	//	Returns force in J/mol*M		?????????????!?!?//
 
 	// Before
-	Float3 v = (*pos1 - *pos0);
-	float dist = v.len();					// [nm]
-	float fraction = sigma / dist;										// [nm/nm], so unitless
-	float f6 = fraction * fraction * fraction * fraction * fraction * fraction;
-	float force = 24.f * 1e-9 * epsilon / dist * f6 * (1.f - 2.f * f6);
+	//Float3 v = (*pos1 - *pos0);
+	//float dist = v.len();					// [nm]
+	//float fraction = sigma / dist;										// [nm/nm], so unitless
+	//float f6 = fraction * fraction * fraction * fraction * fraction * fraction;
+	//float force = 24.f * 1e-9 * epsilon / dist * f6 * (1.f - 2.f * f6);
 
+
+
+
+	// Directly from book
+	float dist_sq = (*pos1 - *pos0).lenSquared();
+	float s = sigma * sigma / dist_sq;
+	s = s * s * s;
+	float force = 24.f * epsilon * s / dist_sq * (1.f - 2.f * s);
 
 	//Float3 v = *pos1 - *pos0;
 	//float dist_sq = v.lenSquared();								// [nm]
@@ -463,13 +471,14 @@ __device__ Float3 calcLJForce(Float3* pos0, Float3* pos1, float* data_ptr, float
 	//Float3 force_unit_vector = (*pos1 - *pos0).norm();
 
 	//float LJ_pot = 4.f * epsilon * (f6 * f6 - f6);						// [J/mol]
-	*potE += 2.f * epsilon * (f6 * f6 - f6);												// Log this value for energy monitoring purposes, half here, half on other particle
+	//*potE += 2.f * epsilon * (f6 * f6 - f6);												// Log this value for energy monitoring purposes, half here, half on other particle
 
 #ifdef LIMA_VERBOSE
-	if (verbose) {
-		//printf("Dist %f       force %f      sigma: %f         epsilon %f\n", (float)dist, (float)force, sigma, epsilon);
-	}
-	if (threadIdx.x == 0 && blockIdx.x == 0) {
+	//if (threadIdx.x == 32 && blockIdx.x == 28 && force < -600000.f && force > -700000) {
+	if (abs(force) > 20000e+6) {
+		printf("Dist %f   D2 %f    force %f      sigma: %f \tepsilon %f  t1 %d t2 %d\n", (float)sqrt(dist_sq), (float) dist_sq, (float)force, sigma, epsilon, type1, type2);
+		pos0->print('0');
+		pos1->print('1');
 		//printf("Thread %d Block %d self %f %f %f other %f %f %f\n", threadIdx.x, blockIdx.x, pos0->x, pos0->y, pos0->z, pos1->x, pos1->y, pos1->z);
 		//printf("Force %f %f %f\n", force_unit_vector.x * force, force_unit_vector.y * force, force_unit_vector.z * force);
 	}
@@ -484,14 +493,11 @@ __device__ Float3 calcLJForce(Float3* pos0, Float3* pos1, float* data_ptr, float
 		}*/
 	}
 #endif
+	return (*pos1 - *pos0) * force;										// N/mol
 
-	return v.norm_fast() * force;
-	//return v.norm_fast() * force;
-	//return v.norm() * force;
-	//return force_unit_vector * force;									//N/mol*v	(v is direction)
 }
 
-constexpr double kb = 17.5 * 1e+6;		//	J/(mol*nm^2)
+constexpr double kb = 17.5 * 1e+6;		//	J/(mol*nm^2)	/ kg/(ns^2 * mol)
 __device__ void calcPairbondForces(Float3* pos_a, Float3* pos_b, float* reference_dist, Float3* results, float* potE) {
 	// Calculates bond force on both particles					//
 	// Calculates forces as J/mol*M								//
@@ -576,9 +582,10 @@ __device__ Float3 computeLJForces(Float3* self_pos, int n_particles, Float3* pos
 	Float3 force(0.f);
 	for (int i = 0; i < n_particles; i++) {
 		force += calcLJForce(self_pos, &positions[i], data_ptr, potE_sum,
+			(forcefield_device.particle_parameters[atomtype_self].sigma + forcefield_device.particle_parameters[atomtypes_others[i]].sigma)*0.2f,
+			forcefield_device.particle_parameters[atomtype_self].epsilon + forcefield_device.particle_parameters[atomtypes_others[i]].epsilon,
+			atomtype_self, atomtypes_others[i]
 
-			forcefield_device.particle_parameters[atomtype_self].sigma + forcefield_device.particle_parameters[atomtypes_others[i]].sigma,
-			forcefield_device.particle_parameters[atomtype_self].epsilon + forcefield_device.particle_parameters[atomtypes_others[i]].epsilon
 		);
 	}
 	return force;// *24.f * 1e-9;
@@ -589,7 +596,9 @@ __device__ Float3 computeSolventToSolventLJForces(Float3* self_pos, NeighborList
 	for (int i = 0; i < nlist->n_solvent_neighbors; i++) {
 		Solvent neighbor = solvents[nlist->neighborsolvent_ids[i]];			
 		LIMAENG::applyHyperpos(&neighbor.pos, self_pos);
-		force += calcLJForce(self_pos, &neighbor.pos, data_ptr, potE_sum, forcefield_device.particle_parameters[ATOMTYPE_SOL].sigma * 2.f, forcefield_device.particle_parameters[ATOMTYPE_SOL].epsilon * 2.f);
+		force += calcLJForce(self_pos, &neighbor.pos, data_ptr, potE_sum, 
+			forcefield_device.particle_parameters[ATOMTYPE_SOL].sigma * 2.f, 
+			forcefield_device.particle_parameters[ATOMTYPE_SOL].epsilon * 2.f);
 		/*if (abs(force.len()) > 1000000) {
 			(*self_pos - neighbor.pos).print('d');
 			printf("F %f %f %f n %d  solvent_id %d neighbor_id %d\n", force.x, force.y, force.z, nlist->n_solvent_neighbors, threadIdx.x + blockIdx.x*blockDim.x, nlist->neighborsolvent_ids[i]);
@@ -725,7 +734,6 @@ __device__ Float3 computeDihedralForces(T* entity, Float3* positions, Float3* ut
 	return utility_buffer[threadIdx.x];
 }
 
-
 __device__ void integratePosition(Float3* pos, Float3* pos_tsub1, Float3* force, const double mass, const double dt, float* thermostat_scalar, int p_index, bool verbose=false) {
 	// Force is in ??Newton, [kg * nm /(mol*ns^2)] //
 
@@ -739,11 +747,8 @@ __device__ void integratePosition(Float3* pos, Float3* pos_tsub1, Float3* force,
 	Float3 delta_pos = *pos - *pos_tsub1;
 	*pos = *pos_tsub1 + delta_pos * *thermostat_scalar;
 #ifdef LIMA_VERBOSE
-	if (force->len() > 200e+6) {
+	if (force->len() > 2e+9) {
 		printf("\nP_index %d Thread %d blockId %d\tForce %f \tFrom %f %f %f\tTo %f %f %f\n", p_index, threadIdx.x, blockIdx.x, force->len(), pos_tsub1->x, pos_tsub1->y, pos_tsub1->z, pos->x, pos->y, pos->z);		
-	}
-	if (verbose) {
-		printf("Mass %f Force %f %f %f\n", mass, force->x, force->y, force->z);
 	}
 #endif
 }
@@ -797,11 +802,12 @@ __global__ void forceKernel(Box* box) {
 		force += computeDihedralForces(&compound, compound_state.positions, utility_buffer, &potE_sum);
 		//box->critical_error_encountered = true;
 		for (int i = 0; i < compound.n_particles; i++) {
-			if (i != threadIdx.x) {
+			if (i != threadIdx.x && !compound.lj_ignore_list[threadIdx.x].ignore((uint8_t) i)) {
 				force += calcLJForce(&compound_state.positions[threadIdx.x], &compound_state.positions[i], data_ptr, &potE_sum,
-					(forcefield_device.particle_parameters[compound.atom_types[threadIdx.x]].sigma + forcefield_device.particle_parameters[compound.atom_types[i]].sigma),
+					(forcefield_device.particle_parameters[compound.atom_types[threadIdx.x]].sigma + forcefield_device.particle_parameters[compound.atom_types[i]].sigma) * 0.2f,		// Don't know how to handle atoms being this close!!!
 					(forcefield_device.particle_parameters[compound.atom_types[threadIdx.x]].epsilon + forcefield_device.particle_parameters[compound.atom_types[i]].epsilon),
-					true
+					//compound.atom_types[threadIdx.x], compound.atom_types[i]
+					compound.particle_global_ids[threadIdx.x], compound.particle_global_ids[i]
 				);// *24.f * 1e-9;
 			}
 		}
@@ -822,7 +828,8 @@ __global__ void forceKernel(Box* box) {
 			LIMAENG::applyHyperpos(&compound_state.positions[0], &utility_buffer[threadIdx.x]);
 		}
 		__syncthreads();
-//		force += computeLJForces(&compound_state.positions[threadIdx.x], n_particles, utility_buffer, data_ptr, &potE_sum, compound.atom_types[threadIdx.x], utility_buffer_small);
+		if (threadIdx.x < compound.n_particles)
+			force += computeLJForces(&compound_state.positions[threadIdx.x], n_particles, utility_buffer, data_ptr, &potE_sum, compound.atom_types[threadIdx.x], utility_buffer_small);
 	}
 	// ------------------------------------------------------------------------------------------------------------------------------------------------------ //
 
@@ -844,11 +851,9 @@ __global__ void forceKernel(Box* box) {
 	
 	// ------------------------------------------------------------ Integration ------------------------------------------------------------ //
 	if (threadIdx.x < compound.n_particles) {
-		int p_index = threadIdx.x;
-		//integratePosition(&compound_state.positions[threadIdx.x], &compound.particles[threadIdx.x].pos_tsub1, &force, compound.particles[threadIdx.x].mass, box->dt, &box->thermostat_scalar, p_index );
+		//int p_index = threadIdx.x;
 
-		//integratePosition(&compound_state.positions[threadIdx.x], &compound.particles[threadIdx.x].pos_tsub1, &force, forcefield_device.particle_parameters[compound.atom_types[threadIdx.x]].mass, box->dt, &box->thermostat_scalar, p_index);
-		integratePosition(&compound_state.positions[threadIdx.x], &compound.prev_positions[threadIdx.x], &force, forcefield_device.particle_parameters[compound.atom_types[threadIdx.x]].mass, box->dt, &box->thermostat_scalar, p_index);
+		integratePosition(&compound_state.positions[threadIdx.x], &compound.prev_positions[threadIdx.x], &force, forcefield_device.particle_parameters[compound.atom_types[threadIdx.x]].mass, box->dt, &box->thermostat_scalar, threadIdx.x);
 		
 		//box->compounds[blockIdx.x].particles[threadIdx.x].pos_tsub1 = compound.particles[threadIdx.x].pos_tsub1;
 		box->compounds[blockIdx.x].prev_positions[threadIdx.x] = compound.prev_positions[threadIdx.x];
@@ -900,7 +905,7 @@ __global__ void forceKernel(Box* box) {
 	
 	// ----------------------------------------------------------------------------- //
 
-	if (force.len() > 200e+6) {
+	if (force.len() > 2e+9) {
 		printf("Critical force %f\n\n\n", force.len());
 		box->critical_error_encountered = true;
 	}

@@ -16,9 +16,9 @@ const int MAX_ATOM_TYPES = 32;
 
 
 struct ParticleParameters {	//Nonbonded
-	float mass = -1;		//[kg/mol]	
+	float mass = -1;		//[kg/mol]	or 
 	float sigma = -1;
-	float epsilon = -1;
+	float epsilon = -1;		// J/mol [kg*nm^2 / s^2]
 };
 
 

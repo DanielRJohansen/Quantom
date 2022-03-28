@@ -1,6 +1,7 @@
 #pragma once
 
 
+#define LIMA_DEBUGMODE
 
 //#define LIMA_SAFERUN		// Use this for?
 #define LIMA_VERBOSE
@@ -24,7 +25,7 @@ const int STEPS_PER_TRAINDATATRANSFER = 500;
 
 
 
-const int STEPS_PER_RENDER = 500;
+const int STEPS_PER_RENDER = 10;
 
 
 const bool APPLY_THERMOSTAT = false;										// Switch to using forcefield_host first
@@ -33,7 +34,7 @@ const bool APPLY_THERMOSTAT = false;										// Switch to using forcefield_host
 
 const int MAX_COMPOUNDS = 0xFF;
 const int MAX_ATOMS = 1'000'000;
-const int MAX_ATOMS_IN_RESIDUE = 16;
+const int MAX_ATOMS_IN_RESIDUE = 32;
 
 
 

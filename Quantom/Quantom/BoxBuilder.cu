@@ -148,7 +148,7 @@ int BoxBuilder::solvateBox(Simulation* simulation)
 					break;
 
 				Float3 solvent_center = Float3(base + dist_between_compounds * (double)x_index, base + dist_between_compounds * (double)y_index, base + dist_between_compounds * (double)z_index);
-				double solvent_radius = 0.2;
+				//double solvent_radius = 0.2;
 
 				if (spaceAvailable(simulation->box, solvent_center)) {
 					simulation->box->solvents[simulation->box->n_solvents++] = createSolvent(

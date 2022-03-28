@@ -68,7 +68,7 @@ private:
 	double v_rms = sqrt(3 * R * T / M);
 
 
-	double MIN_NONBONDED_DIST = 0.24;
+	double MIN_NONBONDED_DIST = 0.5;
 
 
 

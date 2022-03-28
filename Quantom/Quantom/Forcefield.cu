@@ -103,6 +103,7 @@ NBAtomtype* ForceFieldMaker::parseAtomTypes(vector<vector<string>> summary_rows)
 			//for (string e : row)
 				//cout << e << '\t';
 			//printf("\n");
+			// Row is type, id, weight [g], sigma [nm], epsilon [kJ/mol]
 			atomtypes[ptr++] = NBAtomtype(stof(row[2]) * 1e-3, stof(row[3]), stof(row[4]) * 1e+3);
 		}			
 	}

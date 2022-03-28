@@ -109,7 +109,7 @@ void CompoundBuilder::loadParticles(Molecule* molecule, vector<CompoundBuilder::
 
 		//current_compound->addParticle(FFM->atomTypeToIndex(record.atom_name[0]), record.coordinate);
 		//current_compound->addParticle(FFM->getAtomtypeID(record.atom_serial_number), record.coordinate);
-		current_compound->addParticle(FFM->getAtomtypeID(record.atom_serial_number), record.coordinate, FFM->atomTypeToIndex(record.atom_name[0]));
+		current_compound->addParticle(FFM->getAtomtypeID(record.atom_serial_number), record.coordinate, FFM->atomTypeToIndex(record.atom_name[0]), record.atom_serial_number);
 		molecule->n_atoms_total++;
 	}
 }
@@ -194,6 +194,9 @@ void CompoundBuilder::addBond(Molecule* molecule, ParticleRef* maps, vector<stri
 	if (!g_bond.spansTwoCompounds()) {
 		Compound* compound = &molecule->compounds[maps[0].compound_id];
 		compound->singlebonds[compound->n_singlebonds++] = PairBond(bondtype->b0, bondtype->kb, maps[0].local_id, maps[1].local_id);
+		
+		compound->lj_ignore_list[maps[0].local_id].addIgnoreTarget(maps[1].local_id);
+		compound->lj_ignore_list[maps[1].local_id].addIgnoreTarget(maps[0].local_id);
 	}
 	else {
 		// First, we need to make sure all bond particles are added to the bridge.
@@ -202,6 +205,12 @@ void CompoundBuilder::addBond(Molecule* molecule, ParticleRef* maps, vector<stri
 		bridge->addBondParticles(&g_bond, molecule);
 		//bridge->addSinglebond(PairBond(bondtype->b0, bondtype->kb, maps[0].global_id, maps[1].global_id));
 		bridge->addGenericBond(PairBond(bondtype->b0, bondtype->kb, maps[0].global_id, maps[1].global_id));
+
+		//Compound* compound_a = &molecule->compounds[maps[0].compound_id];
+		//compound_a->lj_ignore_list[maps[0].local_id].addIgnoreTarget(maps[1].local_id, maps[1].compound_id);
+
+		//Compound* compound_b = &molecule->compounds[maps[1].compound_id];
+		//compound_b->lj_ignore_list[maps[1].local_id].addIgnoreTarget(maps[0].local_id, maps[0].compound_id);
 	}
 }
 

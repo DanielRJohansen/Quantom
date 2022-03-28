@@ -35,6 +35,8 @@ void DisplayV2::drawFilledCircle(GLfloat x, GLfloat y, GLfloat radius, Int3 colo
 void DisplayV2::drawBalls(RenderBall* balls, int n_balls) {
     for (int i = n_balls-1; i >= 0; i--) {
         RenderBall ball = balls[i];
+        //ball.pos.print('b');
+        //printf("ball %f\n", ball.radius);
         if (!ball.disable)
             drawFilledCircle(ball.pos.x, ball.pos.z, ball.radius, ball.color);
     }

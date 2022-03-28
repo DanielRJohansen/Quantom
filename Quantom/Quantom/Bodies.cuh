@@ -52,7 +52,9 @@ struct ParticleRef {		 // Maybe call map instead?
 struct NBAtomtype {
 	NBAtomtype(){}
 	NBAtomtype(float m, float s, float e) : mass(m), sigma(s), epsilon(e) {}
-	float mass, sigma, epsilon;
+	float mass;			// kg / mol
+	float sigma;		// nm
+	float epsilon;		// J/mol
 };
 
 
@@ -159,6 +161,48 @@ struct GenericBond {					// ONLY used during creation, never on device!
 
 	ParticleRef particles[4];
 	int n_particles = 0;
+};
+
+
+
+struct LJ_Ignores {	// Each particle is associated with 1 of these.
+	uint8_t local_ignores[4] = { 255, 255, 255, 255 };
+	//uint8_t connected_compound_id = 255;		// This is only used, if a bond is in a bridge
+	__host__ bool addIgnoreTarget(uint8_t target_id) {
+		for (int i = 0; i < 4; i++) {
+			if (local_ignores[i] == 255) {
+				local_ignores[i] = target_id;
+//				printf("Added target %d", target_id);
+				return true;
+			}				
+		}
+		printf("Failed to add ignore target!\n");
+		exit(0);
+		return false;
+	}		
+	/*
+	__host__ void addIgnoreTarget(uint8_t target_id, uint8_t compound_id) {
+		local_ignores[3] = target_id;
+		connected_compound_id = compound_id;
+	}
+	*/
+	__device__ bool ignore(uint8_t query_id) {
+		for (int i = 0; i < 4; i++) {
+			if (local_ignores[i] == query_id)
+				return true;
+		}
+		return false;
+	}
+	/*
+	__device__ bool ignore(uint8_t query_id, uint8_t compound_id) {
+		if (local_ignores[3] == query_id && connected_compound_id == compound_id)
+			return true;
+		exit(0);
+		return false;
+	}
+	*/
+
+			
 };
 
 // ------------------------------------------------- COMPOUNDS ------------------------------------------------- //
@@ -284,6 +328,13 @@ struct Compound {
 	uint8_t atom_types[MAX_COMPOUND_PARTICLES];
 	uint8_t atom_color_types[MAX_COMPOUND_PARTICLES];	// For drawing pretty spheres :)
 
+	LJ_Ignores lj_ignore_list[MAX_COMPOUND_PARTICLES];
+
+#ifdef LIMA_DEBUGMODE
+	uint32_t particle_global_ids[MAX_COMPOUND_PARTICLES];
+#endif
+
+
 	Float3 center_of_mass = Float3(0, 0, 0);
 	//double radius = 0;
 
@@ -336,7 +387,7 @@ struct Compound {
 		prev_positions[n_particles] = pos;
 		n_particles++;
 	}
-	__host__ void addParticle(int atomtype_id, Float3 pos, int atomtype_color_id) {
+	__host__ void addParticle(int atomtype_id, Float3 pos, int atomtype_color_id, int global_id) {
 		if (n_particles == MAX_COMPOUND_PARTICLES) {
 			printf("ERROR: Cannot add particle to compound!\n");
 			exit(1);
@@ -345,6 +396,10 @@ struct Compound {
 		atom_types[n_particles] = atomtype_id;
 		prev_positions[n_particles] = pos;
 		atom_color_types[n_particles] = atomtype_color_id;
+#ifdef LIMA_DEBUGMODE
+		particle_global_ids[n_particles] = global_id;
+		//printf("%d global id\n", global_id);
+#endif
 		n_particles++;
 	}
 	__host__ bool hasRoomForRes() {					// TODO: Implement, that it checks n atoms in res
@@ -374,15 +429,18 @@ struct Compound {
 		n_singlebonds = compound->n_singlebonds;
 		n_anglebonds = compound->n_anglebonds;
 		n_dihedrals = compound->n_dihedrals;
+
 	}
 	__device__ void loadData(Compound* compound) {
 		if (threadIdx.x < n_particles) {
 			prev_positions[threadIdx.x] = compound->prev_positions[threadIdx.x];
 			atom_types[threadIdx.x] = compound->atom_types[threadIdx.x];
+			lj_ignore_list[threadIdx.x] = compound->lj_ignore_list[threadIdx.x];
 			forces[threadIdx.x] = compound->forces[threadIdx.x];
 			compound->forces[threadIdx.x] = Float3(0.f);
-			//if (forces[threadIdx.x].len() > 0)
-			//	forces[threadIdx.x].print('f');
+//#ifdef LIMA_DEBUGMODE
+			particle_global_ids[threadIdx.x] = compound->particle_global_ids[threadIdx.x]; 
+//#endif
 		}
 		for (int i = 0; (i * blockDim.x) < n_singlebonds; i++) {
 			int index = i * blockDim.x + threadIdx.x;

@@ -118,7 +118,7 @@ void printForcefieldSummary(string path, vector<FF_nonbonded> records_nonbonded,
 	file << FFOutHelpers::endBlock();
 
 	file << FFOutHelpers::titleH2("Non-bonded parameters");
-	file << FFOutHelpers::titleH2("{atom_type\tatnum\tmass [g/mol]\tsigma []\tepsilon []}");
+	file << FFOutHelpers::titleH2("{atom_type\tatnum\tmass [g/mol]\tsigma [nm]\tepsilon [kJ/mol]}");
 	file << FFOutHelpers::parserTitle("ff_nonbonded");
 	for (FF_nonbonded record : records_nonbonded) {
 		file << record.type << ';' << to_string(record.atnum_local) << ';' << to_string(record.mass) << ';' << to_string(record.sigma) << ';' << to_string(record.epsilon) << endl;
@@ -151,7 +151,7 @@ void printForcefield(string path, vector<Atom> atoms, vector<Bondtype> bonds, ve
 
 
 	file << FFOutHelpers::titleH2("Bonds");
-	file << FFOutHelpers::titleH3("{ID_p1 \t ID_p2 \t b_0 \t k_b}");
+	file << FFOutHelpers::titleH3("{ID_p1\tID_p2\tAtomtype\tAtomtype \t b_0 [nm] \t k_b [J/mol/nm^2]}");
 	file << FFOutHelpers::parserTitle("bonds");
 	for (Bondtype bond : bonds) {
 		file << to_string(bond.id1) << ';' << to_string(bond.id2) << ';'
