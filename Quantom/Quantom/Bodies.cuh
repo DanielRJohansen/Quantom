@@ -377,6 +377,8 @@ struct Compound {
 	}*/
 
 	
+
+
 	__host__ void addParticle(int atomtype_id, Float3 pos) {
 		if (n_particles == MAX_COMPOUND_PARTICLES) {
 			printf("ERROR: Cannot add particle to compound!\n");
@@ -429,7 +431,6 @@ struct Compound {
 		n_singlebonds = compound->n_singlebonds;
 		n_anglebonds = compound->n_anglebonds;
 		n_dihedrals = compound->n_dihedrals;
-
 	}
 	__device__ void loadData(Compound* compound) {
 		if (threadIdx.x < n_particles) {

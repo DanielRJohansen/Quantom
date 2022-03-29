@@ -131,8 +131,6 @@ void CompoundBuilder::loadTopology(Molecule* molecule, vector<vector<string>>* t
 		addGeneric(molecule, &record, mode);
 	}
 
-
-
 }
 
 
@@ -225,21 +223,17 @@ void CompoundBuilder::addAngle(Molecule* molecule, ParticleRef* maps, vector<str
 
 	if (!g_bond.spansTwoCompounds()) {
 		Compound* compound = &molecule->compounds[maps[0].compound_id];
-		//compound->anglebonds[compound->n_anglebonds++] = AngleBond(angle, maps[0].local_id, maps[1].local_id, maps[2].local_id);
 		compound->anglebonds[compound->n_anglebonds++] = AngleBond(maps[0].local_id, maps[1].local_id, maps[2].local_id, angletype->theta_0, angletype->k_theta);
 	}
 	else {
 		CompoundBridge* bridge = compound_bridge_bundle->getBelongingBridge(&g_bond);
 		bridge->addBondParticles(&g_bond, molecule);
-		//bridge->addAnglebond(AngleBond(angle, maps[0].global_id, maps[1].global_id, maps[2].global_id));			
 		bridge->addGenericBond(AngleBond(maps[0].global_id, maps[1].global_id, maps[2].global_id, angletype->theta_0, angletype->k_theta));
 	}
 }
 
 void CompoundBuilder::addDihedral(Molecule* molecule, ParticleRef* maps, vector<string>* record) {
 	loadMaps(maps, record, 4);
-
-	//if (maps[0].global_id == 1)
 
 	GenericBond g_bond = GenericBond(maps, 4);
 	if (!g_bond.allParticlesExist())
@@ -250,13 +244,11 @@ void CompoundBuilder::addDihedral(Molecule* molecule, ParticleRef* maps, vector<
 
 	if (!g_bond.spansTwoCompounds()) {
 		Compound* compound = &molecule->compounds[maps[0].compound_id];
-		//compound->anglebonds[compound->n_anglebonds++] = AngleBond(angle, maps[0].local_id, maps[1].local_id, maps[2].local_id);
 		compound->dihedrals[compound->n_dihedrals++] = DihedralBond(maps[0].local_id, maps[1].local_id, maps[2].local_id, maps[3].local_id, dihedraltype->phi_0, dihedraltype->k_phi);
 	}
 	else {
 		CompoundBridge* bridge = compound_bridge_bundle->getBelongingBridge(&g_bond);
 		bridge->addBondParticles(&g_bond, molecule);
-		//bridge->addAnglebond(AngleBond(angle, maps[0].global_id, maps[1].global_id, maps[2].global_id));			
 		bridge->addGenericBond(DihedralBond(maps[0].global_id, maps[1].global_id, maps[2].global_id, maps[3].global_id, dihedraltype->phi_0, dihedraltype->k_phi));
 	}
 }
@@ -424,13 +416,14 @@ void CompoundBuilder::countElements(Molecule* molecule) {
 		counters[0] += C->n_particles;
 		counters[1] += C->n_singlebonds;
 		counters[2] += C->n_anglebonds;
-		//counters[3] += C->n_dihedrals;
+		counters[3] += C->n_dihedrals;
 	}
 
 	printf("Molecule created with %d compounds\n", molecule->n_compounds);
 	printf("%d particles added\n", counters[0]);
 	printf("%d singlebonds added\n", counters[1]);
 	printf("%d anglebonds added\n", counters[2]);
+	printf("%d dihedrals added\n", counters[3]);
 }
 
 

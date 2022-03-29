@@ -377,11 +377,11 @@ void Engine::applyThermostat() {
 void Engine::step() {
 	auto t0 = std::chrono::high_resolution_clock::now();
 
-	//compoundBridgeKernel <<< simulation->box->bridge_bundle->n_bridges, MAX_PARTICLES_IN_BRIDGE >>> (simulation->box);	// Must come before forceKernel()
+	compoundBridgeKernel <<< simulation->box->bridge_bundle->n_bridges, MAX_PARTICLES_IN_BRIDGE >>> (simulation->box);	// Must come before forceKernel()
 	cudaDeviceSynchronize();
 	//printf("\n\n");
 	forceKernel <<< simulation->box->n_compounds, THREADS_PER_COMPOUNDBLOCK >>> (simulation->box);
-	//solventForceKernel <<< BLOCKS_PER_SOLVENTKERNEL, THREADS_PER_SOLVENTBLOCK >>> (simulation->box);
+	solventForceKernel <<< BLOCKS_PER_SOLVENTKERNEL, THREADS_PER_SOLVENTBLOCK >>> (simulation->box);
 	cudaDeviceSynchronize();
 	//printf("\n\n");
 
@@ -398,7 +398,7 @@ void Engine::step() {
 	simulation->box->solvents = simulation->box->solvents_next;
 	simulation->box->solvents_next = temp_s;
 	
-
+	
 	//cudaMemcpy(simulation->box->compound_state_array, simulation->box->compound_state_array_next, sizeof(CompoundState) * MAX_COMPOUNDS, cudaMemcpyDeviceToDevice);	// Update all positions, after all forces have been calculated
 	
 	
@@ -475,8 +475,8 @@ __device__ Float3 calcLJForce(Float3* pos0, Float3* pos1, float* data_ptr, float
 
 #ifdef LIMA_VERBOSE
 	//if (threadIdx.x == 32 && blockIdx.x == 28 && force < -600000.f && force > -700000) {
-	if (abs(force) > 20000e+6) {
-		printf("Dist %f   D2 %f    force %f      sigma: %f \tepsilon %f  t1 %d t2 %d\n", (float)sqrt(dist_sq), (float) dist_sq, (float)force, sigma, epsilon, type1, type2);
+	if (abs(force) > 200e+6) {
+		printf("\nDist %f   D2 %f    force %f      sigma: %f \tepsilon %f  t1 %d t2 %d\n", (float)sqrt(dist_sq), (float) dist_sq, (float)force, sigma, epsilon, type1, type2);
 		pos0->print('0');
 		pos1->print('1');
 		//printf("Thread %d Block %d self %f %f %f other %f %f %f\n", threadIdx.x, blockIdx.x, pos0->x, pos0->y, pos0->z, pos1->x, pos1->y, pos1->z);
@@ -610,7 +610,7 @@ __device__ Float3 computeSolventToCompoundLJForces(Float3* self_pos, int n_parti
 	Float3 force(0, 0, 0);
 	for (int i = 0; i < n_particles; i++) {
 		force += calcLJForce(self_pos, &positions[i], data_ptr, potE_sum,
-			forcefield_device.particle_parameters[atomtype_self].sigma + forcefield_device.particle_parameters[ATOMTYPE_SOL].sigma,
+			(forcefield_device.particle_parameters[atomtype_self].sigma + forcefield_device.particle_parameters[ATOMTYPE_SOL].sigma)*0.5f,
 			forcefield_device.particle_parameters[atomtype_self].epsilon + forcefield_device.particle_parameters[ATOMTYPE_SOL].epsilon
 		);
 	}
@@ -700,14 +700,14 @@ __device__ Float3 computeAnglebondForces(T* entity, Float3* positions, Float3* u
 template <typename T>	// Can either be Compound or CompoundBridgeCompact
 __device__ Float3 computeDihedralForces(T* entity, Float3* positions, Float3* utility_buffer, float* potE) {
 	utility_buffer[threadIdx.x] = Float3(0, 0, 0);
-	for (int bond_offset = 0; (bond_offset * blockDim.x) < entity->n_anglebonds; bond_offset++) {
+	for (int bond_offset = 0; (bond_offset * blockDim.x) < entity->n_dihedrals; bond_offset++) {
 		DihedralBond* db = nullptr;
 		Float3 forces[4];
 		int bond_index = threadIdx.x + bond_offset * blockDim.x;
 
-		if (bond_index < entity->n_anglebonds) {
+		if (bond_index < entity->n_dihedrals) {
 			db = &entity->dihedrals[bond_index];
-
+			//printf("Firing %d of %d\n", bond_index, entity);
 			calcDihedralbondForces(
 				&positions[db->atom_indexes[0]],
 				&positions[db->atom_indexes[1]],
@@ -730,7 +730,8 @@ __device__ Float3 computeDihedralForces(T* entity, Float3* positions, Float3* ut
 			__syncthreads();
 		}
 	}
-
+	//if (utility_buffer[threadIdx.x].x != utility_buffer[threadIdx.x].x)
+		//utility_buffer[threadIdx.x].print('d');
 	return utility_buffer[threadIdx.x];
 }
 
@@ -905,7 +906,7 @@ __global__ void forceKernel(Box* box) {
 	
 	// ----------------------------------------------------------------------------- //
 
-	if (force.len() > 2e+9) {
+	if (force.len() > 2e+7) {
 		printf("Critical force %f\n\n\n", force.len());
 		box->critical_error_encountered = true;
 	}

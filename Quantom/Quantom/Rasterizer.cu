@@ -79,10 +79,6 @@ RenderBall* Rasterizer::processAtoms(RenderAtom* atoms, Simulation* simulation) 
 
 
 
-
-
-
-
 __device__ ATOM_TYPE RAS_getTypeFromIndex(int atom_index) {
     switch (atom_index)
     {
@@ -178,9 +174,11 @@ __global__ void loadCompoundatomsKernel(Box * box, RenderAtom * atoms) {        
     int compound_id = blockIdx.x;
     int global_id = threadIdx.x + blockIdx.x * blockDim.x;
 
-    atoms[global_id].pos = box->compound_state_array[compound_id].positions[local_id];                                                          // Might need to change this, if thread> n_particles!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    atoms[global_id].mass = SOLVENT_MASS;                                                         // TEMP
+    
     if (local_id < box->compounds[compound_id].n_particles) {
+        atoms[global_id].pos = box->compound_state_array[compound_id].positions[local_id];                                                          // Might need to change this, if thread> n_particles!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        //atoms[global_id].pos.print('A');
+        atoms[global_id].mass = SOLVENT_MASS;                                                         // TEMP
         //atoms[global_id].atom_type = RAS_getTypeFromIndex(box->compounds[compound_id].atom_types[local_id]);
         atoms[global_id].atom_type = RAS_getTypeFromIndex(box->compounds[compound_id].atom_color_types[local_id]);
     }
