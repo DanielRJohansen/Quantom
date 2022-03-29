@@ -13,7 +13,7 @@ const int N_SOLVATE_MOLECULES = 600;
 
 
 
-const int MAX_COMPOUND_PARTICLES = 64;
+const int MAX_COMPOUND_PARTICLES = 128;
 
 
 

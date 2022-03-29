@@ -377,7 +377,8 @@ void Engine::applyThermostat() {
 void Engine::step() {
 	auto t0 = std::chrono::high_resolution_clock::now();
 
-	compoundBridgeKernel <<< simulation->box->bridge_bundle->n_bridges, MAX_PARTICLES_IN_BRIDGE >>> (simulation->box);	// Must come before forceKernel()
+	if (simulation->box->bridge_bundle->n_bridges > 0)
+		compoundBridgeKernel <<< simulation->box->bridge_bundle->n_bridges, MAX_PARTICLES_IN_BRIDGE >>> (simulation->box);	// Must come before forceKernel()
 	cudaDeviceSynchronize();
 	//printf("\n\n");
 	forceKernel <<< simulation->box->n_compounds, THREADS_PER_COMPOUNDBLOCK >>> (simulation->box);

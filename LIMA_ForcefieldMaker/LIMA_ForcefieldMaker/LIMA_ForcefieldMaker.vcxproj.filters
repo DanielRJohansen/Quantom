@@ -18,12 +18,18 @@
     <ClCompile Include="LIMA_ForcefieldMaker.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="ForcefieldMerger.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Filehandling.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ForcefieldTypes.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ForcefieldMerger.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

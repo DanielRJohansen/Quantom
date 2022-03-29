@@ -139,10 +139,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="ForcefieldMerger.cpp" />
     <ClCompile Include="LIMA_ForcefieldMaker.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Filehandling.h" />
+    <ClInclude Include="ForcefieldMerger.h" />
     <ClInclude Include="ForcefieldTypes.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -16,67 +16,71 @@ using namespace std;
 
 const float water_mass = 15.999000 + 2 * 1.008000;
 const float water_sigma = 0.302905564168 + 2 * 0.040001352445;
-const float water_epsilon = (0.50208f + 2.f * 0.19246f);// *1000.f;		// Convert kJ->J
+const float water_epsilon = (0.50208f + 2.f * 0.19246f) *1000.f;		// Convert kJ->J
 
 
-bool charIsNumber(char c) {
-	return ((int)c > 47 && (int)c < 58);
-}
-bool charIsNumberAbove1(char c) {
-	return ((int)c > 49 && (int)c < 58);
-}
-float calcLikeness(string a, string b) {
-	float likeness = 0;
-	float point_scale = 1.f / max(a.length(), b.length());
-
-	for (int i = 0; i < min(a.length(), b.length()); i++) {
-		if (a[i] == b[i])
-			likeness += point_scale;
-		else
-			break;
+struct FTHelpers {
+	static bool charIsNumber(char c) {
+		return ((int)c > 47 && (int)c < 58);
 	}
-	return likeness;
-}
+	static bool charIsNumberAbove1(char c) {
+		return ((int)c > 49 && (int)c < 58);
+	}
+	static float calcLikeness(string a, string b) {
+		float likeness = 0;
+		float point_scale = 1.f / max(a.length(), b.length());
 
-bool isSorted(string* leftmost, string* rightmost) {
-	int ptr = 0;
-	while (leftmost->length() > ptr && rightmost->length() > ptr) {
-		if ((int)(*leftmost)[ptr] < (int)(*rightmost)[ptr]) {
-			return true;
+		for (int i = 0; i < min(a.length(), b.length()); i++) {
+			if (a[i] == b[i])
+				likeness += point_scale;
+			else
+				break;
 		}
-		else if ((int)(*leftmost)[ptr] > (int)(*rightmost)[ptr]) {
+		return likeness;
+	}
+
+	static bool isSorted(string* leftmost, string* rightmost) {
+		int ptr = 0;
+		while (leftmost->length() > ptr && rightmost->length() > ptr) {
+			if ((int)(*leftmost)[ptr] < (int)(*rightmost)[ptr]) {
+				return true;
+			}
+			else if ((int)(*leftmost)[ptr] > (int)(*rightmost)[ptr]) {
+				return false;
+			}
+			ptr++;
+		}
+		if (leftmost->length() > rightmost->length()) {
 			return false;
 		}
-		ptr++;
 	}
-	if (leftmost->length() > rightmost->length()) {
-		return false;
-	}
-}
 
-static vector<string> parseConf(vector<vector<string>> rows) {		// KNOWN ERROR HERE. SOMETIMES SPACES IN FILES ARE TABS, AND IT DOESN'T RECOGNISE A ROW AS A PROPER ENTRY!!
-	vector<string> atom_types;
+	static vector<string> parseConf(vector<vector<string>> rows) {		// KNOWN ERROR HERE. SOMETIMES SPACES IN FILES ARE TABS, AND IT DOESN'T RECOGNISE A ROW AS A PROPER ENTRY!!
+		vector<string> atom_types;
 
-	for (vector<string> row : rows) {
-		if (row.size() != 6) {
-			continue;
-		}
-
-		bool type_already_found = false;
-		for (string atom_type : atom_types) {
-			if (atom_type == row[1]) {
-				type_already_found = true;
-				break;
+		for (vector<string> row : rows) {
+			if (row.size() != 6) {
+				continue;
 			}
+
+			bool type_already_found = false;
+			for (string atom_type : atom_types) {
+				if (atom_type == row[1]) {
+					type_already_found = true;
+					break;
+				}
+			}
+			if (!type_already_found)
+				atom_types.push_back(row[1]);
 		}
-		if (!type_already_found)
-			atom_types.push_back(row[1]);
+
+		printf("%d atom types in conf\n", atom_types.size());
+
+		return atom_types;
 	}
 
-	printf("%d atom types in conf\n", atom_types.size());
 
-	return atom_types;
-}
+};
 
 
 struct Map {
@@ -115,15 +119,18 @@ struct Map {
 };
 
 
-struct FF_nonbonded {
-	FF_nonbonded() {}
-	FF_nonbonded(string t) : type(t){}		// This is for loading form the conf file, for easy comparisons
-	FF_nonbonded(string t, int a, float m, float s, float e) : type(t), atnum(a), mass(m), sigma(s), epsilon(e) {}
+struct NB_Atomtype {
+	NB_Atomtype() {}
+	NB_Atomtype(string t) : type(t){}		// This is for loading form the conf file, for easy comparisons
+	NB_Atomtype(string t, float mass) : type(t), mass(mass) {}		// This if for forcefield merging
+	NB_Atomtype(string t, int atnum, float mass, float sigma, float epsilon) : type(t), atnum(atnum), mass(mass), sigma(sigma), epsilon(epsilon) {}
 	// Official parameters
 	string type;
-	int atnum = -1;		// atnum given by CHARMM
-	int atnum_local = 0;	// atnum specific to simulation
-	float mass, sigma, epsilon;
+	int atnum = -1;					// atnum given by input file (CHARMM)
+	int atnum_local = 0;			// atnum specific to simulation
+	float mass = -1;		// [g/mol]
+	float sigma = -1;	// [nm]
+	float epsilon = -1;	// J/mol
 
 	// LIMA parameters
 	bool is_present_in_simulation = false;
@@ -133,8 +140,8 @@ struct FF_nonbonded {
 
 
 
-	//bool operator==(const FF_nonbonded a) { return (type == a.type); }
-	//static bool sameType(FF_nonbonded a, FF_nonbonded b) { return (a.type == b.type); }
+	//bool operator==(const NB_Atomtype a) { return (type == a.type); }
+	//static bool sameType(NB_Atomtype a, NB_Atomtype b) { return (a.type == b.type); }
 
 
 	// Parser functions
@@ -146,15 +153,15 @@ struct FF_nonbonded {
 			return PAIRTYPES;
 		return current_state;
 	}
-	static vector<FF_nonbonded> parseNonbonded(vector<vector<string>> rows) {		// KNOWN ERROR HERE. SOMETIMES SPACES IN FILES ARE TABS, AND IT DOESN'T RECOGNISE A ROW AS A PROPER ENTRY!!
+	static vector<NB_Atomtype> parseNonbonded(vector<vector<string>> rows) {		// KNOWN ERROR HERE. SOMETIMES SPACES IN FILES ARE TABS, AND IT DOESN'T RECOGNISE A ROW AS A PROPER ENTRY!!
 		STATE current_state = INACTIVE;
 
-		vector<FF_nonbonded> records;
+		vector<NB_Atomtype> records;
 
-		records.push_back(FF_nonbonded("WATER", 0, water_mass, water_sigma, water_epsilon));		// Solvent type always first!
+		records.push_back(NB_Atomtype("WATER", 0, water_mass, water_sigma, water_epsilon));		// Solvent type always first!
 
+		
 		for (vector<string> row : rows) {
-
 			if (row.size() == 3) {
 				current_state = setState(row[1], current_state);
 				continue;
@@ -162,17 +169,26 @@ struct FF_nonbonded {
 
 
 		START:
-
-			switch (current_state)
-			{
+			switch (current_state) {
 			case INACTIVE:
 				break;
 			case ATOMTYPES:
-				if (row.size() != 7) {
+				if (row.size() < 7) {
+					printf("%d\t:", row.size());
+					for (string e : row)
+						cout << e << ':';
+					cout << '\n';
 					continue;													// TODO: dont just run from your problems, man...
-
 				}
-				records.push_back(FF_nonbonded(row[0], stoi(row[1]), stod(row[2]), stod(row[5]), stod(row[6])));
+				if (records.back().type == row[0])	// If the atom type already exitsts, skip
+					break;
+				records.push_back(NB_Atomtype(
+					row[0], 
+					stoi(row[1]), 
+					stof(row[2]), 
+					stof(row[5]), 
+					stof(row[6]) * 1000.f	// convert kJ to J
+				));
 				break;
 			case PAIRTYPES:
 				break;
@@ -183,19 +199,19 @@ struct FF_nonbonded {
 		printf("%d atom types read from file\n", records.size());
 		return records;
 	}
-	static FF_nonbonded findRecord(vector<FF_nonbonded>* records, string type) {
-		for (FF_nonbonded record : *records) {
+	static NB_Atomtype findRecord(vector<NB_Atomtype>* records, string type) {
+		for (NB_Atomtype record : *records) {
 			if (record.type == type) {
 				return record;
 			}
 		}
-		return FF_nonbonded();
+		return NB_Atomtype();
 	}
-	static bool typeAlreadyPresent(vector<FF_nonbonded>* records, string type) {
+	static bool typeAlreadyPresent(vector<NB_Atomtype>* records, string type) {
 		return (findRecord(records, type).atnum != -1);
 	}
-	static vector<FF_nonbonded> filterUnusedTypes(vector<FF_nonbonded> records, vector<string> active_types, Map* map) {
-		vector<FF_nonbonded> filtered_list;
+	static vector<NB_Atomtype> filterUnusedTypes(vector<NB_Atomtype> records, vector<string> active_types, Map* map) {
+		vector<NB_Atomtype> filtered_list;
 
 		filtered_list.push_back(records[0]);				// Solvent is not present in topology, so we force it to be added here!
 		//string* mappings = new string[10000];
@@ -206,26 +222,18 @@ struct FF_nonbonded {
 
 
 
-			FF_nonbonded record = findRecord(&records, alias);
+			NB_Atomtype record = findRecord(&records, alias);
 
 			if (record.atnum != -1) {
 				if (!typeAlreadyPresent(&filtered_list, alias)) {
-					//cout << "Adding alias " << alias << endl;
 					record.atnum_local = filtered_list.size();
 					filtered_list.push_back(record);
 				}
 				if (type != alias) {
 					map->addMap(type, alias);
-					//mappings[*m_cnt * 2] = type;
-					//mappings[*m_cnt * 2 + 1] = alias;
-					//(*m_cnt)++;
-				}
-						
-									
+				}					
 			}
 			else {
-				//cout << "Atom type " << alias << " not found" << endl;
-
 				if (alias.length() > 0) {
 					alias.pop_back();
 					goto TRY_AGAIN;
@@ -304,14 +312,14 @@ struct Atom {
 	}
 
 	//void assignAtomtypeID()
-	static void assignAtomtypeIDs(vector<Atom>* atoms, vector<FF_nonbonded>* forcefield, Map* map) {
+	static void assignAtomtypeIDs(vector<Atom>* atoms, vector<NB_Atomtype>* forcefield, Map* map) {
 
 
 		for (int i = 0; i < atoms->size(); i++) {
 			Atom* atom = &((*atoms).at(i));
 			string alias = map->mapRight(atom->atomtype);
 
-			for (FF_nonbonded force_parameters : *forcefield) {
+			for (NB_Atomtype force_parameters : *forcefield) {
 				if (force_parameters.type == alias) {
 					atom->atomtype_id = force_parameters.atnum_local;
 				}
@@ -322,7 +330,7 @@ struct Atom {
 		for (Atom atom : *atoms) {
 			string alias = map->mapRight(atom.atomtype);
 
-			for (FF_nonbonded force_parameters : *forcefield) {
+			for (NB_Atomtype force_parameters : *forcefield) {
 				if (force_parameters.type == alias) {
 					atom.atomtype_id = force_parameters.simulation_specific_id;
 				}
@@ -483,7 +491,7 @@ struct Bondtype {
 		float best_likeness = 0;
 		Bondtype best_bond;
 		for (Bondtype bond : *FF_bondtypes) {
-			float likeness = calcLikeness(query_type->type1, bond.type1) * calcLikeness(query_type->type2, bond.type2);
+			float likeness = FTHelpers::calcLikeness(query_type->type1, bond.type1) * FTHelpers::calcLikeness(query_type->type2, bond.type2);
 			if (likeness > best_likeness) {
 				best_likeness = likeness;
 				best_bond = bond;
@@ -654,7 +662,7 @@ struct Angletype {
 		float best_likeness = 0;
 		Angletype best_angle;
 		for (Angletype angle : *FF_angletypes) {
-			float likeness = calcLikeness(query_type->type1, angle.type1) * calcLikeness(query_type->type2, angle.type2) * calcLikeness(query_type->type3, angle.type3);
+			float likeness = FTHelpers::calcLikeness(query_type->type1, angle.type1) * FTHelpers::calcLikeness(query_type->type2, angle.type2) * FTHelpers::calcLikeness(query_type->type3, angle.type3);
 			if (likeness > best_likeness) {
 				best_likeness = likeness;
 				best_angle = angle;
@@ -715,12 +723,12 @@ struct Dihedraltype {
 	}
 	void sort() {		
 		if (type1 != type4) {
-			if (!isSorted(&type1, &type4)) {
+			if (!FTHelpers::isSorted(&type1, &type4)) {
 				flip();
 			}
 		}
 		else {			// In case the outer two is identical, we check the inner two.
-			if (!isSorted(&type2, &type3)) {
+			if (!FTHelpers::isSorted(&type2, &type3)) {
 				flip();
 			}
 		}
@@ -818,7 +826,7 @@ struct Dihedraltype {
 		float best_likeness = 0;
 		Dihedraltype best_match;
 		for (Dihedraltype dihedral : *forcefield) {
-			float likeness = calcLikeness(query_type->type1, dihedral.type1) * calcLikeness(query_type->type2, dihedral.type2) * calcLikeness(query_type->type3, dihedral.type3) * calcLikeness(query_type->type4, dihedral.type4);
+			float likeness = FTHelpers::calcLikeness(query_type->type1, dihedral.type1) * FTHelpers::calcLikeness(query_type->type2, dihedral.type2) * FTHelpers::calcLikeness(query_type->type3, dihedral.type3) * FTHelpers::calcLikeness(query_type->type4, dihedral.type4);
 			if (likeness > best_likeness) {
 				best_likeness = likeness;
 				best_match = dihedral;
