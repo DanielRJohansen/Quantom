@@ -47,7 +47,7 @@ public:
 	}
 
 
-	static vector<string> parseRow(string line) {
+	static vector<string> parseRowExternal(string line) {
 		vector<string> row;
 		stringstream ss(line);
 		string element;
@@ -62,14 +62,29 @@ public:
 		}
 		return row;
 	}
+	static vector <string> parseRowInternal(string line) {
+		vector<string> row;
+		stringstream ss(line);
+		string element;
+		string e2;
 
-	static vector<vector<string>> readFile(string path, int end_at = INT_MAX) {
+		while (getline(ss, element, ' ')) {
+			stringstream ss2 = stringstream(element);
+			while (getline(ss2, e2, ';')) {
+				if (e2.length() > 0)
+					row.push_back(e2);
+			}
+		}
+		return row;
+	}
+
+	static vector<vector<string>> readFile(string path, vector<char> ignores = {';', '#', '!'}, bool internal_file=false) {
 
 		fstream file;
 		file.open(path);
 		cout << "Reading file " << path << endl;
 
-		vector<char> ignores = { ';', '#', '!' };
+		//vector<char> ignores = { ';', '#', '!' };
 		vector<vector<string>> rows;
 		int row_cnt = 0;
 		int ignore_cnt = 0;
@@ -83,10 +98,11 @@ public:
 			}
 
 			//cout << line << endl;
-
-			rows.push_back(parseRow(line));
-			if (row_cnt++ >= end_at)
-				break;
+			if (internal_file)
+				rows.push_back(parseRowInternal(line));
+			else
+				rows.push_back(parseRowExternal(line));
+			row_cnt++;
 		}
 		printf("%d rows read. %d rows ignored\n", row_cnt, ignore_cnt);
 
@@ -137,7 +153,7 @@ public:
 		file << FFOutHelpers::endBlock();
 
 		file << FFOutHelpers::titleH2("Non-bonded parameters");
-		file << FFOutHelpers::titleH3("{atom_type \t atnum \t mass [g/mol] \t sigma [nm] \t epsilon [J/mol]}");
+		file << FFOutHelpers::titleH3("{atom_type \t type_id \t mass [g/mol] \t sigma [nm] \t epsilon [J/mol]}");
 		file << FFOutHelpers::parserTitle("ff_nonbonded");
 		for (NB_Atomtype record : records_nonbonded) {
 			file << record.type << ';' << to_string(record.atnum_local) << ';' << to_string(record.mass) << ';' << to_string(record.sigma) << ';' << to_string(record.epsilon) << endl;

@@ -558,7 +558,7 @@ __device__ void calcDihedralbondForces(Float3* pos_left, Float3* pos_lm, Float3*
 
 	//error = (error / (2.f * PI)) * 360.f;
 
-	*potE += 0.5 * ktheta * error * error * 0.5;
+	*potE += 0.5 * k_phi * error * error * 0.5;
 	double force_scalar = dihedral->k_phi * (error);
 
 

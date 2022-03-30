@@ -80,6 +80,21 @@ struct FTHelpers {
 	}
 
 
+	enum STATE { INACTIVE, FF_NONBONDED, FF_BONDTYPES, FF_ANGLETYPES, FF_DIHEDRALTYPES, FF_PAIRTYPES };
+	static STATE setState(string s, STATE current_state) {
+		if (s == "ff_nonbonded")
+			return FF_NONBONDED;
+		if (s == "ff_bondtypes" || s == "bonds")
+			return FF_BONDTYPES;
+		if (s == "ff_angletypes" || s == "angles")
+			return FF_ANGLETYPES;
+		if (s == "ff_dihedraltypes" || s == "dihedrals")
+			return FF_DIHEDRALTYPES;
+		if (s == "pairs")
+			return FF_PAIRTYPES;
+
+		return current_state;
+	}
 };
 
 
@@ -102,8 +117,15 @@ struct Map {
 	Mapping* mappings;
 	int n_mappings = 0; 
 
+	bool mapExists(string l) {
+		for (int i = 0; i < n_mappings; i++)
+			if (l == mappings[i].left)
+				return true;
+		return false;
+	}
 	void addMap(string l, string r) {
-		mappings[n_mappings++] = Mapping(l, r);
+		if (!mapExists(l))
+			mappings[n_mappings++] = Mapping(l, r);
 	}
 	string mapRight(string query) {
 		for (int i = 0; i < n_mappings; i++) {
@@ -123,9 +145,10 @@ struct NB_Atomtype {
 	NB_Atomtype() {}
 	NB_Atomtype(string t) : type(t){}		// This is for loading form the conf file, for easy comparisons
 	NB_Atomtype(string t, float mass) : type(t), mass(mass) {}		// This if for forcefield merging
-	NB_Atomtype(string t, int atnum, float mass, float sigma, float epsilon) : type(t), atnum(atnum), mass(mass), sigma(sigma), epsilon(epsilon) {}
+	NB_Atomtype(string t, float mass, float sigma, float epsilon) : type(t),  mass(mass), sigma(sigma), epsilon(epsilon) {}		// For LIMA_ffnonbonded
+	NB_Atomtype(string t, int atnum, float mass, float sigma, float epsilon) : type(t), atnum(atnum), mass(mass), sigma(sigma), epsilon(epsilon) {}		// For random dudes ff_nonbonded
 	// Official parameters
-	string type;
+	string type = "";
 	int atnum = -1;					// atnum given by input file (CHARMM)
 	int atnum_local = 0;			// atnum specific to simulation
 	float mass = -1;		// [g/mol]
@@ -145,16 +168,9 @@ struct NB_Atomtype {
 
 
 	// Parser functions
-	enum STATE { INACTIVE, ATOMTYPES, PAIRTYPES };
-	static STATE setState(string s, STATE current_state) {
-		if (s == "atomtypes")
-			return ATOMTYPES;
-		if (s == "pairtypes")
-			return PAIRTYPES;
-		return current_state;
-	}
+
 	static vector<NB_Atomtype> parseNonbonded(vector<vector<string>> rows) {		// KNOWN ERROR HERE. SOMETIMES SPACES IN FILES ARE TABS, AND IT DOESN'T RECOGNISE A ROW AS A PROPER ENTRY!!
-		STATE current_state = INACTIVE;
+		FTHelpers::STATE current_state = FTHelpers::INACTIVE;
 
 		vector<NB_Atomtype> records;
 
@@ -162,35 +178,22 @@ struct NB_Atomtype {
 
 		
 		for (vector<string> row : rows) {
-			if (row.size() == 3) {
-				current_state = setState(row[1], current_state);
+
+			if (row.size() == 2) {
+				current_state =FTHelpers::setState(row[1], current_state);
 				continue;
 			}
 
 
-		START:
 			switch (current_state) {
-			case INACTIVE:
-				break;
-			case ATOMTYPES:
-				if (row.size() < 7) {
-					printf("%d\t:", row.size());
-					for (string e : row)
-						cout << e << ':';
-					cout << '\n';
-					continue;													// TODO: dont just run from your problems, man...
-				}
-				if (records.back().type == row[0])	// If the atom type already exitsts, skip
-					break;
+			case FTHelpers::FF_NONBONDED:
+
 				records.push_back(NB_Atomtype(
 					row[0], 
-					stoi(row[1]), 
+					stof(row[1]), 
 					stof(row[2]), 
-					stof(row[5]), 
-					stof(row[6]) * 1000.f	// convert kJ to J
+					stof(row[3])
 				));
-				break;
-			case PAIRTYPES:
 				break;
 			default:
 				break;
@@ -207,25 +210,50 @@ struct NB_Atomtype {
 		}
 		return NB_Atomtype();
 	}
-	static bool typeAlreadyPresent(vector<NB_Atomtype>* records, string type) {
-		return (findRecord(records, type).atnum != -1);
+	static bool typeIsPresent(vector<NB_Atomtype>* records, string type) {
+		return (findRecord(records, type).type != "");
 	}
-	static vector<NB_Atomtype> filterUnusedTypes(vector<NB_Atomtype> records, vector<string> active_types, Map* map) {
+	static vector<NB_Atomtype> filterUnusedTypes(vector<NB_Atomtype> forcefield, vector<string> active_types, Map* map) {
 		vector<NB_Atomtype> filtered_list;
 
-		filtered_list.push_back(records[0]);				// Solvent is not present in topology, so we force it to be added here!
+		filtered_list.push_back(forcefield[0]);				// Solvent is not present in topology, so we force it to be added here!
 		//string* mappings = new string[10000];
 		for (string type : active_types) {
 			bool found = false;
 			string alias = type;
+
+
+
 			TRY_AGAIN:
 
 
+			if (typeIsPresent(&forcefield, alias)) {		// If type from conf exists, in forcefield, we follow happy path
+				NB_Atomtype record = findRecord(&forcefield, alias);
 
-			NB_Atomtype record = findRecord(&records, alias);
+				if (!typeIsPresent(&filtered_list, alias)) {			// If type is not present in filtered list, add it with a simulation-specific type-id.
+					record.atnum_local = filtered_list.size();
+					filtered_list.push_back(record);
+				}				
+				if (type != alias) {									// If type != alias, add it to map
+					map->addMap(type, alias);
+				}
+			}
+			else {												// Type from conf does not exist, so we change the alias and try again
+				if (alias.length() > 1) {
+					alias.pop_back();
+					goto TRY_AGAIN;
+				}
+				else {
+					printf("Failed");
+					exit(404);
+				}
+			}
+
+			/*
+			NB_Atomtype record = findRecord(&forcefield, alias);
 
 			if (record.atnum != -1) {
-				if (!typeAlreadyPresent(&filtered_list, alias)) {
+				if (!typeIsPresent(&filtered_list, alias)) {
 					record.atnum_local = filtered_list.size();
 					filtered_list.push_back(record);
 				}
@@ -243,15 +271,16 @@ struct NB_Atomtype {
 					exit(404);
 				}
 			}
+			*/
 		}
 		printf("Filtered ff down to %d entries (%d bytes)\n", filtered_list.size(), sizeof(float) * 3 * filtered_list.size());
 		printf("Aliases (%d): \n", map->n_mappings);
 		for (int i = 0; i < map->n_mappings; i++) {
-			//cout << mappings[i*2] << "    " << mappings[i*2+1] << endl;
+			//cout << map->mappings[i].left << "    " << map->mappings[i].right << endl;
 		}
+		printf("\n\n\n");
 		return filtered_list;
 	}
-	
 };
 
 
@@ -268,7 +297,6 @@ struct Atom {
 	//float charge;
 
 
-	void convertToZeroindexed() { id--; }
 
 	enum STATE { INACTIVE, ATOMS, FINISHED };
 	static STATE setState(string s, STATE current_state) {
@@ -311,10 +339,10 @@ struct Atom {
 		return records;
 	}
 
-	//void assignAtomtypeID()
+
+
+
 	static void assignAtomtypeIDs(vector<Atom>* atoms, vector<NB_Atomtype>* forcefield, Map* map) {
-
-
 		for (int i = 0; i < atoms->size(); i++) {
 			Atom* atom = &((*atoms).at(i));
 			string alias = map->mapRight(atom->atomtype);
@@ -394,45 +422,23 @@ struct Bondtype {
 		//printf("\n");
 	}
 
-	enum STATE { INACTIVE, BONDTYPES, ANGLETYPES, DIHEDRALTYPES, PAIRTYPES };
-	static STATE setState(string s, STATE current_state) {
-		if (s == "bondtypes" || s == "bonds")
-			return BONDTYPES;
-		if (s == "angletypes" || s == "angles")
-			return ANGLETYPES;
-		if (s == "dihedraltypes")
-			return DIHEDRALTYPES;
-		if (s == "pairs")
-			return PAIRTYPES;
-		return current_state;
-	}
+
 	static vector<Bondtype> parseFFBondtypes(vector<vector<string>> rows) {
-		STATE current_state = INACTIVE;
+		FTHelpers::STATE current_state = FTHelpers::INACTIVE;
 
 		vector<Bondtype> records;
 
 		for (vector<string> row : rows) {
-
-			if (row.size() == 3) {
-				current_state = setState(row[1], current_state);
+			if (row.size() == 2) {
+				current_state = FTHelpers::setState(row[1], current_state);
 				continue;
 			}
 
 
+			switch (current_state) {
+			case FTHelpers::FF_BONDTYPES:
 
-			switch (current_state)
-			{
-			case INACTIVE:
-				break;
-			case BONDTYPES:
-				if (row.size() != 5) {
-					continue;													// TODO: dont just run from your problems, man...
-				}
-				records.push_back(Bondtype(row[0], row[1], stof(row[3]), stof(row[4])));
-				break;
-			case ANGLETYPES:
-				break;
-			case DIHEDRALTYPES:
+				records.push_back(Bondtype(row[0], row[1], stof(row[2]), stof(row[3])));
 				break;
 			default:
 				break;
@@ -443,30 +449,26 @@ struct Bondtype {
 	}
 
 	static vector<Bondtype> parseTopolBondtypes(vector<vector<string>> rows) {
-		STATE current_state = INACTIVE;
+		FTHelpers::STATE current_state = FTHelpers::INACTIVE;
 		vector<Bondtype> records;
 
 		for (vector<string> row : rows) {
 			if (row.size() == 3) {
 				if (row[0][0] == '[') {
-					current_state = setState(row[1], current_state);
+					current_state = FTHelpers::setState(row[1], current_state);
 					continue;
 				}				
 			}
 
 
 
-			switch (current_state)
-			{
-			case BONDTYPES:
+			switch (current_state) {
+			case FTHelpers::FF_BONDTYPES:
 				records.push_back(Bondtype(stoi(row[0]), stoi(row[1])));
 				break;
 			default:
 				break;
 			}
-
-			if (current_state == PAIRTYPES)
-				break;
 		}
 		printf("%d bonds found in topology file\n", records.size());
 		return records;	
@@ -565,48 +567,31 @@ struct Angletype {
 	}
 
 
-	enum STATE { INACTIVE, BONDTYPES, ANGLETYPES, DIHEDRALTYPES };
-	static STATE setState(string s, STATE current_state) {
-		if (s == "bondtypes" || s == "bonds")
-			return BONDTYPES;
-		if (s == "angletypes" || s == "angles")
-			return ANGLETYPES;
-		if (s == "dihedraltypes" || s == "dihedrals")
-			return DIHEDRALTYPES;
-		return current_state;
-	}
+
 
 	static vector<Angletype> parseFFAngletypes(vector<vector<string>> rows) {
-		STATE current_state = INACTIVE;
+		FTHelpers::STATE current_state = FTHelpers::INACTIVE;
 		vector<Angletype> angletypes;
 
 		for (vector<string> row : rows) {
 
-			if (row.size() == 3) {
-				current_state = setState(row[1], current_state);
+			if (row.size() == 2) {
+				current_state = FTHelpers::setState(row[1], current_state);
 				continue;
 			}
 
 
 
-			switch (current_state)
-			{
-			case INACTIVE:
-				break;
-			case ANGLETYPES:
-				if (row.size() < 8) {
-					continue;													// TODO: dont just run from your problems, man...
-				}
-				angletypes.push_back(Angletype(row[0], row[1], row[2], stof(row[4]), stof(row[5])));
-				break;
-			case DIHEDRALTYPES:
+			switch (current_state) {
+			case FTHelpers::FF_ANGLETYPES:
+				angletypes.push_back(Angletype(row[0], row[1], row[2], stof(row[3]), stof(row[4])));
 				break;
 			default:
 				break;
 			}
 
 
-			if (current_state == DIHEDRALTYPES)
+			if (current_state == FTHelpers::FF_DIHEDRALTYPES)
 				break;
 		}
 		printf("%d angletypes in forcefield\n", angletypes.size());
@@ -614,13 +599,13 @@ struct Angletype {
 	}
 
 	static vector<Angletype> parseTopolAngletypes(vector<vector<string>> rows) {
-		STATE current_state = INACTIVE;
+		FTHelpers::STATE current_state = FTHelpers::INACTIVE;
 		vector<Angletype> records;
 
 		for (vector<string> row : rows) {
 			if (row.size() == 3) {
 				if (row[0][0] == '[') {
-					current_state = setState(row[1], current_state);
+					current_state = FTHelpers::setState(row[1], current_state);
 					continue;
 				}
 			}
@@ -629,7 +614,7 @@ struct Angletype {
 
 			switch (current_state)
 			{
-			case ANGLETYPES:
+			case FTHelpers::FF_ANGLETYPES:
 				records.push_back(Angletype(stoi(row[0]), stoi(row[1]), stoi(row[2])));
 				break;
 			default:
@@ -637,7 +622,7 @@ struct Angletype {
 			}
 
 
-			if (current_state == DIHEDRALTYPES)
+			if (current_state == FTHelpers::FF_DIHEDRALTYPES)
 				break;
 		}
 		printf("%d angles found in topology file\n", records.size());
@@ -735,39 +720,24 @@ struct Dihedraltype {
 	}
 
 
-	enum STATE { INACTIVE, BONDTYPES, ANGLETYPES, DIHEDRALTYPES, CMAP };
-	static STATE setState(string s, STATE current_state) {
-		if (s == "bondtypes" || s == "bonds")
-			return BONDTYPES;
-		if (s == "angletypes" || s == "angles")
-			return ANGLETYPES;
-		if (s == "dihedraltypes" || s == "dihedrals")
-			return DIHEDRALTYPES;
-		if (s == "cmap")
-			return CMAP;
-		return current_state;
-	}
 
 	static vector<Dihedraltype> parseFFDihedraltypes(vector<vector<string>> rows) {
-		STATE current_state = INACTIVE;
+		FTHelpers::STATE current_state = FTHelpers::INACTIVE;
 		vector<Dihedraltype> dihedraltypes;
 
 		for (vector<string> row : rows) {
 
-			if (row.size() == 3) {
-				current_state = setState(row[1], current_state);
+			if (row.size() == 2) {
+				current_state = FTHelpers::setState(row[1], current_state);
 				continue;
 			}
 
+	
 
 
-			switch (current_state)
-			{
-			case DIHEDRALTYPES:
-				if (row.size() < 7) {
-					continue;													// TODO: dont just run from your problems, man...
-				}
-				dihedraltypes.push_back(Dihedraltype(row[0], row[1], row[2], row[3], stof(row[5]), stof(row[6])));
+			switch (current_state) {
+			case FTHelpers::FF_DIHEDRALTYPES:
+				dihedraltypes.push_back(Dihedraltype(row[0], row[1], row[2], row[3], stof(row[4]), stof(row[5])));
 				break;
 			default:
 				break;
@@ -779,23 +749,29 @@ struct Dihedraltype {
 	}
 
 	static vector<Dihedraltype> parseTopolDihedraltypes(vector<vector<string>> rows) {
-		STATE current_state = INACTIVE;
+		FTHelpers::STATE current_state = FTHelpers::INACTIVE;
 		vector<Dihedraltype> records;
+
+		bool entered_dihedrals_first_time = false;	// The top contains maybe improper dihedrals? ANyways these mess up, as they are simply named as dihedrals
 
 		for (vector<string> row : rows) {
 			if (row.size() == 3) {
 				if (row[0][0] == '[') {
-					current_state = setState(row[1], current_state);
+					current_state = FTHelpers::setState(row[1], current_state);
+					if (entered_dihedrals_first_time)
+						break;
 					continue;
 				}
 			}
 
+		
 
-
-			switch (current_state)
-			{
-			case DIHEDRALTYPES:
+			switch (current_state) {
+			case FTHelpers::FF_DIHEDRALTYPES:
+				if (row.size() != 5)
+					continue;
 				records.push_back(Dihedraltype(stoi(row[0]), stoi(row[1]), stoi(row[2]), stoi(row[3])));
+				entered_dihedrals_first_time = true;
 				break;
 			default:
 				break;
@@ -858,11 +834,3 @@ struct Dihedraltype {
 		printf("\n");
 	}
 };
-
-
-
-
-
-
-
-

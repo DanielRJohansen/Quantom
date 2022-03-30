@@ -24,7 +24,7 @@ vector<NB_Atomtype> makeFilteredNonbondedFF(Map* map) {
 
 //	vector<vector<string>> ffnonbonded_rows = readFile("C:\\PROJECTS\\Quantom\\charmm36-mar2019.ff\\ffnonbonded.itp");
 	//vector<vector<string>> ffnonbonded_rows = readFile(sim_path+"/Forcefield/ffnonbonded.itp");
-	vector<vector<string>> ffnonbonded_rows = Reader::readFile(FileHelpers::pathJoin(forcefield_path, "ffnonbonded.itp"));
+	vector<vector<string>> ffnonbonded_rows = Reader::readFile(FileHelpers::pathJoin(forcefield_path, "LIMA_ffnonbonded.txt"), {'/'}, true);
 	vector<NB_Atomtype> ffnonbonded = NB_Atomtype::parseNonbonded(ffnonbonded_rows);
 
 	return NB_Atomtype::filterUnusedTypes(ffnonbonded, simconf, map);
@@ -79,7 +79,7 @@ void prepareForcefieldForSimulation() {
 	// These two vectors contain information about all types, but are parsed individually. This is very slightly slower, but MUCH more readable!
 //	vector<vector<string>> ffbonded_rows = readFile("C:\\PROJECTS\\Quantom\\charmm36-mar2019.ff\\ffbonded.itp");
 	//vector<vector<string>> ffbonded_rows = readFile(sim_path + "/Forcefield/ffbonded.itp");
-	vector<vector<string>> ffbonded_rows = Reader::readFile(FileHelpers::pathJoin(forcefield_path, "ffbonded.itp"));
+	vector<vector<string>> ffbonded_rows = Reader::readFile(FileHelpers::pathJoin(forcefield_path, "LIMA_ffbonded.txt"), { '/' }, true);
 	//	vector<vector<string>> topology_rows = readFile("C:\\PROJECTS\\Quantom\\Molecules\\t4lys_full\\topol.top");
 		//vector<vector<string>> topology_rows = readFile(sim_path + "/Molecule/topol.top");
 	vector<vector<string>> topology_rows = Reader::readFile(FileHelpers::pathJoin(mol_path, "topol.top"));
@@ -98,14 +98,14 @@ void prepareForcefieldForSimulation() {
 
 
 	Printer::printForcefieldSummary(
-		FileHelpers::pathJoin(forcefield_path, "ForcefieldSummary.txt"),
+		FileHelpers::pathJoin(forcefield_path, "LIMA_ffnonbonded_filtered.txt"),
 		ff_nonbonded_active, &map
 	);
 
 
 	Printer::printForcefield(
 
-		FileHelpers::pathJoin(forcefield_path, "Forcefield.txt"),
+		FileHelpers::pathJoin(forcefield_path, "LIMA_ffbonded_filtered.txt"),
 		atoms,
 		topology_bonds,
 		topology_angles,
@@ -113,21 +113,15 @@ void prepareForcefieldForSimulation() {
 	);
 }
 
-
-
-
-int main(int argc, char* argv[]) {
-	//prepareForcefieldForSimulation();
-
-
+void mergeForcefieldFiles() {
 	vector<string> files;
 	files.push_back("C:\\PROJECTS\\Quantom\\charmm36-mar2019.ff\\toppar_c36_jul18\\par_all35_ethers.prm");
 	files.push_back("C:\\PROJECTS\\Quantom\\charmm36-mar2019.ff\\toppar_c36_jul18\\par_all36_carb.prm");
 	files.push_back("C:\\PROJECTS\\Quantom\\charmm36-mar2019.ff\\toppar_c36_jul18\\par_all36_lipid.prm");
 	files.push_back("C:\\PROJECTS\\Quantom\\charmm36-mar2019.ff\\toppar_c36_jul18\\par_all36_na.prm");
 	files.push_back("C:\\PROJECTS\\Quantom\\charmm36-mar2019.ff\\toppar_c36_jul18\\par_all36m_prot.prm");
-	
-	
+
+
 
 	files.push_back("C:\\PROJECTS\\Quantom\\charmm36-mar2019.ff\\toppar_c36_jul18\\par_all36_cgenff.prm");	// CHARMM wants this to be read last for some reason??
 
@@ -136,6 +130,15 @@ int main(int argc, char* argv[]) {
 	FM.mergeForcefields(files);
 	Printer::printFFNonbonded(FileHelpers::pathJoin(forcefield_path, "LIMA_ffnonbonded.txt"), FM.ff_nonbonded);
 	Printer::printFFBonded(FileHelpers::pathJoin(forcefield_path, "LIMA_ffbonded.txt"), FM.ff_bondtypes, FM.ff_angletypes, FM.ff_dihedraltypes);
+}
+
+
+
+int main(int argc, char* argv[]) {
+	prepareForcefieldForSimulation();
+
+
+	//mergeForcefieldFiles();
 	
 	return 0;
 }
