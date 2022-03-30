@@ -8,8 +8,7 @@
 
 
 // SImulation specifics
-const int N_SOLVATE_MOLECULES = 600;	
-
+const int N_SOLVATE_MOLECULES = 1;	
 
 
 

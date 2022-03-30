@@ -116,6 +116,7 @@ void CompoundBuilder::loadParticles(Molecule* molecule, vector<CompoundBuilder::
 
 void CompoundBuilder::loadTopology(Molecule* molecule, vector<vector<string>>* top_data)
 {
+	int dihedral_cnt = 0;
 	TopologyMode mode = INACTIVE;
 	for (vector<string> record : *top_data) {
 		if (record.size() == 0) {
@@ -125,9 +126,14 @@ void CompoundBuilder::loadTopology(Molecule* molecule, vector<vector<string>>* t
 		
 		if (mode == INACTIVE) {
 			mode = setMode(record[0]);
+
+			if (mode == DIHEDRAL)			// Bad fix, but for now we ignore the lowest dihedral bonds, as i think they are IMPROPER DIHEDRALS
+				dihedral_cnt++;
+
 			continue;
 		}
-
+		if (mode == DIHEDRAL && dihedral_cnt > 1)
+			continue;
 		addGeneric(molecule, &record, mode);
 	}
 

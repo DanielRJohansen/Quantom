@@ -85,7 +85,9 @@ private:
 #ifdef __linux__
 	string ff_dir = "../../Simulation/Forcefield/";
 #else
-	string ff_dir = "C:\\Users\\Daniel\\git_repo\\Quantom\\";
+	//string ff_dir = "C:\\Users\\Daniel\\git_repo\\Quantom\\";
+	string sim_dir = "C:\\PROJECTS\\Quantom\\Simulation\\";
+	string ff_dir = "C:\\PROJECTS\\Quantom\\Simulation\\Forcefield\\";
 #endif
 
 	//enum STATE { INACTIVE, NB_ATOMTYPE_MAPPINGS, FF_NONBONDED, NB_ATOMTYPES, PAIRTYPES };

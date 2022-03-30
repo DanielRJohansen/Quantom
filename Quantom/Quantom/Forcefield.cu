@@ -13,8 +13,12 @@ void ForceFieldMaker::buildForcefield() {
 //	vector<vector<string>> summary_rows = Filehandler::readFile("C:\\Users\\Daniel\\git_repo\\Quantom\\ForcefieldSummary.txt", INT_MAX, true);
 //	vector<vector<string>> forcefield_rows = Filehandler::readFile("C:\\Users\\Daniel\\git_repo\\Quantom\\Forcefield.txt", INT_MAX, true);
 
-	vector<vector<string>> summary_rows = Filehandler::readFile(ff_dir + "ForcefieldSummary.txt", INT_MAX, true);
-	vector<vector<string>> forcefield_rows = Filehandler::readFile(ff_dir + "Forcefield.txt", INT_MAX, true);
+	//vector<vector<string>> summary_rows = Filehandler::readFile(ff_dir + "ForcefieldSummary.txt", INT_MAX, true);
+	//vector<vector<string>> forcefield_rows = Filehandler::readFile(ff_dir + "Forcefield.txt", INT_MAX, true);
+
+	vector<vector<string>> summary_rows = Filehandler::readFile(ff_dir + "LIMA_ffnonbonded_filtered.txt", INT_MAX, true);
+	vector<vector<string>> forcefield_rows = Filehandler::readFile(ff_dir + "LIMA_ffbonded_filtered.txt", INT_MAX, true);
+
 
 	nb_atomtypes = parseAtomTypes(summary_rows);					// 1 entry per type in compressed forcefield
 	loadAtomypesIntoForcefield();
@@ -103,8 +107,8 @@ NBAtomtype* ForceFieldMaker::parseAtomTypes(vector<vector<string>> summary_rows)
 			//for (string e : row)
 				//cout << e << '\t';
 			//printf("\n");
-			// Row is type, id, weight [g], sigma [nm], epsilon [kJ/mol]
-			atomtypes[ptr++] = NBAtomtype(stof(row[2]) * 1e-3, stof(row[3]), stof(row[4]) * 1e+3);
+			// Row is type, id, weight [g], sigma [nm], epsilon [J/mol]
+			atomtypes[ptr++] = NBAtomtype(stof(row[2]), stof(row[3]), stof(row[4]));
 		}			
 	}
 	n_nb_atomtypes = ptr;
@@ -164,7 +168,7 @@ AngleBond* ForceFieldMaker::parseAngles(vector<vector<string>> forcefield_rows) 
 		}
 
 		if (current_state == ANGLES) {
-			angles[ptr++] = AngleBond(stoi(row[0]), stoi(row[1]), stoi(row[2]), stof(row[6]) * (2*PI)/360.f , stof(row[7]));		// Convert degree to radians here!
+			angles[ptr++] = AngleBond(stoi(row[0]), stoi(row[1]), stoi(row[2]), stof(row[6]) , stof(row[7]));		// Assumes radians here
 		}
 
 	}
@@ -177,15 +181,21 @@ DihedralBond* ForceFieldMaker::parseDihedrals(vector<vector<string>> forcefield_
 	DihedralBond* dihedrals = new DihedralBond[10000];
 	int ptr = 0;
 	STATE current_state = INACTIVE;
+	bool has_been_enabled = false;
+
 
 	for (vector<string> row : forcefield_rows) {
 		if (newParseTitle(row)) {
 			current_state = setState(row[1], current_state);
+			
+		//	if (has_been_enabled)	// To deal with the wierd dihedrals at the bottom of the topol.top
+			//	break;
 			continue;
 		}
 
 		if (current_state == DIHEDRALS) {
 			dihedrals[ptr++] = DihedralBond(stoi(row[0]), stoi(row[1]), stoi(row[2]), stoi(row[3]), stof(row[8]), stof(row[9]));			// MIGHT HAVE TO DO AN ABS() ON K_PHI, SINCE IT IS NEGATIVE SOMETIMES??? WHAT THE FUCKKKKKKKKKK CHEMISTS?????!?!?!
+			//has_been_enabled = true;
 		}
 	}
 	n_topol_dihedrals = ptr;

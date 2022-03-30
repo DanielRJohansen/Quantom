@@ -476,7 +476,7 @@ __device__ Float3 calcLJForce(Float3* pos0, Float3* pos1, float* data_ptr, float
 
 #ifdef LIMA_VERBOSE
 	//if (threadIdx.x == 32 && blockIdx.x == 28 && force < -600000.f && force > -700000) {
-	if (abs(force) > 200e+6) {
+	if (abs(force) > 20e+8) {
 		printf("\nDist %f   D2 %f    force %f      sigma: %f \tepsilon %f  t1 %d t2 %d\n", (float)sqrt(dist_sq), (float) dist_sq, (float)force, sigma, epsilon, type1, type2);
 		pos0->print('0');
 		pos1->print('1');
@@ -558,7 +558,7 @@ __device__ void calcDihedralbondForces(Float3* pos_left, Float3* pos_lm, Float3*
 
 	//error = (error / (2.f * PI)) * 360.f;
 
-	*potE += 0.5 * k_phi * error * error * 0.5;
+	*potE += 0.5 * dihedral->k_phi * error * error * 0.5;
 	double force_scalar = dihedral->k_phi * (error);
 
 
@@ -584,7 +584,7 @@ __device__ Float3 computeLJForces(Float3* self_pos, int n_particles, Float3* pos
 	for (int i = 0; i < n_particles; i++) {
 		force += calcLJForce(self_pos, &positions[i], data_ptr, potE_sum,
 			(forcefield_device.particle_parameters[atomtype_self].sigma + forcefield_device.particle_parameters[atomtypes_others[i]].sigma)*0.2f,
-			forcefield_device.particle_parameters[atomtype_self].epsilon + forcefield_device.particle_parameters[atomtypes_others[i]].epsilon,
+			(forcefield_device.particle_parameters[atomtype_self].epsilon + forcefield_device.particle_parameters[atomtypes_others[i]].epsilon) * 0.5,
 			atomtype_self, atomtypes_others[i]
 
 		);
@@ -598,8 +598,8 @@ __device__ Float3 computeSolventToSolventLJForces(Float3* self_pos, NeighborList
 		Solvent neighbor = solvents[nlist->neighborsolvent_ids[i]];			
 		LIMAENG::applyHyperpos(&neighbor.pos, self_pos);
 		force += calcLJForce(self_pos, &neighbor.pos, data_ptr, potE_sum, 
-			forcefield_device.particle_parameters[ATOMTYPE_SOL].sigma * 2.f, 
-			forcefield_device.particle_parameters[ATOMTYPE_SOL].epsilon * 2.f);
+			forcefield_device.particle_parameters[ATOMTYPE_SOL].sigma, 
+			forcefield_device.particle_parameters[ATOMTYPE_SOL].epsilon);
 		/*if (abs(force.len()) > 1000000) {
 			(*self_pos - neighbor.pos).print('d');
 			printf("F %f %f %f n %d  solvent_id %d neighbor_id %d\n", force.x, force.y, force.z, nlist->n_solvent_neighbors, threadIdx.x + blockIdx.x*blockDim.x, nlist->neighborsolvent_ids[i]);
@@ -611,8 +611,8 @@ __device__ Float3 computeSolventToCompoundLJForces(Float3* self_pos, int n_parti
 	Float3 force(0, 0, 0);
 	for (int i = 0; i < n_particles; i++) {
 		force += calcLJForce(self_pos, &positions[i], data_ptr, potE_sum,
-			(forcefield_device.particle_parameters[atomtype_self].sigma + forcefield_device.particle_parameters[ATOMTYPE_SOL].sigma)*0.5f,
-			forcefield_device.particle_parameters[atomtype_self].epsilon + forcefield_device.particle_parameters[ATOMTYPE_SOL].epsilon
+			(forcefield_device.particle_parameters[atomtype_self].sigma + forcefield_device.particle_parameters[ATOMTYPE_SOL].sigma) * 0.5f,
+			(forcefield_device.particle_parameters[atomtype_self].epsilon + forcefield_device.particle_parameters[ATOMTYPE_SOL].epsilon) * 0.5f
 		);
 	}
 	return force;// *24.f * 1e-9;
@@ -750,7 +750,7 @@ __device__ void integratePosition(Float3* pos, Float3* pos_tsub1, Float3* force,
 	*pos = *pos_tsub1 + delta_pos * *thermostat_scalar;
 #ifdef LIMA_VERBOSE
 	if (force->len() > 2e+9) {
-		printf("\nP_index %d Thread %d blockId %d\tForce %f \tFrom %f %f %f\tTo %f %f %f\n", p_index, threadIdx.x, blockIdx.x, force->len(), pos_tsub1->x, pos_tsub1->y, pos_tsub1->z, pos->x, pos->y, pos->z);		
+		printf("\nP_index %d Thread %d blockId %d\tForce %f mass  %f \tFrom %f %f %f\tTo %f %f %f\n", p_index, threadIdx.x, blockIdx.x, force->len(), mass, pos_tsub1->x, pos_tsub1->y, pos_tsub1->z, pos->x, pos->y, pos->z);		
 	}
 #endif
 }
@@ -807,7 +807,7 @@ __global__ void forceKernel(Box* box) {
 			if (i != threadIdx.x && !compound.lj_ignore_list[threadIdx.x].ignore((uint8_t) i)) {
 				force += calcLJForce(&compound_state.positions[threadIdx.x], &compound_state.positions[i], data_ptr, &potE_sum,
 					(forcefield_device.particle_parameters[compound.atom_types[threadIdx.x]].sigma + forcefield_device.particle_parameters[compound.atom_types[i]].sigma) * 0.2f,		// Don't know how to handle atoms being this close!!!
-					(forcefield_device.particle_parameters[compound.atom_types[threadIdx.x]].epsilon + forcefield_device.particle_parameters[compound.atom_types[i]].epsilon),
+					(forcefield_device.particle_parameters[compound.atom_types[threadIdx.x]].epsilon + forcefield_device.particle_parameters[compound.atom_types[i]].epsilon) * 0.5f,
 					//compound.atom_types[threadIdx.x], compound.atom_types[i]
 					compound.particle_global_ids[threadIdx.x], compound.particle_global_ids[i]
 				);// *24.f * 1e-9;
@@ -907,8 +907,8 @@ __global__ void forceKernel(Box* box) {
 	
 	// ----------------------------------------------------------------------------- //
 
-	if (force.len() > 2e+7) {
-		printf("Critical force %f\n\n\n", force.len());
+	if (force.len() > 2e+9) {
+		printf("\n\nCritical force %f\n\n\n", force.len());
 		box->critical_error_encountered = true;
 	}
 		

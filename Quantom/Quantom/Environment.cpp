@@ -3,7 +3,6 @@
 
 
 Environment::Environment() {
-
 	display = new DisplayV2();
 
 
@@ -57,6 +56,7 @@ void Environment::verifySimulationParameters() {	// Not yet implemented
 	assert(STEPS_PER_THERMOSTAT % STEPS_PER_LOGTRANSFER == 0);		// Change to trajtransfer later
 	//assert(STEPS_PER_THERMOSTAT >= STEPS_PER_LOGTRANSFER);
 
+	printf("Simulation parameters verified\n");
 }
 
 void Environment::verifyBox() {

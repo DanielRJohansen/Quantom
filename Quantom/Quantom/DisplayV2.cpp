@@ -5,6 +5,7 @@ DisplayV2::DisplayV2() {
 #ifdef ENABLE_DISPLAY
     int success = initGLFW();
 #endif
+    printf("Display initialized\n");
 }
 
 

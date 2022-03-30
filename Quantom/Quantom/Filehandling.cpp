@@ -16,6 +16,7 @@ bool Filehandler::ignoreRow(vector<char> ignores, string line) {
 
 
 vector<vector<string>> Filehandler::readFile(string path, int end_at, bool verbose) {
+	cout << "Reading file " << path << endl;
 	fstream file;
 	file.open(path);
 
