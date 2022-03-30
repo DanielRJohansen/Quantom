@@ -210,7 +210,7 @@ DihedralBond* ForceFieldMaker::parseDihedrals(vector<vector<string>> forcefield_
 
 void ForceFieldMaker::loadAtomypesIntoForcefield() {
 	for (int i = 0; i < n_nb_atomtypes; i++) {
-		forcefield.particle_parameters[i].mass = nb_atomtypes[i].mass;
+		forcefield.particle_parameters[i].mass = nb_atomtypes[i].mass * 1e-3;		// Convert g/mol to kg/mol
 		forcefield.particle_parameters[i].sigma = nb_atomtypes[i].sigma;
 		forcefield.particle_parameters[i].epsilon = nb_atomtypes[i].epsilon;
 	}

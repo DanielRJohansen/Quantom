@@ -123,7 +123,8 @@ void Engine::handleNLISTS(Simulation* simulation, bool async, bool force_update)
 void Engine::offloadPositionDataNLIST(Simulation* simulation) {
 	//cudaMemcpyAsync(compoundstatearray_host, simulation->box->compound_state_array, sizeof(CompoundState) * simulation->box->n_compounds, cudaMemcpyDeviceToHost);
 	cudaMemcpy(nlist_data_collection->compoundstates, simulation->box->compound_state_array, sizeof(CompoundState) * simulation->n_compounds, cudaMemcpyDeviceToHost);
-	cudaMemcpy(nlist_data_collection->solvents, simulation->box->solvents, sizeof(Solvent) * simulation->n_solvents, cudaMemcpyDeviceToHost);
+	if (simulation->n_solvents > 0)
+		cudaMemcpy(nlist_data_collection->solvents, simulation->box->solvents, sizeof(Solvent) * simulation->n_solvents, cudaMemcpyDeviceToHost);
 }
 
 void Engine::pushNlistsToDevice() {
@@ -334,8 +335,10 @@ float Engine::getBoxTemperature() {
 
 			Float3 posa = simulation->traj_buffer[i + step_offset_a];
 			Float3 posb = simulation->traj_buffer[i + step_offset_b];
-			float kinE = LIMAENG::calcKineticEnergy(&posa, &posb, forcefield_device.particle_parameters[simulation->box->compounds[c].atom_types[i]].mass, simulation->dt);			// Doesnt work, use forcefield_host!!
+			float kinE = LIMAENG::calcKineticEnergy(&posa, &posb, forcefield_host.particle_parameters[simulation->compounds_host[c].atom_types[i]].mass, simulation->dt);			// Doesnt work, use forcefield_host!!
 			//float kinE = LIMAENG::calcKineticEnergy(&posa, &posb, forcefield_device.particle_parameters[simulation->box->compounds[c].atom_types[i]].mass, simulation->dt);			// Doesnt work, use forcefield_host!!
+			//printf("kinE %f\n", kinE);
+			//printf("mass %f\n", forcefield_host.particle_parameters[simulation->compounds_host[c].atom_types[i]].mass);
 			kinE_sum += kinE;
 			particles_total++;
 		}
@@ -382,7 +385,8 @@ void Engine::step() {
 	cudaDeviceSynchronize();
 	//printf("\n\n");
 	forceKernel <<< simulation->box->n_compounds, THREADS_PER_COMPOUNDBLOCK >>> (simulation->box);
-	solventForceKernel <<< BLOCKS_PER_SOLVENTKERNEL, THREADS_PER_SOLVENTBLOCK >>> (simulation->box);
+	if (simulation->n_solvents > 0)
+		solventForceKernel <<< BLOCKS_PER_SOLVENTKERNEL, THREADS_PER_SOLVENTBLOCK >>> (simulation->box);
 	cudaDeviceSynchronize();
 	//printf("\n\n");
 
@@ -498,27 +502,27 @@ __device__ Float3 calcLJForce(Float3* pos0, Float3* pos1, float* data_ptr, float
 
 }
 
-constexpr double kb = 17.5 * 1e+6;		//	J/(mol*nm^2)	/ kg/(ns^2 * mol)
-__device__ void calcPairbondForces(Float3* pos_a, Float3* pos_b, float* reference_dist, Float3* results, float* potE) {
+//constexpr double kb = 17.5 * 1e+6;		//	J/(mol*nm^2)	/ kg/(ns^2 * mol)
+__device__ void calcPairbondForces(Float3* pos_a, Float3* pos_b, PairBond* bondtype, Float3* results, float* potE) {
 	// Calculates bond force on both particles					//
 	// Calculates forces as J/mol*M								//
 
 	Float3 difference = *pos_a - *pos_b;						//	[nm]
-	double error = difference.len() - *reference_dist;			//	[nm]
+	double error = difference.len() - bondtype->b0;			//	[nm]
 
-	*potE += 0.5 * kb * (error * error) * 0.5;					// [J/mol]
+	*potE += 0.5 * bondtype->kb * (error * error) * 0.5;					// [J/mol]
 
 	difference = difference.norm();								// dif_unit_vec, but shares register with dif
-	double force_scalar = -kb * error;							// [N/mol] directionless, yes?
+	double force_scalar = -bondtype->kb * error;							// [N/mol] directionless, yes?
 
 	results[0] = difference * force_scalar;
 	results[1] = difference * force_scalar * -1;
 
 #ifdef LIMA_VERBOSE
-	if (error > 12.7f) {
-		printf("thread %d  error %f ref %f force %f\n", threadIdx.x, error, *reference_dist, force_scalar);
-		pos_a->print('a');
-		pos_b->print('b');
+	if (force_scalar > 2e+7) {
+		printf("thread %d  error %f ref %f force %f\n", threadIdx.x, error, bondtype->b0, force_scalar);
+		//pos_a->print('a');
+		//pos_b->print('b');
 	}
 #endif
 		
@@ -645,7 +649,7 @@ __device__ Float3 computePairbondForces(T* entity, Float3* positions, Float3* ut
 				&positions[pb->atom_indexes[0]],
 				&positions[pb->atom_indexes[1]],
 				//&pb->reference_dist,
-				&pb->b0,
+				pb,
 				forces, potE
 			);
 		}
@@ -749,7 +753,7 @@ __device__ void integratePosition(Float3* pos, Float3* pos_tsub1, Float3* force,
 	Float3 delta_pos = *pos - *pos_tsub1;
 	*pos = *pos_tsub1 + delta_pos * *thermostat_scalar;
 #ifdef LIMA_VERBOSE
-	if (force->len() > 2e+9) {
+	if (force->len() > 2e+8) {
 		printf("\nP_index %d Thread %d blockId %d\tForce %f mass  %f \tFrom %f %f %f\tTo %f %f %f\n", p_index, threadIdx.x, blockIdx.x, force->len(), mass, pos_tsub1->x, pos_tsub1->y, pos_tsub1->z, pos->x, pos->y, pos->z);		
 	}
 #endif

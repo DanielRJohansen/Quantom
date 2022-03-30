@@ -40,7 +40,7 @@ public:
 		cudaDeviceSynchronize();
 		cudaError_t cuda_status = cudaGetLastError();
 		if (cuda_status != cudaSuccess) {
-			cout << cuda_status;
+			cout << "\nCuda error code: " <<  cuda_status<< endl;
 			fprintf(stderr, text);
 			exit(1);
 		}
