@@ -47,7 +47,7 @@ clc
 %data = readmatrix("D:\\Quantom\\energies_steps_81476.csv");
 %a = data(1:5,1:2:end)
 %workdir = "C:\\PROJECTS\\Quantom\\LIMANET\\sim_out\\Steps_20000";
-workdir = "C:\\PROJECTS\\Quantom\\Simulation\\Steps_5602";
+workdir = "C:\\PROJECTS\\Quantom\\Simulation\\Steps_23424";
 file = fopen(strcat(workdir, "\\energy.bin"), "rb");
 data = fread(file,'double');
 fclose(file);

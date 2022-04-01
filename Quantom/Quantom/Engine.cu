@@ -54,7 +54,7 @@ void Engine::hostMaster() {						// This is and MUST ALWAYS be called after the 
 	if ((simulation->getStep() % STEPS_PER_LOGTRANSFER) == 0) {
 		offloadLoggingData();
 		offloadPositionData();
-		if ((simulation->getStep() % STEPS_PER_THERMOSTAT) == 0 && APPLY_THERMOSTAT) {
+		if ((simulation->getStep() % STEPS_PER_THERMOSTAT) == 0 && APPLY_THERMOSTAT && simulation->getStep() > 1000) {
 			applyThermostat();
 		}
 	}

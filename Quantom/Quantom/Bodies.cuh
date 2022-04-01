@@ -208,7 +208,7 @@ struct LJ_Ignores {	// Each particle is associated with 1 of these.
 
 // ------------------------------------------------- COMPOUNDS ------------------------------------------------- //
 const int NEIGHBORLIST_MAX_COMPOUNDS = 64;
-const int NEIGHBORLIST_MAX_SOLVENTS = 512;
+const int NEIGHBORLIST_MAX_SOLVENTS = 1024;
 
 class NeighborList {
 public:
