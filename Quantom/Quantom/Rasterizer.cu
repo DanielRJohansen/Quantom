@@ -47,7 +47,7 @@ RenderAtom* Rasterizer::getAllAtoms(Simulation* simulation) {
 	Box* box = simulation->box;
 	loadCompoundatomsKernel << <simulation->n_compounds, MAX_COMPOUND_PARTICLES >> > (box, atoms);
     if (simulation->n_solvents > 0)
-    	loadSolventatomsKernel << <1, simulation->n_solvents >> > (simulation->box, atoms, solvent_offset);
+    	loadSolventatomsKernel << <simulation->n_solvents/100, 100 >> > (simulation->box, atoms, solvent_offset);
 	cudaDeviceSynchronize();
 
 	return atoms;
@@ -189,9 +189,10 @@ __global__ void loadCompoundatomsKernel(Box * box, RenderAtom * atoms) {        
 }
 
 __global__ void loadSolventatomsKernel(Box * box, RenderAtom * atoms, int offset) {
-    atoms[threadIdx.x + offset].pos = box->solvents[threadIdx.x].pos;
-    atoms[threadIdx.x + offset].mass = SOLVENT_MASS;
-    atoms[threadIdx.x + offset].atom_type = SOL;
+    int solvent_id = threadIdx.x + blockIdx.x * 100;
+    atoms[solvent_id + offset].pos = box->solvents[solvent_id].pos;
+    atoms[solvent_id + offset].mass = SOLVENT_MASS;
+    atoms[solvent_id + offset].atom_type = SOL;
 }
 
 

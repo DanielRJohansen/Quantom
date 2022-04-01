@@ -137,7 +137,7 @@ public:
 
 
 	uint32_t total_particles_upperbound = 0;
-	uint32_t total_compound_particles;			// Precise number, but DO NOT EVER USE IN INDEXING!!
+	uint32_t total_compound_particles = 0;			// Precise number, but DO NOT EVER USE IN INDEXING!!
 	uint32_t total_particles = 0;				// Precise number, but DO NOT EVER USE IN INDEXING!!
 	
 	int n_steps = SIMULATION_STEPS;

@@ -328,10 +328,10 @@ float Engine::getBoxTemperature() {
 
 
 
-	int particles_total = simulation->n_solvents;
+	//int particles_total = simulation->n_solvents;
 
 	for (int c = 0; c < simulation->n_compounds; c++) {
-		int compound_offset = simulation->n_compounds * MAX_COMPOUND_PARTICLES;
+		int compound_offset = c * MAX_COMPOUND_PARTICLES;
 		for (int i = 0; i < simulation->compounds_host[c].n_particles; i++) {	// i gotta move this somewhere else....
 
 			Float3 posa = simulation->traj_buffer[i + compound_offset + step_offset_a];
@@ -341,7 +341,7 @@ float Engine::getBoxTemperature() {
 			//printf("kinE %f\n", kinE);
 			//printf("mass %f\n", forcefield_host.particle_parameters[simulation->compounds_host[c].atom_types[i]].mass);
 			kinE_sum += kinE;
-			particles_total++;
+			//particles_total++;
 		}
 	}
 	
@@ -367,7 +367,7 @@ void Engine::applyThermostat() {
 	const float target_temp = 313.f;				// [k]
 	float temp = getBoxTemperature();
 	printf("\n %d Temperature: %f\n", (simulation->getStep()-1) / STEPS_PER_THERMOSTAT, temp);
-	if (temp > target_temp/3.f && temp < target_temp*3.f) {
+	if (temp > target_temp/4.f && temp < target_temp*4.f || true) {
 		simulation->box->thermostat_scalar = target_temp / temp;
 		//printf("Scalar: %f\n", simulation->box->thermostat_scalar);
 	}
@@ -832,7 +832,7 @@ __global__ void forceKernel(Box* box) {
 		__syncthreads();	// Dunno if necessary
 		force += computePairbondForces(&compound, compound_state.positions, utility_buffer, &potE_sum);
 		force += computeAnglebondForces(&compound, compound_state.positions, utility_buffer, &potE_sum);
-		force += computeDihedralForces(&compound, compound_state.positions, utility_buffer, &potE_sum);
+		//force += computeDihedralForces(&compound, compound_state.positions, utility_buffer, &potE_sum);
 		
 		for (int i = 0; i < compound.n_particles; i++) {
 			if (i != threadIdx.x && !compound.lj_ignore_list[threadIdx.x].ignore((uint8_t) i, (uint8_t) blockIdx.x)) {
@@ -864,6 +864,7 @@ __global__ void forceKernel(Box* box) {
 		__syncthreads();
 		if (threadIdx.x < compound.n_particles) {
 			//force += computeLJForces(&compound_state.positions[threadIdx.x], n_particles, utility_buffer, data_ptr, &potE_sum, compound.atom_types[threadIdx.x], utility_buffer_small);
+			
 			force += computeIntermolecularLJForces(&compound_state.positions[threadIdx.x], n_particles, utility_buffer, data_ptr, &potE_sum, compound.atom_types[threadIdx.x], utility_buffer_small, compound.lj_ignore_list, compound.particle_global_ids);
 		}
 			
@@ -888,7 +889,6 @@ __global__ void forceKernel(Box* box) {
 	
 	// ------------------------------------------------------------ Integration ------------------------------------------------------------ //
 	if (threadIdx.x < compound.n_particles) {
-
 		integratePosition(&compound_state.positions[threadIdx.x], &compound.prev_positions[threadIdx.x], &force, forcefield_device.particle_parameters[compound.atom_types[threadIdx.x]].mass, box->dt, &box->thermostat_scalar, threadIdx.x);		
 		box->compounds[blockIdx.x].prev_positions[threadIdx.x] = compound.prev_positions[threadIdx.x];
 	}
