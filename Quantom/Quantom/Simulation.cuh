@@ -12,7 +12,7 @@ constexpr float BOX_LEN_HALF = BOX_LEN/2.f;
 
 #ifndef __linux__
 const string MOL_FOLDER = "C:\\PROJECTS\\Quantom\\molecules\\t4lys_full\\";
-const string OUT_DIR = "C:\\PROJECTS\\Quantom\\LIMANET\\sim_out";
+const string OUT_DIR = "C:\\PROJECTS\\Quantom\\Simulation\\";
 #else
 //const string MOL_FOLDER = "../Compounds/t4lys/";
 const string MOL_FOLDER = "../../Simulation/Molecule/";
@@ -23,28 +23,10 @@ const string OUT_DIR = "../../Simulation/";
 
 
 
-
-
-constexpr double WARN_FORCE = 80'000;
-constexpr double END_SIM_FORCE = 10'500'000;
-const int LOG_P_ID = 17;
-
-const int MAX_SOLVENTS = 0xFFFF;
-constexpr float CUTOFF = 1.f;	//nm/
-//const int MAX_ATOM_TYPES = 16;
+const int BLOCKS_PER_SOLVENTKERNEL = ceil((float)N_SOLVATE_MOLECULES / (float)THREADS_PER_SOLVENTBLOCK);
 
 
 
-
-const int THREADS_PER_SOLVENTBLOCK = 32;	// Must be >= N_SOLVATE_MOLECULES
-const int BLOCKS_PER_SOLVENTKERNEL = ceil((float)N_SOLVATE_MOLECULES/(float)THREADS_PER_SOLVENTBLOCK);
-
-
-const int THREADS_PER_COMPOUNDBLOCK = 128; // Must be >= max comp particles
-
-
-
-const int SIMULATION_STEPS = 100000;
 
 constexpr double SOLVENT_MASS = 18.01528f * 1e-3;	// kg/mol
 //constexpr double SOLVENT_MASS = 12.0107 * 1e-3;	// kg/mol

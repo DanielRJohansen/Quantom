@@ -199,8 +199,9 @@ void CompoundBuilder::addBond(Molecule* molecule, ParticleRef* maps, vector<stri
 		Compound* compound = &molecule->compounds[maps[0].compound_id];
 		compound->singlebonds[compound->n_singlebonds++] = PairBond(bondtype->b0, bondtype->kb, maps[0].local_id, maps[1].local_id);
 		
-		compound->lj_ignore_list[maps[0].local_id].addIgnoreTarget(maps[1].local_id);
-		compound->lj_ignore_list[maps[1].local_id].addIgnoreTarget(maps[0].local_id);
+		//printf("adding ignore between %d %d %d and %d %d %d\n", maps[0].local_id, maps[0].compound_id, maps[0].global_id, maps[1].local_id, maps[1].compound_id, maps[1].global_id );
+		//compound->lj_ignore_list[maps[0].local_id].addIgnoreTarget(maps[1].local_id, maps[1].compound_id);
+		//compound->lj_ignore_list[maps[1].local_id].addIgnoreTarget(maps[0].local_id, maps[0].compound_id);
 	}
 	else {
 		// First, we need to make sure all bond particles are added to the bridge.
@@ -210,10 +211,10 @@ void CompoundBuilder::addBond(Molecule* molecule, ParticleRef* maps, vector<stri
 		//bridge->addSinglebond(PairBond(bondtype->b0, bondtype->kb, maps[0].global_id, maps[1].global_id));
 		bridge->addGenericBond(PairBond(bondtype->b0, bondtype->kb, maps[0].global_id, maps[1].global_id));
 
-		//Compound* compound_a = &molecule->compounds[maps[0].compound_id];
+		Compound* compound_a = &molecule->compounds[maps[0].compound_id];
 		//compound_a->lj_ignore_list[maps[0].local_id].addIgnoreTarget(maps[1].local_id, maps[1].compound_id);
 
-		//Compound* compound_b = &molecule->compounds[maps[1].compound_id];
+		Compound* compound_b = &molecule->compounds[maps[1].compound_id];
 		//compound_b->lj_ignore_list[maps[1].local_id].addIgnoreTarget(maps[0].local_id, maps[0].compound_id);
 	}
 }
@@ -226,15 +227,38 @@ void CompoundBuilder::addAngle(Molecule* molecule, ParticleRef* maps, vector<str
 
 
 	AngleBond* angletype = FFM->getAngleType(maps[0].global_id, maps[1].global_id, maps[2].global_id);
-
+	Compound* compound;
 	if (!g_bond.spansTwoCompounds()) {
-		Compound* compound = &molecule->compounds[maps[0].compound_id];
+		compound = &molecule->compounds[maps[0].compound_id];
 		compound->anglebonds[compound->n_anglebonds++] = AngleBond(maps[0].local_id, maps[1].local_id, maps[2].local_id, angletype->theta_0, angletype->k_theta);
+
+		compound->lj_ignore_list[maps[0].local_id].addIgnoreTarget(maps[1].local_id, maps[1].compound_id);
+		compound->lj_ignore_list[maps[1].local_id].addIgnoreTarget(maps[0].local_id, maps[0].compound_id);
+
+		compound->lj_ignore_list[maps[0].local_id].addIgnoreTarget(maps[2].local_id, maps[2].compound_id);
+		compound->lj_ignore_list[maps[2].local_id].addIgnoreTarget(maps[0].local_id, maps[0].compound_id);
+
+		compound->lj_ignore_list[maps[1].local_id].addIgnoreTarget(maps[2].local_id, maps[2].compound_id);
+		compound->lj_ignore_list[maps[2].local_id].addIgnoreTarget(maps[1].local_id, maps[1].compound_id);
 	}
 	else {
 		CompoundBridge* bridge = compound_bridge_bundle->getBelongingBridge(&g_bond);
 		bridge->addBondParticles(&g_bond, molecule);
 		bridge->addGenericBond(AngleBond(maps[0].global_id, maps[1].global_id, maps[2].global_id, angletype->theta_0, angletype->k_theta));
+
+
+
+		compound = &molecule->compounds[maps[0].compound_id];
+		compound->lj_ignore_list[maps[0].local_id].addIgnoreTarget(maps[1].local_id, maps[1].compound_id);
+		compound->lj_ignore_list[maps[0].local_id].addIgnoreTarget(maps[2].local_id, maps[2].compound_id);
+
+		compound = &molecule->compounds[maps[1].compound_id];
+		compound->lj_ignore_list[maps[1].local_id].addIgnoreTarget(maps[0].local_id, maps[0].compound_id);
+		compound->lj_ignore_list[maps[1].local_id].addIgnoreTarget(maps[2].local_id, maps[2].compound_id);
+
+		compound = &molecule->compounds[maps[2].compound_id];
+		compound->lj_ignore_list[maps[0].local_id].addIgnoreTarget(maps[0].local_id, maps[0].compound_id);
+		compound->lj_ignore_list[maps[2].local_id].addIgnoreTarget(maps[2].local_id, maps[2].compound_id);
 	}
 }
 

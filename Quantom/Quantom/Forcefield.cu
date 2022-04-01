@@ -213,5 +213,6 @@ void ForceFieldMaker::loadAtomypesIntoForcefield() {
 		forcefield.particle_parameters[i].mass = nb_atomtypes[i].mass * 1e-3;		// Convert g/mol to kg/mol
 		forcefield.particle_parameters[i].sigma = nb_atomtypes[i].sigma;
 		forcefield.particle_parameters[i].epsilon = nb_atomtypes[i].epsilon;
+		printf("Mass %f Sigma %f Epsilon %f\n", nb_atomtypes[i].mass, nb_atomtypes[i].sigma, nb_atomtypes[i].epsilon);
 	}
 }

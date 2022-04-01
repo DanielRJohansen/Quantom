@@ -32,7 +32,7 @@ public:
 		LIMAENG::applyHyperpos(pos1, pos2);
 
 
-		double vel = (*pos1 - *pos2).len() * 0.5l / dt;
+		float vel = (*pos1 - *pos2).len() * 0.5f / dt;
 		float kinE = 0.5 * mass * vel * vel;
 		return kinE;
 	}

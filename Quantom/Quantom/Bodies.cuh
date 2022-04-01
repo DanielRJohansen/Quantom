@@ -166,29 +166,30 @@ struct GenericBond {					// ONLY used during creation, never on device!
 
 
 struct LJ_Ignores {	// Each particle is associated with 1 of these.
-	uint8_t local_ignores[4] = { 255, 255, 255, 255 };
-	//uint8_t connected_compound_id = 255;		// This is only used, if a bond is in a bridge
-	__host__ bool addIgnoreTarget(uint8_t target_id) {
-		for (int i = 0; i < 4; i++) {
-			if (local_ignores[i] == 255) {
-				local_ignores[i] = target_id;
-//				printf("Added target %d", target_id);
-				return true;
-			}				
-		}
-		printf("Failed to add ignore target!\n");
-		exit(0);
-		return false;
-	}		
-	/*
+	uint8_t local_ids[16];
+	uint8_t compound_ids[16];
+	uint8_t n_ignores = 0;
+
+	
 	__host__ void addIgnoreTarget(uint8_t target_id, uint8_t compound_id) {
-		local_ignores[3] = target_id;
-		connected_compound_id = compound_id;
+		if (n_ignores == 16) {
+			printf("Failed to add ignore target!\n");
+			exit(0);
+		}
+		for (int i = 0; i < n_ignores; i++) {		// If target particle is already ignored, do nothing
+			if (local_ids[i] == target_id && compound_ids[i] == compound_id)
+				return;
+		}
+
+		local_ids[n_ignores] = target_id;
+		compound_ids[n_ignores] = compound_id;
+		n_ignores++;
 	}
-	*/
-	__device__ bool ignore(uint8_t query_id) {
-		for (int i = 0; i < 4; i++) {
-			if (local_ignores[i] == query_id)
+	
+
+	__device__ bool ignore(uint8_t query_local_id, uint8_t query_compound_id) {
+		for (int i = 0; i < n_ignores; i++) {
+			if (local_ids[i] == query_local_id && compound_ids[i] == query_compound_id)
 				return true;
 		}
 		return false;

@@ -20,7 +20,7 @@ Environment::Environment() {
 	//Compound mol_4pcw10 = compoundbuilder.buildMolecule("D:\\Quantom\\filaggrin\\4pcw_first10.pdb", "D:\\Quantom\\filaggrin\\topol.top", 7);
 	//Compound mol_4pcw10 = compoundbuilder.buildMolecule("D:\\Quantom\\filaggrin\\conf.gro", "D:\\Quantom\\filaggrin\\topol.top", 4);
 	//Compound mol_6lzm_10 = compoundbuilder.buildMolecule(MOL_FOLDER + "conf.gro", MOL_FOLDER + "topol.top", 10);
-	Molecule mol_6lzm_10 = compoundbuilder->buildMolecule(MOL_FOLDER + "conf.gro", MOL_FOLDER + "topol.top", 10, 0);
+	Molecule mol_6lzm_10 = compoundbuilder->buildMolecule(MOL_FOLDER + "conf.gro", MOL_FOLDER + "topol.top", 180, 0);
 
 	printf("bridges after %d\n", mol_6lzm_10.compound_bridge_bundle->n_bridges);
 	//printf("here %d", temp.n_particles);
@@ -55,6 +55,8 @@ void Environment::verifySimulationParameters() {	// Not yet implemented
 
 	assert(STEPS_PER_THERMOSTAT % STEPS_PER_LOGTRANSFER == 0);		// Change to trajtransfer later
 	//assert(STEPS_PER_THERMOSTAT >= STEPS_PER_LOGTRANSFER);
+	assert(THREADS_PER_SOLVENTBLOCK >= MAX_COMPOUND_PARTICLES);
+
 
 	printf("Simulation parameters verified\n");
 }
@@ -95,7 +97,7 @@ void Environment::run() {
 	printf("\n\n\n########################## SIMULATION FINISHED ##########################\n\n\n\n");
 
 	if (simulation->finished || simulation->box->critical_error_encountered) {
-		//postRunEvents();
+		postRunEvents();
 	}
 }
 
@@ -117,7 +119,7 @@ void Environment::postRunEvents() {
 		simulation->getStep() * MAX_COMPOUND_PARTICLES * 6,
 		simulation->out_dir + "\\sim_out.bin"
 	);*/
-
+	return;
 	string data_processing_command = "C:\\Users\\Daniel\\git_repo\\Quantom\\LIMA_services\\x64\\Debug\\LIMA_services.exe "
 		+ simulation->out_dir + " "
 		+ to_string(simulation->getStep())

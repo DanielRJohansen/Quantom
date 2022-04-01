@@ -46,19 +46,25 @@ clc
 %data = readmatrix("D:\\Quantom\\energies_steps_99997.csv");
 %data = readmatrix("D:\\Quantom\\energies_steps_81476.csv");
 %a = data(1:5,1:2:end)
-workdir = "C:\\PROJECTS\\Quantom\\LIMANET\\sim_out\\Steps_20000";
+%workdir = "C:\\PROJECTS\\Quantom\\LIMANET\\sim_out\\Steps_20000";
+workdir = "C:\\PROJECTS\\Quantom\\Simulation\\Steps_6802";
 file = fopen(strcat(workdir, "\\energy.bin"), "rb");
 data = fread(file,'double');
 fclose(file);
 
 file = fopen(strcat(workdir, "\\temperature.bin"));
 temp_data = fread(file, 'single');
-fclose(file)
+fclose(file);
 
+length(data)
+n_elements = length(data)/3
+%data = reshape(data, [3, n_elements])';
+%size(data);
 
-n_elements = length(data)/3;
-data = reshape(data, [3, n_elements])';
-size(data);
+t = (1:length(temp_data)).*200;
+plot(t, temp_data)
+%ylim([-2000 2000])
+%% 
 
 tiledlayout(2,1)
 nexttile
