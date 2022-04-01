@@ -10,7 +10,7 @@
 
 
 // SImulation specifics
-const int N_SOLVATE_MOLECULES = 300;	
+const int N_SOLVATE_MOLECULES = 1200;	
 
 
 
@@ -50,9 +50,9 @@ const int MAX_COMPOUND_PARTICLES = 128;
 
 
 const int STEPS_PER_NLIST_UPDATE = 200;
-const int STEPS_PER_LOGTRANSFER = 20;
+const int STEPS_PER_LOGTRANSFER = 200;
 //const int STEPS_PER_TRAJTRANSFER = 100;
-const int STEPS_PER_THERMOSTAT = 20;
+const int STEPS_PER_THERMOSTAT = 200;
 const int STEPS_PER_TRAINDATATRANSFER = 1000;
 
 

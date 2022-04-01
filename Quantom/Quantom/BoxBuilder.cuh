@@ -58,13 +58,12 @@ private:
 
 
 
-	double m = 18.01528;					// g/mol
-	double M = m * 0.001;				// kg/mol
+	double M = SOLVENT_MASS;				// kg/mol
 	//double k_B = 8.617333262145 * 10e-5;	// Boltzmann constant
 	double k_B = 1.380 * 1e-23;
-	double T = 293;	// Kelvin
+	double T = 313;	// Kelvin
 	double R = 8.3144;					// J/(Kelvin*mol)
-	double mean_velocity = m / (2 * k_B * T);
+	//double mean_velocity = M / (2 * k_B * T);				// This is bullshit
 	double v_rms = sqrt(3 * R * T / M);
 
 

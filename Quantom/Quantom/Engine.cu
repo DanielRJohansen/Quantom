@@ -324,17 +324,18 @@ float Engine::getBoxTemperature() {
 
 	const int step_offset_a = step * simulation->total_particles_upperbound;
 	const int step_offset_b = (step - 2) * simulation->total_particles_upperbound;
-	const int solvent_offset = MAX_COMPOUND_PARTICLES;
+	const int solvent_offset = MAX_COMPOUND_PARTICLES * simulation->n_compounds;
 
 
 
 	int particles_total = simulation->n_solvents;
 
 	for (int c = 0; c < simulation->n_compounds; c++) {
+		int compound_offset = simulation->n_compounds * MAX_COMPOUND_PARTICLES;
 		for (int i = 0; i < simulation->compounds_host[c].n_particles; i++) {	// i gotta move this somewhere else....
 
-			Float3 posa = simulation->traj_buffer[i + step_offset_a];
-			Float3 posb = simulation->traj_buffer[i + step_offset_b];
+			Float3 posa = simulation->traj_buffer[i + compound_offset + step_offset_a];
+			Float3 posb = simulation->traj_buffer[i + compound_offset + step_offset_b];
 			float kinE = LIMAENG::calcKineticEnergy(&posa, &posb, forcefield_host.particle_parameters[simulation->compounds_host[c].atom_types[i]].mass, simulation->dt);			// Doesnt work, use forcefield_host!!
 			//float kinE = LIMAENG::calcKineticEnergy(&posa, &posb, forcefield_device.particle_parameters[simulation->box->compounds[c].atom_types[i]].mass, simulation->dt);			// Doesnt work, use forcefield_host!!
 			//printf("kinE %f\n", kinE);
@@ -344,8 +345,8 @@ float Engine::getBoxTemperature() {
 		}
 	}
 	
-	printf("\nKin e %Lf\n", kinE_sum);
-	kinE_sum = 0;
+	//printf("\nKin e %Lf\n", kinE_sum);
+	//kinE_sum = 0;
 	for (int i = 0; i < simulation->n_solvents; i++) {
 		Float3 posa = simulation->traj_buffer[i + solvent_offset + step_offset_a];
 		Float3 posb = simulation->traj_buffer[i + solvent_offset + step_offset_b];
@@ -354,7 +355,7 @@ float Engine::getBoxTemperature() {
 	}
 
 	//double avg_kinE = kinE_sum / (long double)particles_total;
-	double avg_kinE = kinE_sum / (long double)simulation->n_solvents;
+	double avg_kinE = kinE_sum / (long double)simulation->total_particles;
 	float temperature = avg_kinE * 2.f / (3.f * 8.3145);
 	simulation->temperature_buffer[step / STEPS_PER_THERMOSTAT] = temperature;
 	//printf("\nTemp: %f\n", temperature);
@@ -363,15 +364,15 @@ float Engine::getBoxTemperature() {
 
 																																			// THIS fn requires mallocmanaged!!   // HARD DISABLED HERE
 void Engine::applyThermostat() {
-	const float target_temp = 300.f;				// [k]
+	const float target_temp = 313.f;				// [k]
 	float temp = getBoxTemperature();
 	printf("\n %d Temperature: %f\n", (simulation->getStep()-1) / STEPS_PER_THERMOSTAT, temp);
 	if (temp > target_temp/3.f && temp < target_temp*3.f) {
-		//simulation->box->thermostat_scalar = max_temp / temp;																				
+		simulation->box->thermostat_scalar = target_temp / temp;
 		//printf("Scalar: %f\n", simulation->box->thermostat_scalar);
 	}
 	else {
-		printf("Critical temperature encountered\n");
+		printf("Critical temperature encountered (%0.02f [k])\n", temp);
 		simulation->box->critical_error_encountered = true;
 	}
 }
@@ -385,7 +386,7 @@ void Engine::step() {
 	auto t0 = std::chrono::high_resolution_clock::now();
 
 	if (simulation->box->bridge_bundle->n_bridges > 0) {
-		//compoundBridgeKernel << < simulation->box->bridge_bundle->n_bridges, MAX_PARTICLES_IN_BRIDGE >> > (simulation->box);	// Must come before forceKernel()
+		compoundBridgeKernel << < simulation->box->bridge_bundle->n_bridges, MAX_PARTICLES_IN_BRIDGE >> > (simulation->box);	// Must come before forceKernel()
 	}
 		
 	cudaDeviceSynchronize();
@@ -831,8 +832,8 @@ __global__ void forceKernel(Box* box) {
 		__syncthreads();	// Dunno if necessary
 		force += computePairbondForces(&compound, compound_state.positions, utility_buffer, &potE_sum);
 		force += computeAnglebondForces(&compound, compound_state.positions, utility_buffer, &potE_sum);
-		//force += computeDihedralForces(&compound, compound_state.positions, utility_buffer, &potE_sum);
-		//box->critical_error_encountered = true;
+		force += computeDihedralForces(&compound, compound_state.positions, utility_buffer, &potE_sum);
+		
 		for (int i = 0; i < compound.n_particles; i++) {
 			if (i != threadIdx.x && !compound.lj_ignore_list[threadIdx.x].ignore((uint8_t) i, (uint8_t) blockIdx.x)) {
 				force += calcLJForce(&compound_state.positions[threadIdx.x], &compound_state.positions[i], data_ptr, &potE_sum,
@@ -863,7 +864,7 @@ __global__ void forceKernel(Box* box) {
 		__syncthreads();
 		if (threadIdx.x < compound.n_particles) {
 			//force += computeLJForces(&compound_state.positions[threadIdx.x], n_particles, utility_buffer, data_ptr, &potE_sum, compound.atom_types[threadIdx.x], utility_buffer_small);
-			//force += computeIntermolecularLJForces(&compound_state.positions[threadIdx.x], n_particles, utility_buffer, data_ptr, &potE_sum, compound.atom_types[threadIdx.x], utility_buffer_small, compound.lj_ignore_list, compound.particle_global_ids);
+			force += computeIntermolecularLJForces(&compound_state.positions[threadIdx.x], n_particles, utility_buffer, data_ptr, &potE_sum, compound.atom_types[threadIdx.x], utility_buffer_small, compound.lj_ignore_list, compound.particle_global_ids);
 		}
 			
 	}
@@ -887,11 +888,8 @@ __global__ void forceKernel(Box* box) {
 	
 	// ------------------------------------------------------------ Integration ------------------------------------------------------------ //
 	if (threadIdx.x < compound.n_particles) {
-		//int p_index = threadIdx.x;
 
-		integratePosition(&compound_state.positions[threadIdx.x], &compound.prev_positions[threadIdx.x], &force, forcefield_device.particle_parameters[compound.atom_types[threadIdx.x]].mass, box->dt, &box->thermostat_scalar, threadIdx.x);
-		
-		//box->compounds[blockIdx.x].particles[threadIdx.x].pos_tsub1 = compound.particles[threadIdx.x].pos_tsub1;
+		integratePosition(&compound_state.positions[threadIdx.x], &compound.prev_positions[threadIdx.x], &force, forcefield_device.particle_parameters[compound.atom_types[threadIdx.x]].mass, box->dt, &box->thermostat_scalar, threadIdx.x);		
 		box->compounds[blockIdx.x].prev_positions[threadIdx.x] = compound.prev_positions[threadIdx.x];
 	}
 	__syncthreads();
@@ -1040,9 +1038,9 @@ __global__ void solventForceKernel(Box* box) {
 		//int solvent_index = threadIdx.x;		// Temporary
 		int step_offset = (box->step % STEPS_PER_LOGTRANSFER) * box->total_particles_upperbound;
 
-		//box->potE_buffer[compounds_offset + solvent_index + step_offset] = potE_sum;	//  data_ptr[0];
+		box->potE_buffer[compounds_offset + solvent_index + step_offset] = potE_sum;	//  data_ptr[0];
 		//printf("pot: %f\n", box->potE_buffer[compounds_offset + solvent_index + (box->step) * box->total_particles]);
-		//box->traj_buffer[compounds_offset + solvent_index + step_offset] = solvent->pos;
+		box->traj_buffer[compounds_offset + solvent_index + step_offset] = solvent->pos;
 	}
 
 	// ----------------------------------------------------------------------------- //
