@@ -54,8 +54,8 @@ void Engine::hostMaster() {						// This is and MUST ALWAYS be called after the 
 	if ((simulation->getStep() % STEPS_PER_LOGTRANSFER) == 0) {
 		offloadLoggingData();
 		offloadPositionData();
-		if ((simulation->getStep() % STEPS_PER_THERMOSTAT) == 0 && APPLY_THERMOSTAT) {
-			applyThermostat();
+		if ((simulation->getStep() % STEPS_PER_THERMOSTAT) == 0 && ENABLE_BOXTEMP) {
+			handleBoxtemp();
 		}
 	}
 	if ((simulation->getStep() % STEPS_PER_TRAINDATATRANSFER) == 0) {
@@ -66,7 +66,7 @@ void Engine::hostMaster() {						// This is and MUST ALWAYS be called after the 
 	handleNLISTS(simulation);
 	
 
-	if ((simulation->getStep() % STEPS_PER_THERMOSTAT) == 1) {	// So this runs 1 step AFTER applyThermostat
+	if ((simulation->getStep() % STEPS_PER_THERMOSTAT) == 1) {	// So this runs 1 step AFTER handleBoxtemp
 		simulation->box->thermostat_scalar = 1.f;
 	}
 
@@ -363,7 +363,7 @@ float Engine::getBoxTemperature() {
 }
 
 																																			// THIS fn requires mallocmanaged!!   // HARD DISABLED HERE
-void Engine::applyThermostat() {
+void Engine::handleBoxtemp() {
 	const float target_temp = 313.f;				// [k]
 	float temp = getBoxTemperature();
 	float temp_scalar = target_temp / temp;
@@ -374,8 +374,10 @@ void Engine::applyThermostat() {
 
 	printf("\n %d Temperature: %f\n", (simulation->getStep()-1) / STEPS_PER_THERMOSTAT, temp);
 	if (temp > target_temp/4.f && temp < target_temp*4.f || true) {
-		simulation->box->thermostat_scalar = target_temp / temp;
-		//printf("Scalar: %f\n", simulation->box->thermostat_scalar);
+		if (APPLY_THERMOSTAT) {
+			simulation->box->thermostat_scalar = target_temp / temp;
+			//printf("Scalar: %f\n", simulation->box->thermostat_scalar);
+		}		
 	}
 	else {
 		printf("Critical temperature encountered (%0.02f [k])\n", temp);
@@ -611,7 +613,7 @@ __device__ Float3 computeLJForces(Float3* self_pos, int n_particles, Float3* pos
 	Float3 force(0.f);
 	for (int i = 0; i < n_particles; i++) {
 		force += calcLJForce(self_pos, &positions[i], data_ptr, potE_sum,
-			(forcefield_device.particle_parameters[atomtype_self].sigma + forcefield_device.particle_parameters[atomtypes_others[i]].sigma)*0.2f,
+			(forcefield_device.particle_parameters[atomtype_self].sigma + forcefield_device.particle_parameters[atomtypes_others[i]].sigma)*0.5f,
 			(forcefield_device.particle_parameters[atomtype_self].epsilon + forcefield_device.particle_parameters[atomtypes_others[i]].epsilon) * 0.5,
 			atomtype_self, atomtypes_others[i]
 
@@ -627,7 +629,7 @@ __device__ Float3 computeIntermolecularLJForces(Float3* self_pos, int n_particle
 
 
 		force += calcLJForce(self_pos, &positions[i], data_ptr, potE_sum,
-			(forcefield_device.particle_parameters[atomtype_self].sigma + forcefield_device.particle_parameters[atomtypes_others[i]].sigma) * 0.2f,
+			(forcefield_device.particle_parameters[atomtype_self].sigma + forcefield_device.particle_parameters[atomtypes_others[i]].sigma) * 0.5f,
 			(forcefield_device.particle_parameters[atomtype_self].epsilon + forcefield_device.particle_parameters[atomtypes_others[i]].epsilon) * 0.5,
 			//atomtype_self, atomtypes_others[i]
 			global_ids[threadIdx.x], global_ids[i]
@@ -845,7 +847,7 @@ __global__ void forceKernel(Box* box) {
 		__syncthreads();	// Dunno if necessary
 		force += computePairbondForces(&compound, compound_state.positions, utility_buffer, &potE_sum);
 		force += computeAnglebondForces(&compound, compound_state.positions, utility_buffer, &potE_sum);
-		//force += computeDihedralForces(&compound, compound_state.positions, utility_buffer, &potE_sum);
+		force += computeDihedralForces(&compound, compound_state.positions, utility_buffer, &potE_sum);
 		
 		for (int i = 0; i < compound.n_particles; i++) {
 			//continue;

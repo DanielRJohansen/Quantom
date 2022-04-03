@@ -18,11 +18,11 @@
 
 // SImulation specifics
 
-constexpr float BOX_LEN = 15.f;		// Must be > twice the len of largest compound
+constexpr float BOX_LEN = 14.f;		// Must be > twice the len of largest compound
 constexpr float BOX_LEN_HALF = BOX_LEN / 2.f;
 
-const int N_SOLVATE_MOLECULES = 1200;	
-const int MAX_RESIDUES_TO_LOAD = 400;
+const int N_SOLVATE_MOLECULES = 500;	
+const int MAX_RESIDUES_TO_LOAD = 200;
 
 
 
@@ -66,7 +66,7 @@ const int STEPS_PER_TRAINDATATRANSFER = 1000;
 
 const int STEPS_PER_RENDER = 200;
 
-
+const bool ENABLE_BOXTEMP = true;
 const bool APPLY_THERMOSTAT = true;										// Switch to using forcefield_host first
 
 

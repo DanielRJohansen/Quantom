@@ -155,7 +155,7 @@ private:
 	void offloadTrainData();
 
 	float getBoxTemperature();
-	void applyThermostat();
+	void handleBoxtemp();
 
 
 	int prev_nlist_update_step = 0;
