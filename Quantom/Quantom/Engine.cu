@@ -366,9 +366,15 @@ float Engine::getBoxTemperature() {
 void Engine::applyThermostat() {
 	const float target_temp = 313.f;				// [k]
 	float temp = getBoxTemperature();
+	float temp_scalar = target_temp / temp;
+
+	temp_scalar = min(temp_scalar, 1.1f);		// I just added this to not change any temperatures too rapidly
+	temp_scalar = max(temp_scalar, 0.9f);
+
+
 	printf("\n %d Temperature: %f\n", (simulation->getStep()-1) / STEPS_PER_THERMOSTAT, temp);
 	if (temp > target_temp/4.f && temp < target_temp*4.f || true) {
-		//simulation->box->thermostat_scalar = target_temp / temp;
+		simulation->box->thermostat_scalar = target_temp / temp;
 		//printf("Scalar: %f\n", simulation->box->thermostat_scalar);
 	}
 	else {
@@ -1098,7 +1104,7 @@ __global__ void compoundBridgeKernel(Box* box) {
 	// ------------------------------------------------------------ Intramolecular Operations ------------------------------------------------------------ //
 	{											// So for the very first step, these ´should all be 0, but they are not??										TODO: Look into this at some point!!!! Also, can cant really apply hyperpos here without breaking stuff, sindce
 																																								// The bridge spans such a big volume! :/
-//		LIMAENG::applyHyperpos(&positions[0], &positions[particle_id_bridge]);
+		LIMAENG::applyHyperpos(&positions[0], &positions[particle_id_bridge]);
 		__syncthreads();	
 		force += computePairbondForces(&bridge, positions, utility_buffer, &potE_sum);
 		force += computeAnglebondForces(&bridge, positions, utility_buffer, &potE_sum);
