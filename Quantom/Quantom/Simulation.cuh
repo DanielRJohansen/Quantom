@@ -6,8 +6,6 @@
 
 
 
-constexpr float BOX_LEN = 8.f;		// Must be > twice the len of largest compound
-constexpr float BOX_LEN_HALF = BOX_LEN/2.f;
 
 
 #ifndef __linux__

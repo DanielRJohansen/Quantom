@@ -36,7 +36,7 @@ RenderBall* Rasterizer::render(Simulation* simulation) {
 __global__ void loadCompoundatomsKernel(Box* box, RenderAtom* atoms);
 __global__ void loadSolventatomsKernel(Box* box, RenderAtom* atoms, int offset);
 __global__ void processAtomsKernel(RenderAtom* atoms, RenderBall* balls);
-
+const int THREADS_PER_LOADSOLVENTSATOMSKERNEL = 100;
 
 RenderAtom* Rasterizer::getAllAtoms(Simulation* simulation) {
 	
@@ -44,10 +44,14 @@ RenderAtom* Rasterizer::getAllAtoms(Simulation* simulation) {
 	RenderAtom* atoms;
 	cudaMalloc(&atoms, sizeof(RenderAtom) * simulation->total_particles_upperbound);
 
+    int solvent_blocks = ceil((float)simulation->n_solvents / (float)THREADS_PER_LOADSOLVENTSATOMSKERNEL);
+
+
 	Box* box = simulation->box;
-	loadCompoundatomsKernel << <simulation->n_compounds, MAX_COMPOUND_PARTICLES >> > (box, atoms);
+    if (simulation->n_compounds > 0)
+	    loadCompoundatomsKernel << <simulation->n_compounds, MAX_COMPOUND_PARTICLES >> > (box, atoms);
     if (simulation->n_solvents > 0)
-    	loadSolventatomsKernel << <simulation->n_solvents/100, 100 >> > (simulation->box, atoms, solvent_offset);
+    	loadSolventatomsKernel << < solvent_blocks, THREADS_PER_LOADSOLVENTSATOMSKERNEL >> > (simulation->box, atoms, solvent_offset);
 	cudaDeviceSynchronize();
 
 	return atoms;
@@ -61,7 +65,7 @@ void Rasterizer::sortAtoms(RenderAtom* atoms, int dim) {
 RenderBall* Rasterizer::processAtoms(RenderAtom* atoms, Simulation* simulation) {
     RenderBall* balls_device;
     cudaMalloc(&balls_device, sizeof(RenderBall) * simulation->total_particles_upperbound);
-
+    printf("\n\nt: %d\n", simulation->total_particles_upperbound);
     processAtomsKernel <<< n_threadblocks, RAS_THREADS_PER_BLOCK >>> (atoms, balls_device);
     cudaDeviceSynchronize();
 
@@ -188,11 +192,14 @@ __global__ void loadCompoundatomsKernel(Box * box, RenderAtom * atoms) {        
     }
 }
 
-__global__ void loadSolventatomsKernel(Box * box, RenderAtom * atoms, int offset) {
-    int solvent_id = threadIdx.x + blockIdx.x * 100;
-    atoms[solvent_id + offset].pos = box->solvents[solvent_id].pos;
-    atoms[solvent_id + offset].mass = SOLVENT_MASS;
-    atoms[solvent_id + offset].atom_type = SOL;
+__global__ void loadSolventatomsKernel(Box* box, RenderAtom * atoms, int offset) {
+    int solvent_id = threadIdx.x + blockIdx.x * THREADS_PER_LOADSOLVENTSATOMSKERNEL;
+
+    if (solvent_id < box->n_solvents) {
+        atoms[solvent_id + offset].pos = box->solvents[solvent_id].pos;
+        atoms[solvent_id + offset].mass = SOLVENT_MASS;
+        atoms[solvent_id + offset].atom_type = SOL;
+    }    
 }
 
 

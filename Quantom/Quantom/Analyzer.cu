@@ -18,6 +18,7 @@ void __device__ distributedSummation(T* arrayptr, int array_len) {				// Places 
 	}
 }
 
+/*
 double __device__ calcKineticEnergy(Float3* pos1, Float3* pos2, double mass, double dt) {
 	LIMAENG::applyHyperpos(pos1, pos2);
 
@@ -26,6 +27,8 @@ double __device__ calcKineticEnergy(Float3* pos1, Float3* pos2, double mass, dou
 	double kinE = 0.5 * mass * vel * vel;
 	return kinE;
 }
+*/
+
 
 void __global__ monitorCompoundEnergyKernel(Box* box, Float3* traj_buffer, double* potE_buffer, Float3* data_out) {		// everything here breaks if not all compounds are identical in particle count and particle mass!!!!!!!
 	__shared__ Float3 energy[MAX_COMPOUND_PARTICLES];
@@ -58,7 +61,7 @@ void __global__ monitorCompoundEnergyKernel(Box* box, Float3* traj_buffer, doubl
 	//LIMAENG::applyHyperpos(&pos_tadd1, &pos_tsub1);
 	//testspace::testerfn(4);
 	//double kinE = calcKineticEnergy(&pos_tadd1, &pos_tsub1, compound.particles[threadIdx.x].mass, box->dt);
-	double kinE = calcKineticEnergy(&pos_tadd1, &pos_tsub1, SOLVENT_MASS, box->dt);
+	double kinE = LIMAENG::calcKineticEnergy(&pos_tadd1, &pos_tsub1, SOLVENT_MASS, box->dt);
 	//double kinE = calcKineticEnergy(&pos_tadd1, &pos_tsub1, forcefield_device, box->dt);
 	/*
 	applyHyperposA(&pos_tadd1, &pos_tsub1);
@@ -113,7 +116,7 @@ void __global__ monitorSolventEnergyKernel(Box* box, Float3* traj_buffer, double
 
 	Float3 pos_tsub1 = traj_buffer[compounds_offset + solvent_index + (step - 1) * box->total_particles_upperbound];
 	Float3 pos_tadd1 = traj_buffer[compounds_offset + solvent_index + (step + 1) * box->total_particles_upperbound];
-	double kinE = calcKineticEnergy(&pos_tadd1, &pos_tsub1, SOLVENT_MASS, box->dt);
+	double kinE = LIMAENG::calcKineticEnergy(&pos_tadd1, &pos_tsub1, SOLVENT_MASS, box->dt);
 
 	double potE = potE_buffer[compounds_offset + solvent_index + step * box->total_particles_upperbound];
 

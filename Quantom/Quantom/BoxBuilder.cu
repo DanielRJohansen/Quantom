@@ -225,8 +225,7 @@ void BoxBuilder::integrateCompound(Compound* compound, Simulation* simulation)
 
 
 
-Solvent BoxBuilder::createSolvent(Float3 com, double dt)	// Nodes obv. points to addresses in device global memory.
-{
+Solvent BoxBuilder::createSolvent(Float3 com, double dt) {
 	Float3 solvent_vel = Float3(random(), random(), random()).norm() * v_rms;
 	return Solvent(com, com - solvent_vel * dt);
 }

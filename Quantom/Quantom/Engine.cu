@@ -54,7 +54,7 @@ void Engine::hostMaster() {						// This is and MUST ALWAYS be called after the 
 	if ((simulation->getStep() % STEPS_PER_LOGTRANSFER) == 0) {
 		offloadLoggingData();
 		offloadPositionData();
-		if ((simulation->getStep() % STEPS_PER_THERMOSTAT) == 0 && APPLY_THERMOSTAT && simulation->getStep() > 1000) {
+		if ((simulation->getStep() % STEPS_PER_THERMOSTAT) == 0 && APPLY_THERMOSTAT) {
 			applyThermostat();
 		}
 	}
@@ -368,7 +368,7 @@ void Engine::applyThermostat() {
 	float temp = getBoxTemperature();
 	printf("\n %d Temperature: %f\n", (simulation->getStep()-1) / STEPS_PER_THERMOSTAT, temp);
 	if (temp > target_temp/4.f && temp < target_temp*4.f || true) {
-		simulation->box->thermostat_scalar = target_temp / temp;
+		//simulation->box->thermostat_scalar = target_temp / temp;
 		//printf("Scalar: %f\n", simulation->box->thermostat_scalar);
 	}
 	else {
@@ -385,13 +385,16 @@ void Engine::applyThermostat() {
 void Engine::step() {
 	auto t0 = std::chrono::high_resolution_clock::now();
 
-	if (simulation->box->bridge_bundle->n_bridges > 0) {
+	if (simulation->box->bridge_bundle->n_bridges > 0) {																		// Illegal access to device mem!!
 		compoundBridgeKernel << < simulation->box->bridge_bundle->n_bridges, MAX_PARTICLES_IN_BRIDGE >> > (simulation->box);	// Must come before forceKernel()
 	}
 		
 	cudaDeviceSynchronize();
 	//printf("\n\n");
-	forceKernel <<< simulation->box->n_compounds, THREADS_PER_COMPOUNDBLOCK >>> (simulation->box);
+	if (simulation->n_compounds > 0) {
+		forceKernel << < simulation->box->n_compounds, THREADS_PER_COMPOUNDBLOCK >> > (simulation->box);
+	}
+	
 	if (simulation->n_solvents > 0) { 
 		solventForceKernel << < BLOCKS_PER_SOLVENTKERNEL, THREADS_PER_SOLVENTBLOCK >> > (simulation->box); 
 	}
@@ -545,8 +548,8 @@ __device__ void calcAnglebondForces(Float3* pos_left, Float3* pos_middle, Float3
 	Float3 normal1 = v1.cross(v2);
 	Float3 normal2 = v2.cross(v1);
 
-	Float3 inward_force_direction1 = (v1.cross(normal1)).norm();
-	Float3 inward_force_direction2 = (v2.cross(normal2)).norm();
+	Float3 inward_force_direction1 = (v1.cross(normal2)).norm();
+	Float3 inward_force_direction2 = (v2.cross(normal1)).norm();
 
 	double angle = Float3::getAngle(v1, v2);
 	double error = angle - angletype->theta_0;// *reference_angle;
@@ -561,6 +564,10 @@ __device__ void calcAnglebondForces(Float3* pos_left, Float3* pos_middle, Float3
 	results[0] = inward_force_direction1 * force_scalar;
 	results[2] = inward_force_direction2 * force_scalar;
 	results[1] = (results[0] + results[2]) * -1;
+
+
+	//printf("\nangle %f error %f force %f t0 %f kt %f\n", angle, error, force_scalar, angletype->theta_0, angletype->k_theta);
+
 }
 
 __device__ void calcDihedralbondForces(Float3* pos_left, Float3* pos_lm, Float3* pos_rm, Float3* pos_right, DihedralBond* dihedral, Float3* results, float* potE) {
@@ -835,6 +842,7 @@ __global__ void forceKernel(Box* box) {
 		//force += computeDihedralForces(&compound, compound_state.positions, utility_buffer, &potE_sum);
 		
 		for (int i = 0; i < compound.n_particles; i++) {
+			//continue;
 			if (i != threadIdx.x && !compound.lj_ignore_list[threadIdx.x].ignore((uint8_t) i, (uint8_t) blockIdx.x)) {
 				force += calcLJForce(&compound_state.positions[threadIdx.x], &compound_state.positions[i], data_ptr, &potE_sum,
 					(forcefield_device.particle_parameters[compound.atom_types[threadIdx.x]].sigma + forcefield_device.particle_parameters[compound.atom_types[i]].sigma) * 0.2f,		// Don't know how to handle atoms being this close!!!
@@ -1077,7 +1085,7 @@ __global__ void compoundBridgeKernel(Box* box) {
 	positions[particle_id_bridge] = Float3(0.f);
 	if (particle_id_bridge < bridge.n_particles) {
 		ParticleRefCompact* p_ref = &bridge.particle_refs[particle_id_bridge];
-		positions[particle_id_bridge] = box->compound_state_array[p_ref->compound_id].positions[p_ref->local_id];
+		positions[particle_id_bridge] = box->compound_state_array[p_ref->compound_id].positions[p_ref->local_id_compound];
 	}
 	__syncthreads();
 
@@ -1088,19 +1096,27 @@ __global__ void compoundBridgeKernel(Box* box) {
 	Float3 force(0.f);
 
 	// ------------------------------------------------------------ Intramolecular Operations ------------------------------------------------------------ //
-	{											// So for the very first step, these ´should all be 0, but they are not??										TODO: Look into this at some point!!!!
-
-		LIMAENG::applyHyperpos(&positions[0], &positions[particle_id_bridge]);
+	{											// So for the very first step, these ´should all be 0, but they are not??										TODO: Look into this at some point!!!! Also, can cant really apply hyperpos here without breaking stuff, sindce
+																																								// The bridge spans such a big volume! :/
+//		LIMAENG::applyHyperpos(&positions[0], &positions[particle_id_bridge]);
 		__syncthreads();	
 		force += computePairbondForces(&bridge, positions, utility_buffer, &potE_sum);
 		force += computeAnglebondForces(&bridge, positions, utility_buffer, &potE_sum);
+		//force += computeDihedralForces(&bridge, positions, utility_buffer, &potE_sum);
 	}
 	__syncthreads();
 
 
 	if (particle_id_bridge < bridge.n_particles) {
 		ParticleRefCompact* p_ref = &bridge.particle_refs[particle_id_bridge];
-		box->compounds[p_ref->compound_id].forces[p_ref->local_id] = force;
+		box->compounds[p_ref->compound_id].forces[p_ref->local_id_compound] = force;
+
+
+
+		int compound_offset = p_ref->compound_id * MAX_COMPOUND_PARTICLES;
+		int step_offset = (box->step % STEPS_PER_LOGTRANSFER) * box->total_particles_upperbound;
+
+		box->potE_buffer[p_ref->local_id_compound + compound_offset + step_offset] = potE_sum;
 		//force.print(char((int)threadIdx.x+48));
 	}
 

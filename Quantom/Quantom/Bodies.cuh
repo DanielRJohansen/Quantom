@@ -33,13 +33,13 @@ struct Solvent {
 
 struct ParticleRef {		 // Maybe call map instead?
 	ParticleRef() {}
-	ParticleRef(int g, int c, int l) : global_id(g), compound_id(c), local_id(l) {}
+	ParticleRef(int g, int c, int l) : global_id(g), compound_id(c), local_id_compound(l) {}
 
 	int global_id = -1;		// refers to the id in conf file!
 
 	// For designated compound
 	int compound_id = -1;
-	int local_id = -1;		// Particles id in compound
+	int local_id_compound = -1;		// Particles id in compound
 
 	// For designated compound_bridge
 	int bridge_id = -1;
@@ -134,7 +134,7 @@ struct GenericBond {					// ONLY used during creation, never on device!
 	}
 	bool allParticlesExist() {	// Returns false if any particle in bond does not exist, for example when ignoring hydrogens
 		for (int i = 0; i < n_particles; i++) {
-			if (particles[i].local_id == -1)
+			if (particles[i].local_id_compound == -1)
 				return false;
 		}
 		return true;
@@ -238,8 +238,6 @@ public:
 				return true;
 			}
 			printf("\nFailed to insert solvent neighbor id %d!\n", new_id);
-			for (int i = 0; i < n_solvent_neighbors; i++)
-				printf("n: %d\n", neighborsolvent_ids[i]);
 			break;
 		default:
 			break;
@@ -473,7 +471,7 @@ struct Compound {
 struct CompoundBridgeBundleCompact;
 struct Molecule {
 	Molecule();
-	int n_compounds = 1;
+	int n_compounds = 0;
 	Compound* compounds;
 	CompoundBridgeBundleCompact* compound_bridge_bundle;
 	//CompoundBridgeBundle compound_bridge_bundle;	// Special compound, for special kernel. For now we only need one
@@ -535,7 +533,7 @@ struct CompoundBridge {
 	void addParticle(ParticleRef* particle_ref, Molecule* molecule) {
 		particle_ref->bridge_id = 0;
 		particle_ref->local_id_bridge = n_particles;
-		atom_types[n_particles] = molecule->compounds[particle_ref->compound_id].atom_types[particle_ref->local_id];
+		atom_types[n_particles] = molecule->compounds[particle_ref->compound_id].atom_types[particle_ref->local_id_compound];
 		particle_refs[n_particles] = *particle_ref;
 		n_particles++;
 		//printf("Adding particle with global id: %d\n", particle_ref->global_id);
@@ -637,10 +635,10 @@ struct CompoundBridgeBundle {
 
 struct ParticleRefCompact {
 	ParticleRefCompact() {}
-	ParticleRefCompact(ParticleRef pref) : compound_id(pref.compound_id), local_id(pref.local_id) {}
+	ParticleRefCompact(ParticleRef pref) : compound_id(pref.compound_id), local_id_compound(pref.local_id_compound) {}
 
 	int compound_id = -1;
-	int local_id = -1;
+	int local_id_compound = -1;
 };
 
 struct CompoundBridgeCompact {
