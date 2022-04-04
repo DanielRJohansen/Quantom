@@ -32,6 +32,16 @@ Environment::Environment() {
 	delete[] mol_6lzm_10.compounds;
 	boxbuilder.finishBox(simulation);
 
+
+	for (int c = 0; c < simulation->n_compounds; c++) {
+		Compound* compound = &simulation->box->compounds[c];
+		for (int i = 0; i < compound->n_particles; i++) {
+			printf("%d:   ", compound->particle_global_ids[i]);
+			compound->prev_positions[i].print();
+		}
+	}
+
+
 	simulation->moveToDevice();	// Only moves the Box to the device
 	verifyBox();
 

@@ -500,10 +500,11 @@ __device__ Float3 calcLJForce(Float3* pos0, Float3* pos1, float* data_ptr, float
 
 #ifdef LIMA_VERBOSE
 	//if (threadIdx.x == 32 && blockIdx.x == 28 && force < -600000.f && force > -700000) {
-	if (abs(force) > 20e+8) {
+	//if (abs(force) > 20e+8 && type1 == 200 && type2 == 1) {
+	if (abs(force) > 20e+8 ) {
 		printf("\nDist %f   D2 %f    force %f      sigma: %f \tepsilon %f  t1 %d t2 %d\n", (float)sqrt(dist_sq), (float) dist_sq, (float)force, sigma, epsilon, type1, type2);
-		//pos0->print('0');
-		//pos1->print('1');
+		pos0->print('1');
+		pos1->print('2');
 		//printf("Thread %d Block %d self %f %f %f other %f %f %f\n", threadIdx.x, blockIdx.x, pos0->x, pos0->y, pos0->z, pos1->x, pos1->y, pos1->z);
 		//printf("Force %f %f %f\n", force_unit_vector.x * force, force_unit_vector.y * force, force_unit_vector.z * force);
 	}
@@ -621,7 +622,30 @@ __device__ Float3 computeLJForces(Float3* self_pos, int n_particles, Float3* pos
 	}
 	return force;// *24.f * 1e-9;
 }
-__device__ Float3 computeIntermolecularLJForces(Float3* self_pos, int n_particles, Float3* positions, float* data_ptr, float* potE_sum, uint8_t atomtype_self, uint8_t* atomtypes_others, LJ_Ignores* lj_ignore_list, uint32_t* global_ids) {	// Assumes all positions are 
+//__device__ Float3 computeIntermolecularLJForces(Float3* self_pos, int n_particles, Float3* positions, float* data_ptr, float* potE_sum, uint8_t atomtype_self, uint8_t* atomtypes_others, LJ_Ignores* lj_ignore_list, uint32_t* global_ids) {	// Assumes all positions are 
+__device__ Float3 computerIntermolecularLJForces(Float3* self_pos, uint8_t atomtype_self, LJ_Ignores* lj_ignore_list, float* potE_sum, uint32_t global_id_self, float* data_ptr,	
+	Compound* neighbor_compound, Float3* neighbor_positions, int neighborcompound_id) {
+	
+	Float3 force(0.f);
+	for (int neighborparticle_id = 0; neighborparticle_id < neighbor_compound->n_particles; neighborparticle_id++) {
+		if (lj_ignore_list->ignore((uint8_t)neighborparticle_id, (uint8_t)neighborcompound_id))	// Check if particle_self is bonded to particle_i in neighbor compound
+			continue;
+
+		int neighborparticle_atomtype = neighbor_compound->atom_types[neighborparticle_id];
+
+		force += calcLJForce(self_pos, &neighbor_positions[neighborparticle_id], data_ptr, potE_sum,
+			(forcefield_device.particle_parameters[atomtype_self].sigma + forcefield_device.particle_parameters[neighborparticle_atomtype].sigma) * 0.5f,
+			(forcefield_device.particle_parameters[atomtype_self].epsilon + forcefield_device.particle_parameters[neighborparticle_atomtype].epsilon) * 0.5,
+			//atomtype_self, atomtypes_others[i]
+			global_id_self, neighbor_compound->particle_global_ids[neighborparticle_id]
+		);
+	}
+	return force;// *24.f * 1e-9;
+}
+
+
+/*
+
 	Float3 force(0.f);
 	for (int i = 0; i < n_particles; i++) {
 		if (lj_ignore_list[threadIdx.x].ignore((uint8_t)i, (uint8_t)blockIdx.x))	// Check if particle_self is bonded to particle_i in neighbor compound
@@ -636,8 +660,7 @@ __device__ Float3 computeIntermolecularLJForces(Float3* self_pos, int n_particle
 		);
 	}
 	return force;// *24.f * 1e-9;
-}
-
+*/
 __device__ Float3 computeSolventToSolventLJForces(Float3* self_pos, NeighborList* nlist, Solvent* solvents, float* data_ptr, float* potE_sum) {	// Specific to solvent kernel
 	Float3 force(0.f);
 	for (int i = 0; i < nlist->n_solvent_neighbors; i++) {
@@ -796,7 +819,7 @@ __device__ void integratePosition(Float3* pos, Float3* pos_tsub1, Float3* force,
 	*pos = *pos_tsub1 + delta_pos * *thermostat_scalar;
 #ifdef LIMA_VERBOSE
 	if (force->len() > 2e+8) {
-		printf("\nP_index %d Thread %d blockId %d\tForce %f mass  %f \tFrom %f %f %f\tTo %f %f %f\n", p_index, threadIdx.x, blockIdx.x, force->len(), mass, pos_tsub1->x, pos_tsub1->y, pos_tsub1->z, pos->x, pos->y, pos->z);		
+		//printf("\nP_index %d Thread %d blockId %d\tForce %f mass  %f \tFrom %f %f %f\tTo %f %f %f\n", p_index, threadIdx.x, blockIdx.x, force->len(), mass, pos_tsub1->x, pos_tsub1->y, pos_tsub1->z, pos->x, pos->y, pos->z);		
 	}
 #endif
 }
@@ -850,7 +873,7 @@ __global__ void forceKernel(Box* box) {
 		force += computeDihedralForces(&compound, compound_state.positions, utility_buffer, &potE_sum);
 		
 		for (int i = 0; i < compound.n_particles; i++) {
-			//continue;
+			continue;
 			if (i != threadIdx.x && !compound.lj_ignore_list[threadIdx.x].ignore((uint8_t) i, (uint8_t) blockIdx.x)) {
 				force += calcLJForce(&compound_state.positions[threadIdx.x], &compound_state.positions[i], data_ptr, &potE_sum,
 					(forcefield_device.particle_parameters[compound.atom_types[threadIdx.x]].sigma + forcefield_device.particle_parameters[compound.atom_types[i]].sigma) * 0.2f,		// Don't know how to handle atoms being this close!!!
@@ -866,22 +889,24 @@ __global__ void forceKernel(Box* box) {
 
 
 	// --------------------------------------------------------------- Intermolecular forces --------------------------------------------------------------- //
-	for (int i = 0; i < box->n_compounds; i++) {
+	for (int compound_id = 0; compound_id < box->n_compounds; compound_id++) {
 
-		if (i == blockIdx.x)	// Only needed untill we have proper neighbor lists
+		if (compound_id == blockIdx.x)	// Only needed untill we have proper neighbor lists
 			continue;
-		int n_particles = box->compound_state_array[i].n_particles;
+		int n_particles = box->compound_state_array[compound_id].n_particles;
 
 		if (threadIdx.x < n_particles) {	
-			utility_buffer[threadIdx.x] = box->compound_state_array[i].positions[threadIdx.x];
-			utility_buffer_small[threadIdx.x] = box->compounds[i].atom_types[threadIdx.x];
+			utility_buffer[threadIdx.x] = box->compound_state_array[compound_id].positions[threadIdx.x];
+			utility_buffer_small[threadIdx.x] = box->compounds[compound_id].atom_types[threadIdx.x];
 			LIMAENG::applyHyperpos(&compound_state.positions[0], &utility_buffer[threadIdx.x]);
 		}
 		__syncthreads();
 		if (threadIdx.x < compound.n_particles) {
-			//force += computeLJForces(&compound_state.positions[threadIdx.x], n_particles, utility_buffer, data_ptr, &potE_sum, compound.atom_types[threadIdx.x], utility_buffer_small);
-			
-			force += computeIntermolecularLJForces(&compound_state.positions[threadIdx.x], n_particles, utility_buffer, data_ptr, &potE_sum, compound.atom_types[threadIdx.x], utility_buffer_small, compound.lj_ignore_list, compound.particle_global_ids);
+			//force += computeIntermolecularLJForces(&compound_state.positions[threadIdx.x], n_particles, utility_buffer, data_ptr, &potE_sum, compound.atom_types[threadIdx.x], utility_buffer_small, compound.lj_ignore_list, compound.particle_global_ids);
+
+			//force += computerIntermolecularLJForces(&compound_state.positions[threadIdx.x], compound.atom_types[threadIdx.x], &compound.lj_ignore_list[threadIdx.x], &potE_sum, compound.particle_global_ids[threadIdx.x], data_ptr,
+				//&box->compounds[compound_id], utility_buffer, compound_id);
+
 		}
 			
 	}
@@ -897,7 +922,7 @@ __global__ void forceKernel(Box* box) {
 	}
 	__syncthreads();
 	if (threadIdx.x < compound.n_particles) {
-		force += computeSolventToCompoundLJForces(&compound_state.positions[threadIdx.x], neighborlist.n_solvent_neighbors, utility_buffer, data_ptr, &potE_sum, compound.atom_types[threadIdx.x]);
+		//force += computeSolventToCompoundLJForces(&compound_state.positions[threadIdx.x], neighborlist.n_solvent_neighbors, utility_buffer, data_ptr, &potE_sum, compound.atom_types[threadIdx.x]);
 	}		
 	// ------------------------------------------------------------------------------------------------------------------------------------------------ //
 
