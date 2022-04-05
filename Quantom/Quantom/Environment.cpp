@@ -36,8 +36,16 @@ Environment::Environment() {
 	for (int c = 0; c < simulation->n_compounds; c++) {
 		Compound* compound = &simulation->box->compounds[c];
 		for (int i = 0; i < compound->n_particles; i++) {
-			printf("%d:   ", compound->particle_global_ids[i]);
+			//printf("%d:   ", compound->particle_global_ids[i]);
 			compound->prev_positions[i].print();
+
+			if (compound->particle_global_ids[i] == 200) {
+				for (int ii = 0; ii < compound->lj_ignore_list[i].n_ignores; ii++) {
+					printf("%d %d %d\n", compound->lj_ignore_list[i].local_ids[ii], compound->lj_ignore_list[i].compound_ids[ii], 0);// compound->lj_ignore_list[i].)
+				}
+				//exit(0);
+			}
+
 		}
 	}
 

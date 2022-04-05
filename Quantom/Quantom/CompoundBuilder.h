@@ -64,7 +64,7 @@ private:
 	void addBond(Molecule* molecule, ParticleRef* maps, vector<string>* record);
 	void addAngle(Molecule* molecule, ParticleRef* maps, vector<string>* record);
 	void addDihedral(Molecule* molecule, ParticleRef* maps, vector<string>* record);
-
+	void distributeLJIgnores(Molecule* molecule, ParticleRef* maps, int n);
 
 
 

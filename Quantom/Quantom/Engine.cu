@@ -642,8 +642,6 @@ __device__ Float3 computerIntermolecularLJForces(Float3* self_pos, uint8_t atomt
 	}
 	return force;// *24.f * 1e-9;
 }
-
-
 /*
 
 	Float3 force(0.f);
@@ -661,6 +659,8 @@ __device__ Float3 computerIntermolecularLJForces(Float3* self_pos, uint8_t atomt
 	}
 	return force;// *24.f * 1e-9;
 */
+
+
 __device__ Float3 computeSolventToSolventLJForces(Float3* self_pos, NeighborList* nlist, Solvent* solvents, float* data_ptr, float* potE_sum) {	// Specific to solvent kernel
 	Float3 force(0.f);
 	for (int i = 0; i < nlist->n_solvent_neighbors; i++) {
@@ -889,23 +889,23 @@ __global__ void forceKernel(Box* box) {
 
 
 	// --------------------------------------------------------------- Intermolecular forces --------------------------------------------------------------- //
-	for (int compound_id = 0; compound_id < box->n_compounds; compound_id++) {
+	for (int neighborcompound_id = 0; neighborcompound_id < box->n_compounds; neighborcompound_id++) {
 
-		if (compound_id == blockIdx.x)	// Only needed untill we have proper neighbor lists
+		if (neighborcompound_id == blockIdx.x)	// Only needed untill we have proper neighbor lists
 			continue;
-		int n_particles = box->compound_state_array[compound_id].n_particles;
+		int n_particles = box->compound_state_array[neighborcompound_id].n_particles;
 
 		if (threadIdx.x < n_particles) {	
-			utility_buffer[threadIdx.x] = box->compound_state_array[compound_id].positions[threadIdx.x];
-			utility_buffer_small[threadIdx.x] = box->compounds[compound_id].atom_types[threadIdx.x];
+			utility_buffer[threadIdx.x] = box->compound_state_array[neighborcompound_id].positions[threadIdx.x];
+			utility_buffer_small[threadIdx.x] = box->compounds[neighborcompound_id].atom_types[threadIdx.x];
 			LIMAENG::applyHyperpos(&compound_state.positions[0], &utility_buffer[threadIdx.x]);
 		}
 		__syncthreads();
 		if (threadIdx.x < compound.n_particles) {
 			//force += computeIntermolecularLJForces(&compound_state.positions[threadIdx.x], n_particles, utility_buffer, data_ptr, &potE_sum, compound.atom_types[threadIdx.x], utility_buffer_small, compound.lj_ignore_list, compound.particle_global_ids);
 
-			//force += computerIntermolecularLJForces(&compound_state.positions[threadIdx.x], compound.atom_types[threadIdx.x], &compound.lj_ignore_list[threadIdx.x], &potE_sum, compound.particle_global_ids[threadIdx.x], data_ptr,
-				//&box->compounds[compound_id], utility_buffer, compound_id);
+			force += computerIntermolecularLJForces(&compound_state.positions[threadIdx.x], compound.atom_types[threadIdx.x], &compound.lj_ignore_list[threadIdx.x], &potE_sum, compound.particle_global_ids[threadIdx.x], data_ptr,
+				&box->compounds[neighborcompound_id], utility_buffer, neighborcompound_id);
 
 		}
 			
