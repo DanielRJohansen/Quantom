@@ -65,7 +65,6 @@ void Rasterizer::sortAtoms(RenderAtom* atoms, int dim) {
 RenderBall* Rasterizer::processAtoms(RenderAtom* atoms, Simulation* simulation) {
     RenderBall* balls_device;
     cudaMalloc(&balls_device, sizeof(RenderBall) * simulation->total_particles_upperbound);
-    printf("\n\nt: %d\n", simulation->total_particles_upperbound);
     processAtomsKernel <<< n_threadblocks, RAS_THREADS_PER_BLOCK >>> (atoms, balls_device);
     cudaDeviceSynchronize();
 
@@ -217,7 +216,7 @@ __global__ void processAtomsKernel(RenderAtom* atoms, RenderBall* balls) {
     //atoms[index] = atom;
 
     // Convert units to normalized units for OpenGL
-    atom.radius = 0.5 * atom.radius;            // Yeah, i'm just eyeballing this..
+    atom.radius = 0.25 * atom.radius;            // Yeah, i'm just eyeballing this..
     for (int dim = 0; dim < 3; dim++) {
         *atom.pos.placeAt(dim) = (atom.pos.at(dim) / (double) BOX_LEN - 0.5f) * 1.8l;
     }

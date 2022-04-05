@@ -398,7 +398,6 @@ void Engine::step() {
 	}
 		
 	cudaDeviceSynchronize();
-	//printf("\n\n");
 	if (simulation->n_compounds > 0) {
 		forceKernel << < simulation->box->n_compounds, THREADS_PER_COMPOUNDBLOCK >> > (simulation->box);
 	}
@@ -408,7 +407,6 @@ void Engine::step() {
 	}
 		
 	cudaDeviceSynchronize();
-	//printf("\n\n");
 
 	auto t1 = std::chrono::high_resolution_clock::now();
 
@@ -875,7 +873,7 @@ __global__ void forceKernel(Box* box) {
 		force += computeDihedralForces(&compound, compound_state.positions, utility_buffer, &potE_sum);
 		
 		for (int i = 0; i < compound.n_particles; i++) {
-			continue;
+			//continue;
 			if (i != threadIdx.x && !compound.lj_ignore_list[threadIdx.x].ignore((uint8_t) i, (uint8_t) blockIdx.x)) {
 				force += calcLJForce(&compound_state.positions[threadIdx.x], &compound_state.positions[i], data_ptr, &potE_sum,
 					(forcefield_device.particle_parameters[compound.atom_types[threadIdx.x]].sigma + forcefield_device.particle_parameters[compound.atom_types[i]].sigma) * 0.2f,		// Don't know how to handle atoms being this close!!!
@@ -904,7 +902,6 @@ __global__ void forceKernel(Box* box) {
 		}
 		__syncthreads();				// CRITICAL
 		if (threadIdx.x < compound.n_particles) {
-			//force += computeIntermolecularLJForces(&compound_state.positions[threadIdx.x], n_particles, utility_buffer, data_ptr, &potE_sum, compound.atom_types[threadIdx.x], utility_buffer_small, compound.lj_ignore_list, compound.particle_global_ids);
 
 			force += computerIntermolecularLJForces(&compound_state.positions[threadIdx.x], compound.atom_types[threadIdx.x], &compound.lj_ignore_list[threadIdx.x], &potE_sum, compound.particle_global_ids[threadIdx.x], data_ptr,
 				&box->compounds[neighborcompound_id], utility_buffer, neighborcompound_id);
@@ -924,7 +921,7 @@ __global__ void forceKernel(Box* box) {
 	}
 	__syncthreads();
 	if (threadIdx.x < compound.n_particles) {
-		//force += computeSolventToCompoundLJForces(&compound_state.positions[threadIdx.x], neighborlist.n_solvent_neighbors, utility_buffer, data_ptr, &potE_sum, compound.atom_types[threadIdx.x]);
+		force += computeSolventToCompoundLJForces(&compound_state.positions[threadIdx.x], neighborlist.n_solvent_neighbors, utility_buffer, data_ptr, &potE_sum, compound.atom_types[threadIdx.x]);
 	}		
 	// ------------------------------------------------------------------------------------------------------------------------------------------------ //
 

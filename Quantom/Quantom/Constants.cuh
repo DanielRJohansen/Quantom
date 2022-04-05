@@ -18,10 +18,10 @@
 
 // SImulation specifics
 
-constexpr float BOX_LEN = 14.f;		// Must be > twice the len of largest compound
+constexpr float BOX_LEN = 10.f;		// Must be > twice the len of largest compound
 constexpr float BOX_LEN_HALF = BOX_LEN / 2.f;
 
-const int N_SOLVATE_MOLECULES = 500;	
+const int N_SOLVATE_MOLECULES = 1000;	
 const int MAX_RESIDUES_TO_LOAD = 200;
 
 
