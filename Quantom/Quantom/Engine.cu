@@ -371,8 +371,8 @@ void Engine::handleBoxtemp() {
 	temp_scalar = min(temp_scalar, 1.1f);		// I just added this to not change any temperatures too rapidly
 	temp_scalar = max(temp_scalar, 0.9f);
 
-
-	printf("\n %d Temperature: %f\n", (simulation->getStep()-1) / STEPS_PER_THERMOSTAT, temp);
+	if (PRINT_TEMP) { printf("\n %d Temperature: %f\n", (simulation->getStep() - 1) / STEPS_PER_THERMOSTAT, temp); }
+		
 	if (temp > target_temp/4.f && temp < target_temp*4.f || true) {
 		if (APPLY_THERMOSTAT) {
 			simulation->box->thermostat_scalar = target_temp / temp;
@@ -501,8 +501,8 @@ __device__ Float3 calcLJForce(Float3* pos0, Float3* pos1, float* data_ptr, float
 #ifdef LIMA_VERBOSE
 	//if (threadIdx.x == 32 && blockIdx.x == 28 && force < -600000.f && force > -700000) {
 	//if (abs(force) > 20e+8 && type1 == 200 && type2 == 1) {
-	if (abs(force) > 20e+8 ) {
-		printf("\nDist %f   D2 %f    force %f      sigma: %f \tepsilon %f  t1 %d t2 %d\n", (float)sqrt(dist_sq), (float) dist_sq, (float)force, sigma, epsilon, type1, type2);
+	if (abs(force) > 20e+8) {
+		printf("\nDist %f   D2 %f    force %f [MN]     sigma: %f \tepsilon %f  t1 %d t2 %d\n", (float)sqrt(dist_sq), (float) dist_sq, (float)force*1e-6, sigma, epsilon, type1, type2);
 		pos0->print('1');
 		pos1->print('2');
 		//printf("Thread %d Block %d self %f %f %f other %f %f %f\n", threadIdx.x, blockIdx.x, pos0->x, pos0->y, pos0->z, pos1->x, pos1->y, pos1->z);
@@ -632,6 +632,8 @@ __device__ Float3 computerIntermolecularLJForces(Float3* self_pos, uint8_t atomt
 			continue;
 
 		int neighborparticle_atomtype = neighbor_compound->atom_types[neighborparticle_id];
+
+
 
 		force += calcLJForce(self_pos, &neighbor_positions[neighborparticle_id], data_ptr, potE_sum,
 			(forcefield_device.particle_parameters[atomtype_self].sigma + forcefield_device.particle_parameters[neighborparticle_atomtype].sigma) * 0.5f,
@@ -893,14 +895,14 @@ __global__ void forceKernel(Box* box) {
 
 		if (neighborcompound_id == blockIdx.x)	// Only needed untill we have proper neighbor lists
 			continue;
-		int n_particles = box->compound_state_array[neighborcompound_id].n_particles;
+		int neighborcompound_particles = box->compound_state_array[neighborcompound_id].n_particles;
 
-		if (threadIdx.x < n_particles) {	
+		if (threadIdx.x < neighborcompound_particles) {
 			utility_buffer[threadIdx.x] = box->compound_state_array[neighborcompound_id].positions[threadIdx.x];
 			utility_buffer_small[threadIdx.x] = box->compounds[neighborcompound_id].atom_types[threadIdx.x];
 			LIMAENG::applyHyperpos(&compound_state.positions[0], &utility_buffer[threadIdx.x]);
 		}
-		__syncthreads();
+		__syncthreads();				// CRITICAL
 		if (threadIdx.x < compound.n_particles) {
 			//force += computeIntermolecularLJForces(&compound_state.positions[threadIdx.x], n_particles, utility_buffer, data_ptr, &potE_sum, compound.atom_types[threadIdx.x], utility_buffer_small, compound.lj_ignore_list, compound.particle_global_ids);
 
@@ -908,7 +910,7 @@ __global__ void forceKernel(Box* box) {
 				&box->compounds[neighborcompound_id], utility_buffer, neighborcompound_id);
 
 		}
-			
+		__syncthreads();				// CRITICAL			
 	}
 	// ------------------------------------------------------------------------------------------------------------------------------------------------------ //
 
@@ -981,7 +983,7 @@ __global__ void forceKernel(Box* box) {
 	// ----------------------------------------------------------------------------- //
 
 	if (force.len() > 2e+9) {
-		printf("\n\nCritical force %f\n\n\n", force.len());
+		//printf("\n\nCritical force %f\n\n\n", force.len());
 		box->critical_error_encountered = true;
 	}
 		
