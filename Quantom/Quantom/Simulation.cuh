@@ -110,6 +110,7 @@ public:
 	}
 	__host__ void copyBoxVariables() {
 		n_compounds = box->n_compounds;
+		n_bridges = box->bridge_bundle->n_bridges;
 		n_solvents = box->n_solvents;
 		compounds_host = new Compound[n_compounds];
 		for (int i = 0; i < n_compounds; i++)
@@ -150,7 +151,10 @@ public:
 
 	// Box variable copies, here for ease of access.
 	int n_compounds = 0;
+	int n_bridges = 0; 
 	int n_solvents = 0;
+
+
 
 	string out_dir = OUT_DIR;
 	

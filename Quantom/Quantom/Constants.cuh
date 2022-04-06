@@ -37,35 +37,28 @@ constexpr float CUTOFF = 1.f;	//nm/
 
 
 
-
+// OPTIMIZATION PARAMETERS
 const int THREADS_PER_SOLVENTBLOCK = 128;	// Must be >= N_SOLVATE_MOLECULES
-
-
 const int THREADS_PER_COMPOUNDBLOCK = 128; // Must be >= max comp particles
-
-
-
-const int SIMULATION_STEPS = 100000;
-
-
-
-
-
-
 const int MAX_COMPOUND_PARTICLES = 128;
+
+
+const int SIMULATION_STEPS = 1000;
+
 
 
 
 const int STEPS_PER_NLIST_UPDATE = 200;
+
+
+
+const int STEPS_PER_RENDER = 100;
+
+
+// THERMOSTAT PARAMETERS
 const int STEPS_PER_LOGTRANSFER = 20;
 //const int STEPS_PER_TRAJTRANSFER = 100;
 const int STEPS_PER_THERMOSTAT = 10;
-const int STEPS_PER_TRAINDATATRANSFER = 1000;
-
-
-
-const int STEPS_PER_RENDER = 50;
-
 const bool ENABLE_BOXTEMP = true;
 const bool APPLY_THERMOSTAT = true;										// Switch to using forcefield_host first
 const bool PRINT_TEMP = false;
@@ -77,6 +70,12 @@ const int MAX_ATOMS_IN_RESIDUE = 32;
 
 
 
+
+
+
+// Logging constants
+const int N_DATAGAN_VALUES = 6;
+const int STEPS_PER_TRAINDATATRANSFER = 1000;
 
 
 

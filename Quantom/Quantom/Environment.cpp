@@ -13,13 +13,8 @@ Environment::Environment() {
 	ForceFieldMaker* forcefieldmaker = new ForceFieldMaker();
 	compoundbuilder = new CompoundBuilder(forcefieldmaker);
 
-	//engine = new Engine;
 
-	
-	//Compound mol_dpc = compoundbuilder.buildMolecule("D:\\Quantom\\m40.pdb", "D:\\Quantom\\dpc.itp", 1);
-	//Compound mol_4pcw10 = compoundbuilder.buildMolecule("D:\\Quantom\\filaggrin\\4pcw_first10.pdb", "D:\\Quantom\\filaggrin\\topol.top", 7);
-	//Compound mol_4pcw10 = compoundbuilder.buildMolecule("D:\\Quantom\\filaggrin\\conf.gro", "D:\\Quantom\\filaggrin\\topol.top", 4);
-	//Compound mol_6lzm_10 = compoundbuilder.buildMolecule(MOL_FOLDER + "conf.gro", MOL_FOLDER + "topol.top", 10);
+
 	Molecule mol_6lzm_10 = compoundbuilder->buildMolecule(MOL_FOLDER + "conf.gro", MOL_FOLDER + "topol.top", MAX_RESIDUES_TO_LOAD, 0);
 
 	printf("bridges after %d\n", mol_6lzm_10.compound_bridge_bundle->n_bridges);
@@ -28,6 +23,8 @@ Environment::Environment() {
 	boxbuilder.buildBox(simulation);
 	//boxbuilder.addSingleMolecule(simulation, &mol_6lzm_10);
 	boxbuilder.addSingleMolecule(simulation, &mol_6lzm_10);
+	boxbuilder.solvateBox(simulation);	// Always do after placing compounds
+
 	//boxbuilder.addScatteredMolecules(simulation, &mol_dpc, N_LIPID_COPIES);
 	delete[] mol_6lzm_10.compounds;
 	boxbuilder.finishBox(simulation);
@@ -134,10 +131,10 @@ void Environment::postRunEvents() {
 		simulation->getStep() * 6 * MAX_COMPOUND_PARTICLES,
 		simulation->out_dir + "\\sim_out.bin");
 
-	/*dumpToFile(simulation->box->data_GAN,
-		simulation->getStep() * MAX_COMPOUND_PARTICLES * 6,
+	dumpToFile(simulation->box->data_GAN,
+		simulation->getStep() * simulation->n_compounds * MAX_COMPOUND_PARTICLES * 6,
 		simulation->out_dir + "\\sim_out.bin"
-	);*/
+	);
 	return;
 	string data_processing_command = "C:\\Users\\Daniel\\git_repo\\Quantom\\LIMA_services\\x64\\Debug\\LIMA_services.exe "
 		+ simulation->out_dir + " "

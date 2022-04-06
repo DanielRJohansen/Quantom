@@ -32,7 +32,7 @@ Molecule CompoundBuilder::buildMolecule(string pdb_path, string itp_path, int ma
 	*molecule.compound_bridge_bundle = CompoundBridgeBundleCompact(compound_bridge_bundle);
 
 	countElements(&molecule);
-	printf("Molecule built\n\n\n");
+	printf("Molecule built with %d compounds and %d bridges\n\n\n", molecule.n_compounds, molecule.compound_bridge_bundle->n_bridges);
 
 	for (int i = 0; i < molecule.n_compounds; i++) {
 		molecule.compounds[i].calcParticleSphere();
@@ -225,7 +225,7 @@ void CompoundBuilder::addAngle(Molecule* molecule, ParticleRef* maps, vector<str
 
 	AngleBond* angletype = FFM->getAngleType(maps[0].global_id, maps[1].global_id, maps[2].global_id);
 
-	//distributeLJIgnores(molecule, maps, 3);
+	distributeLJIgnores(molecule, maps, 3);
 
 	if (!g_bond.spansTwoCompounds()) {
 		Compound* compound = &molecule->compounds[maps[0].compound_id];

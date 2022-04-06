@@ -307,7 +307,7 @@ void Engine::offloadPositionData() {
 }
 
 void Engine::offloadTrainData() {
-	const int step_offset = (simulation->getStep() - STEPS_PER_TRAINDATATRANSFER) * MAX_COMPOUND_PARTICLES * 6;	// fix max_compound to the actual count save LOTS of space!. Might need a file in simout that specifies cnt for loading in other programs...
+	const int step_offset = (simulation->getStep() - STEPS_PER_TRAINDATATRANSFER) * MAX_COMPOUND_PARTICLES * N_DATAGAN_VALUES;	// fix max_compound to the actual count save LOTS of space!. Might need a file in simout that specifies cnt for loading in other programs...
 	cudaMemcpy(&simulation->traindata_buffer[step_offset], simulation->box->data_GAN, sizeof(Float3) * MAX_COMPOUND_PARTICLES * 6 * STEPS_PER_TRAINDATATRANSFER, cudaMemcpyDeviceToHost);
 	LIMAENG::genericErrorCheck("Cuda error during traindata offloading\n");
 }
@@ -681,7 +681,7 @@ __device__ Float3 computeSolventToCompoundLJForces(Float3* self_pos, int n_parti
 	for (int i = 0; i < n_particles; i++) {
 		force += calcLJForce(self_pos, &positions[i], data_ptr, potE_sum,
 			(forcefield_device.particle_parameters[atomtype_self].sigma + forcefield_device.particle_parameters[ATOMTYPE_SOL].sigma) * 0.5f,
-			(forcefield_device.particle_parameters[atomtype_self].epsilon + forcefield_device.particle_parameters[ATOMTYPE_SOL].epsilon) * 0.5f
+			sqrtf(forcefield_device.particle_parameters[atomtype_self].epsilon * forcefield_device.particle_parameters[ATOMTYPE_SOL].epsilon)
 		);
 	}
 	return force;// *24.f * 1e-9;
@@ -863,6 +863,7 @@ __global__ void forceKernel(Box* box) {
 	
 	//Float3 force(0.f);
 	Float3 force = compound.forces[threadIdx.x];
+	Float3 force_LJ_sol;
 	// ------------------------------------------------------------ Intramolecular Operations ------------------------------------------------------------ //
 	{
 
@@ -876,11 +877,11 @@ __global__ void forceKernel(Box* box) {
 			//continue;
 			if (i != threadIdx.x && !compound.lj_ignore_list[threadIdx.x].ignore((uint8_t) i, (uint8_t) blockIdx.x)) {
 				force += calcLJForce(&compound_state.positions[threadIdx.x], &compound_state.positions[i], data_ptr, &potE_sum,
-					(forcefield_device.particle_parameters[compound.atom_types[threadIdx.x]].sigma + forcefield_device.particle_parameters[compound.atom_types[i]].sigma) * 0.2f,		// Don't know how to handle atoms being this close!!!
-					(forcefield_device.particle_parameters[compound.atom_types[threadIdx.x]].epsilon + forcefield_device.particle_parameters[compound.atom_types[i]].epsilon) * 0.5f,
-					compound.atom_types[threadIdx.x], compound.atom_types[i]
+					(forcefield_device.particle_parameters[compound.atom_types[threadIdx.x]].sigma + forcefield_device.particle_parameters[compound.atom_types[i]].sigma) * 0.5f,		// Don't know how to handle atoms being this close!!!
+					sqrtf(forcefield_device.particle_parameters[compound.atom_types[threadIdx.x]].epsilon * forcefield_device.particle_parameters[compound.atom_types[i]].epsilon),
+					//compound.atom_types[threadIdx.x], compound.atom_types[i]
 					//compound.particle_global_ids[threadIdx.x], blockIdx.x
-					//compound.particle_global_ids[threadIdx.x], compound.particle_global_ids[i]
+					compound.particle_global_ids[threadIdx.x], compound.particle_global_ids[i]
 				);// *24.f * 1e-9;
 			}
 		}
@@ -921,7 +922,9 @@ __global__ void forceKernel(Box* box) {
 	}
 	__syncthreads();
 	if (threadIdx.x < compound.n_particles) {
-		force += computeSolventToCompoundLJForces(&compound_state.positions[threadIdx.x], neighborlist.n_solvent_neighbors, utility_buffer, data_ptr, &potE_sum, compound.atom_types[threadIdx.x]);
+		//force += computeSolventToCompoundLJForces(&compound_state.positions[threadIdx.x], neighborlist.n_solvent_neighbors, utility_buffer, data_ptr, &potE_sum, compound.atom_types[threadIdx.x]);
+		force_LJ_sol = computeSolventToCompoundLJForces(&compound_state.positions[threadIdx.x], neighborlist.n_solvent_neighbors, utility_buffer, data_ptr, &potE_sum, compound.atom_types[threadIdx.x]);
+		force += force_LJ_sol;
 	}		
 	// ------------------------------------------------------------------------------------------------------------------------------------------------ //
 
@@ -970,8 +973,13 @@ __global__ void forceKernel(Box* box) {
 			box->outdata[6 + box->step * 10] = data_ptr[1];// force.len();
 		}
 */
-		int step_offset = (box->step % STEPS_PER_TRAINDATATRANSFER) * MAX_COMPOUND_PARTICLES * 6;
-		box->data_GAN[0 + threadIdx.x * 6 + step_offset] = compound_state.positions[threadIdx.x];
+
+		int n_compounds_total = gridDim.x;
+		int step_offset = (box->step % STEPS_PER_TRAINDATATRANSFER) * n_compounds_total * MAX_COMPOUND_PARTICLES * N_DATAGAN_VALUES;
+		int compound_offset = blockIdx.x * MAX_COMPOUND_PARTICLES * N_DATAGAN_VALUES;
+		int particle_offset = threadIdx.x * N_DATAGAN_VALUES;
+		//box->data_GAN[0 + particle_offset + compound_offset + step_offset] = compound_state.positions[threadIdx.x];
+		//box->data_GAN[1 + particle_offset + compound_offset + step_offset] = force_LJ_sol;
 //		box->data_GAN[1 + threadIdx.x * 6 + step_offset] = force_bond + force_angle;
 //		box->data_GAN[2 + threadIdx.x * 6 + step_offset] = force_LJ_com;
 //		box->data_GAN[3 + threadIdx.x * 6 + step_offset] = force_LJ_sol;
@@ -1134,7 +1142,7 @@ __global__ void compoundBridgeKernel(Box* box) {
 		__syncthreads();	
 		force += computePairbondForces(&bridge, positions, utility_buffer, &potE_sum);
 		force += computeAnglebondForces(&bridge, positions, utility_buffer, &potE_sum);
-		//force += computeDihedralForces(&bridge, positions, utility_buffer, &potE_sum);
+		force += computeDihedralForces(&bridge, positions, utility_buffer, &potE_sum);
 	}
 	__syncthreads();
 

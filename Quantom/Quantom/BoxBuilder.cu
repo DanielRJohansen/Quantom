@@ -58,10 +58,10 @@ void BoxBuilder::addScatteredMolecules(Simulation* simulation, Compound* molecul
 	printf("Scattered %d Compounds in box\n", simulation->box->n_compounds);
 }
 
-void BoxBuilder::finishBox(Simulation* simulation)
-{
-	printf("%d Compounds in box\n\n", simulation->box->n_compounds);
-	solvateBox(simulation);	// Always do after placing compounds
+void BoxBuilder::finishBox(Simulation* simulation) {
+	simulation->copyBoxVariables();
+
+	printf("Box contains %d compounds, %d bridges and %d solvents\n\n", simulation->n_compounds, simulation->n_bridges, simulation->n_solvents);
 
 
 	// Need this variable both on host and device
@@ -99,24 +99,26 @@ void BoxBuilder::finishBox(Simulation* simulation)
 
 
 
-
+	// TRAINING DATA and TEMPRARY OUTPUTS
 	long double total_bytes = sizeof(double) * 10 * simulation->n_steps
-		+ sizeof(Float3) * 6 * MAX_COMPOUND_PARTICLES * STEPS_PER_TRAINDATATRANSFER;
-
+		+ sizeof(Float3) * N_DATAGAN_VALUES * MAX_COMPOUND_PARTICLES * simulation->n_compounds * STEPS_PER_TRAINDATATRANSFER;
 	printf("Reserving %.2lf GB device mem for logging\n", (total_bytes) * 1e-9);
 	cudaMallocManaged(&simulation->box->outdata, sizeof(double) * 10 * simulation->n_steps);	// 10 data streams for 10k steps. 1 step at a time.
 	//cudaMallocManaged(&simulation->box->data_GAN, sizeof(Float3) * 6 * MAX_COMPOUND_PARTICLES * simulation->n_steps);
-	cudaMallocManaged(&simulation->box->data_GAN, sizeof(Float3) * 6 * MAX_COMPOUND_PARTICLES * STEPS_PER_TRAINDATATRANSFER);
-	simulation->traindata_buffer = new Float3[6 * MAX_COMPOUND_PARTICLES * simulation->n_steps];
+	cudaMallocManaged(&simulation->box->data_GAN, sizeof(Float3) * N_DATAGAN_VALUES * MAX_COMPOUND_PARTICLES * simulation->n_compounds * STEPS_PER_TRAINDATATRANSFER);
+	simulation->traindata_buffer = new Float3[N_DATAGAN_VALUES * MAX_COMPOUND_PARTICLES * simulation->n_compounds * simulation->n_steps];
+
+
+
+
 
 	cudaDeviceSynchronize();
 	if (cudaGetLastError() != cudaSuccess) {
-		fprintf(stderr, "Error during log-data allocation\n");
+		fprintf(stderr, "Error during log-data mem. allocation\n");
 		exit(1);
 	}
 
 
-	simulation->copyBoxVariables();
 	simulation->box->moveToDevice();
 	printf("Boxbuild complete!\n\n\n");
 }

@@ -13,11 +13,13 @@ public:
 	void addScatteredMolecules(Simulation* simulation, Compound* molecule, int n_copies);
 	void addDoubleMembrane(Simulation* simulation, Compound* molecule);
 	void finishBox(Simulation* simulation);
+	int solvateBox(Simulation* simulation);					// Returns # of solvate compounds placed
+
+
 
 private:
 
 	void placeSingleMolecule(Simulation* simulation, Compound* molecule);
-	int solvateBox(Simulation* simulation);					// Returns # of solvate compounds placed
 
 	void integrateCompound(Float3 com, int compound_index,
 		CompoundState* statebuffer_node, double dt, Simulation* simulation);
