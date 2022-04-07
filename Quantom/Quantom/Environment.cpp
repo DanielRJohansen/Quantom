@@ -104,6 +104,11 @@ void Environment::postRunEvents() {
 	dumpToFile(analyzed_package.temperature_data, analyzed_package.n_temperature_values, simulation->out_dir + "temperature.bin");
 
 
+
+	for (int i = 0; i < simulation->getStep(); i++) {
+		//simulation->traindata_buffer[0 + i * N_DATAGAN_VALUES * MAX_COMPOUND_PARTICLES * simulation->n_compounds].print();
+	}
+
 	dumpToFile(simulation->traindata_buffer,
 		N_DATAGAN_VALUES * MAX_COMPOUND_PARTICLES * simulation->n_compounds * simulation->getStep(),
 		simulation->out_dir + "sim_traindata.bin");
@@ -111,12 +116,14 @@ void Environment::postRunEvents() {
 
 
 #ifndef __linux__
+
+
 	string data_processing_command = "C:\\Users\\Daniel\\git_repo\\Quantom\\LIMA_services\\x64\\Debug\\LIMA_services.exe "
 		+ simulation->out_dir + " "
 		+ to_string(simulation->getStep()) + " "
 		+ "0" + " "											// do_shuffle
-		+ to_string(MAX_COMPOUND_PARTICLES) + " "
-		+ to_string(simulation->n_compounds)
+		+ to_string(simulation->n_compounds) + " "
+		+ to_string(MAX_COMPOUND_PARTICLES)		
 		;											
 
 	cout << data_processing_command << "\n\n";

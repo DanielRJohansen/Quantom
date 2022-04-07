@@ -43,7 +43,7 @@ const int THREADS_PER_COMPOUNDBLOCK = 128; // Must be >= max comp particles
 const int MAX_COMPOUND_PARTICLES = 128;
 
 
-const int SIMULATION_STEPS = 1000;
+const int SIMULATION_STEPS = 100000;
 
 
 

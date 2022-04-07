@@ -14,17 +14,17 @@ const int ROW_START = 100;
 
 struct Float3 {
 	Float3() {}
-	Float3(double a) : x(a), y(a), z(a) {}
-	Float3(double x, double y, double z) : x(x), y(y), z(z) {}
-	Float3(double* a) { x = a[0]; y = a[1]; z = a[2]; }
+	Float3(float a) : x(a), y(a), z(a) {}
+	Float3(float x, float y, float z) : x(x), y(y), z(z) {}
+	Float3(float* a) { x = a[0]; y = a[1]; z = a[2]; }
 
-	inline Float3 operator * (const double a) const { return Float3(x * a, y * a, z * a); }
+	inline Float3 operator * (const float a) const { return Float3(x * a, y * a, z * a); }
 	inline Float3 operator * (const Float3 a) const { return Float3(x * a.x, y * a.y, z * a.z); }
 	inline Float3 operator + (const Float3 a) const { return Float3(x + a.x, y + a.y, z + a.z); }
 	inline Float3 operator - (const Float3 a) const { return Float3(x - a.x, y - a.y, z - a.z); }
 	inline bool operator == (const Float3 a) const { return (a.x == x && a.y == y && a.z == z); }
 	inline void operator += (const Float3 a) { x += a.x; y += a.y; z += a.z; }
-	inline void operator *= (const double a) { x *= a; y *= a; z *= a; }
+	inline void operator *= (const float a) { x *= a; y *= a; z *= a; }
 
 	inline bool operator < (const Float3 a) { return x < a.x&& y < a.y&& z < a.z; }
 	inline bool operator > (const Float3 a) { return x > a.x && y > a.y && z > a.z; }
@@ -33,14 +33,14 @@ struct Float3 {
 
 
 	Float3 norm() {
-		double l = len();
+		float l = len();
 		if (l)
 			return *this * (1.f / l);
 		return Float3(0, 0, 0);
 	}
 	Float3 square() { return Float3(x * x, y * y, z * z); }
-	inline double len() { return (double)sqrtf(x * x + y * y + z * z); }
-	double at(int index) {
+	inline float len() { return (float)sqrtf(x * x + y * y + z * z); }
+	float at(int index) {
 		switch (index) {
 		case 0:
 			return x;
@@ -53,7 +53,7 @@ struct Float3 {
 			return -404;
 		}
 	}
-	double* placeAt(int index) {
+	float* placeAt(int index) {
 		switch (index) {
 		case 0:
 			return &x;
@@ -71,7 +71,7 @@ struct Float3 {
 		}
 	}
 
-	double x, y, z;
+	float x, y, z;
 };
 
 struct Atom {
@@ -80,7 +80,7 @@ struct Atom {
 	int id;
 	Float3 pos;
 	Float3 LJ_force;
-	double euclidean_dist;
+	float euclidean_dist;
 };
 
 struct Row {
@@ -238,9 +238,8 @@ void readDataBIN(Row* rows, string path, int N_STEPS, int particles_per_step) {
 		for (int p = 0; p < particles_per_step; p++) {			
 			int buffer_index = p * f3_per_particle + step * particles_per_step * f3_per_particle;
 
-			rows[step].atoms[p] = Atom(p, buffer[buffer_index + 0], buffer[buffer_index + 3]);	// Need of way of determining whether a particle exists, or is in the buffer!!!!!!!!!!!!!!!!!!!!!
+			rows[step].atoms[p] = Atom(p, buffer[buffer_index + 0], buffer[buffer_index + 1]);	// Need of way of determining whether a particle exists, or is in the buffer!!!!!!!!!!!!!!!!!!!!!
 		}
-		rows[step].atoms[0].pos.print('p');
 	}
 }
 
@@ -283,7 +282,7 @@ void makeForceChangePlot(selfcenteredDatapoint* data, int n_datapoints) {
 	int zeroes = 0;
 	int bin;
 	for (int i = 0; i < n_datapoints; i++) {
-		double force_change = (data[i].atoms_relative[0].LJ_force - data[i].atoms_relative_prev[0].LJ_force).len();
+		float force_change = (data[i].atoms_relative[0].LJ_force - data[i].atoms_relative_prev[0].LJ_force).len();
 		
 		if (force_change < 1.f) {
 			bin = 0;
@@ -298,7 +297,7 @@ void makeForceChangePlot(selfcenteredDatapoint* data, int n_datapoints) {
 		else 
 			bin = (int)log2(force_change);
 			
-		printf("BIN: %d. Force %f\n", bin, force_change);
+		//printf("BIN: %d. Force %f\n", bin, force_change);
 		bins[bin]++;
 		if (bin < 0 || bin > 31) {
 			printf("Bin: %d\n");
@@ -315,10 +314,10 @@ void makeForceChangePlot(selfcenteredDatapoint* data, int n_datapoints) {
 	printf("];\n\n\n");
 }
 
-int discardVolatileDatapoints(selfcenteredDatapoint* data, int n_datapoints, double cuttoff_value) {	// Removes datapoints where the change in force is too large for the NN to handle..
+int discardVolatileDatapoints(selfcenteredDatapoint* data, int n_datapoints, float cuttoff_value) {	// Removes datapoints where the change in force is too large for the NN to handle..
 	int n_ignored = 0;
 	for (int i = 0; i < n_datapoints; i++) {
-		double force_change = (data[i].atoms_relative[0].LJ_force - data[i].atoms_relative_prev[0].LJ_force).len();
+		float force_change = (data[i].atoms_relative[0].LJ_force - data[i].atoms_relative_prev[0].LJ_force).len();
 		if (force_change > cuttoff_value) {
 			data[i].ignore = true;
 			n_ignored++;
