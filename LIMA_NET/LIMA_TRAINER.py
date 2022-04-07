@@ -1,5 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from time import time
+
 
 class Trainer():
     def __init__(self, net, working_folder, n_neighbors):
@@ -16,6 +18,7 @@ class Trainer():
 
 
         for e in range(n_epochs):
+            t0 = time()
             if (e == 0):                # Dont train the first epoch, so we can see a baseline!
                 train_loss_hist.append(1)
             else:
@@ -24,7 +27,7 @@ class Trainer():
             val_loss_hist.append(vloss)
             val_acc_hist.append(vacc)
 
-            print("Epoch ", e, " train-loss: ", train_loss_hist[-1], " val-loss: ", val_loss_hist[-1], " mean accuracy: ", val_acc_hist[-1])
+            print("Epoch ", e, " train-loss: ", train_loss_hist[-1], " val-loss: ", val_loss_hist[-1], " mean accuracy: ", val_acc_hist[-1], " time: ", time()-t0)
         
         
         self.makePlot(train_loss_hist, train_acc_hist, val_loss_hist, val_acc_hist, n_epochs)

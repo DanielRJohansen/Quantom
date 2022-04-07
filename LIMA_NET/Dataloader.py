@@ -74,8 +74,8 @@ class WaterforceDataloader():
 
 
         #### Now split the dataset
-        self.n_train = int(datapoints_total * 0.7)
-       # n_val = int(datapoints_total * 0.3)
+        self.n_train = int(datapoints_total * 0.8)
+
         trainset = LIMADataset(data[0:self.n_train, :], labels[0:self.n_train, :])
         valset = LIMADataset(data[self.n_train:, :], labels[self.n_train:, :])
         self.batch_size = batch_size

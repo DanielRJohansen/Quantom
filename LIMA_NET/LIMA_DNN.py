@@ -31,7 +31,8 @@ class LIMADNN(nn.Module):
 
         self.fc_sforce1 = nn.Linear(3, 3)
 
-        self.fc_fullstack1 = nn.Linear(16, 8)
+        self.fc_fullstack1 = nn.Linear(16, 16)
+        self.fc_fullstack2 = nn.Linear(16, 8)
 
         self.fc_out = nn.Linear(8, 3)
 
@@ -57,6 +58,7 @@ class LIMADNN(nn.Module):
 
         stack = torch.cat((posforce, sforce), 1)
         stack = self.fc_fullstack1(stack)
+        stack = self.fc_fullstack2(stack)
 
         out = self.fc_out(stack)
         out = torch.sigmoid(out)

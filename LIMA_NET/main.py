@@ -15,7 +15,7 @@ import torch
 
 
 if __name__ == '__main__':
-    n_neighbors = 2
+    n_neighbors = 16
 
     #workdir = "C:\\PROJECTS\\Quantom\\LIMANET\\sim_out\\Steps_10000"
     workdir = "C:\\PROJECTS\\Quantom\\Simulation\\Steps_100000\\"
@@ -31,5 +31,5 @@ if __name__ == '__main__':
 
     trainer = Trainer(net, workdir, n_neighbors=n_neighbors)
 
-    trainer.train(100)
+    trainer.train(50)
     #net.train(5000)
