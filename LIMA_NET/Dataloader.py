@@ -20,29 +20,48 @@ class LIMADataset(Dataset):
 
 
 class WaterforceDataloader():
-    def __init__(self, data_filepath, nearest_n_atoms=69, batch_size=64):
-        final_index = 6 + 3 * nearest_n_atoms * 2
-        values_per_row = 70*3*2
+    def __init__(self, data_filepath, neighbors_per_row, nearest_n_atoms=128, batch_size=64):
 
-        raw_data = np.fromfile(data_filepath, dtype=np.double)
-        print(raw_data[0:6])
-        print(raw_data.shape)
-        raw_data = raw_data.reshape((int(len(raw_data)/(values_per_row)), values_per_row))
-        print(raw_data.shape)
-        print(raw_data[0, 0:6])
-        #raw_data = raw_data.transpose()
+        values_per_row = 3 * 2 * (1 + neighbors_per_row)        # 2 for self pos + self_pos_prev
+
+        raw_data = np.fromfile(data_filepath, dtype=np.float32)
 
 
-        raw_data = raw_data.astype(np.float32)
 
-        #raw_data = np.genfromtxt(data_filepath, delimiter=';', dtype=np.float32)
+
+        #print(raw_data[0:6])
         #print(raw_data.shape)
-        #exit()
-        #print(raw_data[0,0:6])
-        #exit(0)
+        raw_data = raw_data.reshape((int(len(raw_data)/(values_per_row)), values_per_row))          # Reshape into steps
+        #print(raw_data.shape)
+        raw_data = raw_data[:,0:3 * 2 * (1 + nearest_n_atoms)]                                              # Remove distant atoms
+        #print(raw_data.shape)
+        #print(raw_data[0, 0:6])
 
-        labels = torch.from_numpy(raw_data[:, 0:3])
-        data = torch.from_numpy(raw_data[:, 3:final_index])  # -1 removes the na that numpy adds for some odd reason..
+
+        labels = raw_data[:,0:3]
+        prev_data = raw_data[:, 3:]
+        neighbor_data = raw_data[:,6:]
+
+
+
+ #       labels = torch.from_numpy(raw_data[:, 0:3])
+  #      data = torch.from_numpy(raw_data[:, 3:final_index])  # -1 removes the na that numpy adds for some odd reason..
+
+        # All this does is rearrange data so all postions of neighbors comes first, then all forces of neighbors
+        neighbor_data = neighbor_data.reshape((neighbor_data.shape[0], neighbor_data.shape[1]//3, 3))
+        pos_data = neighbor_data[:,::2,:].reshape((neighbor_data.shape[0], nearest_n_atoms*3))
+        force_data = neighbor_data[:,1::2,:].reshape((neighbor_data.shape[0], nearest_n_atoms*3))
+
+
+
+        data = np.concatenate((prev_data, pos_data, force_data), axis=1)
+        
+        label = torch.from_numpy(labels)
+        data = torch.from_numpy(data)
+
+
+
+
         datapoints_total = data.shape[0]
 
         self.inputsize = data.shape[1]
