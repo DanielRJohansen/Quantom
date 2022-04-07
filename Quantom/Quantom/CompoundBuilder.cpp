@@ -43,8 +43,6 @@ Molecule CompoundBuilder::buildMolecule(string pdb_path, string itp_path, int ma
 	delete compound_bridge_bundle;
 
 
-
-
 	return molecule;
 }
 
@@ -92,7 +90,9 @@ void CompoundBuilder::loadParticles(Molecule* molecule, vector<CompoundBuilder::
 		if (record.residue_seq_number != current_res_id) {
 			if (current_compound == nullptr || !current_compound->hasRoomForRes()) {
 				//molecule->compound_bridge_bundle.addBridge(current_compound_id, current_compound_id + 1);
-				compound_bridge_bundle->addBridge(current_compound_id, current_compound_id + 1);
+
+				if (current_compound_id != -1)		// Dont add bridge to first compound
+					compound_bridge_bundle->addBridge(current_compound_id, current_compound_id + 1);
 
 				current_compound_id++;
 				current_compound = &molecule->compounds[current_compound_id];

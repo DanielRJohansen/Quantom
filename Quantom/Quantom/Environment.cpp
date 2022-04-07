@@ -17,41 +17,19 @@ Environment::Environment() {
 
 	Molecule mol_6lzm_10 = compoundbuilder->buildMolecule(MOL_FOLDER + "conf.gro", MOL_FOLDER + "topol.top", MAX_RESIDUES_TO_LOAD, 0);
 
-	printf("bridges after %d\n", mol_6lzm_10.compound_bridge_bundle->n_bridges);
-	//printf("here %d", temp.n_particles);
-	printf("mol bridge 0 particles %d\n", mol_6lzm_10.compound_bridge_bundle->compound_bridges[0].n_particles);
 	boxbuilder.buildBox(simulation);
-	//boxbuilder.addSingleMolecule(simulation, &mol_6lzm_10);
 	boxbuilder.addSingleMolecule(simulation, &mol_6lzm_10);
-	boxbuilder.solvateBox(simulation);	// Always do after placing compounds
-
 	//boxbuilder.addScatteredMolecules(simulation, &mol_dpc, N_LIPID_COPIES);
+	boxbuilder.solvateBox(simulation);	// Always do after placing compounds
 	delete[] mol_6lzm_10.compounds;
 	boxbuilder.finishBox(simulation);
 
 
-	for (int c = 0; c < simulation->n_compounds; c++) {
-		break;
-		Compound* compound = &simulation->box->compounds[c];
-		for (int i = 0; i < compound->n_particles; i++) {
-			printf("%d %d %d:   ", c, i, compound->particle_global_ids[i]);
-			compound->prev_positions[i].print();
-
-			if (compound->particle_global_ids[i] == 200) {
-				for (int ii = 0; ii < compound->lj_ignore_list[i].n_ignores; ii++) {
-					//printf("%d %d %d\n", compound->lj_ignore_list[i].local_ids[ii], compound->lj_ignore_list[i].compound_ids[ii], 0);// compound->lj_ignore_list[i].)
-				}
-				//exit(0);
-			}
-
-		}
-	}
 
 
 	simulation->moveToDevice();	// Only moves the Box to the device
 	verifyBox();
 
-	//engine = new Engine(simulation, forcefieldmaker->getForcefield());
 	engine = new Engine(simulation, forcefieldmaker->getNBForcefield());
 
 
@@ -128,18 +106,14 @@ void Environment::postRunEvents() {
 
 
 	dumpToFile(simulation->traindata_buffer,
-		simulation->getStep() * 6 * MAX_COMPOUND_PARTICLES,
-		simulation->out_dir + "\\sim_out.bin");
+		N_DATAGAN_VALUES * MAX_COMPOUND_PARTICLES * simulation->n_compounds * simulation->getStep(),
+		simulation->out_dir + "\\sim_traindata.bin");
 
-	dumpToFile(simulation->box->data_GAN,
-		simulation->getStep() * simulation->n_compounds * MAX_COMPOUND_PARTICLES * 6,
-		simulation->out_dir + "\\sim_out.bin"
-	);
 	return;
 	string data_processing_command = "C:\\Users\\Daniel\\git_repo\\Quantom\\LIMA_services\\x64\\Debug\\LIMA_services.exe "
 		+ simulation->out_dir + " "
-		+ to_string(simulation->getStep())
-		+ " 0";											// do_shuffle
+		+ to_string(simulation->getStep()) + " "
+		+ "0";											// do_shuffle
 
 	cout << data_processing_command << "\n\n";
 	system(&data_processing_command[0]);		
@@ -164,9 +138,7 @@ void Environment::handleStatus(Simulation* simulation) {
 	}
 }
 
-void Environment::handleDisplay(Simulation* simulation) {
-	//display->render(simulation);
-	
+void Environment::handleDisplay(Simulation* simulation) {	
 	if (!(simulation->getStep() % simulation->steps_per_render)) {
 		display->render(simulation);
 

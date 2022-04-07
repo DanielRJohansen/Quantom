@@ -308,7 +308,7 @@ void Engine::offloadPositionData() {
 
 void Engine::offloadTrainData() {
 	const int step_offset = (simulation->getStep() - STEPS_PER_TRAINDATATRANSFER) * MAX_COMPOUND_PARTICLES * N_DATAGAN_VALUES;	// fix max_compound to the actual count save LOTS of space!. Might need a file in simout that specifies cnt for loading in other programs...
-	cudaMemcpy(&simulation->traindata_buffer[step_offset], simulation->box->data_GAN, sizeof(Float3) * MAX_COMPOUND_PARTICLES * 6 * STEPS_PER_TRAINDATATRANSFER, cudaMemcpyDeviceToHost);
+	cudaMemcpy(&simulation->traindata_buffer[step_offset], simulation->box->data_GAN, sizeof(Float3) * N_DATAGAN_VALUES * simulation->n_compounds * MAX_COMPOUND_PARTICLES * STEPS_PER_TRAINDATATRANSFER, cudaMemcpyDeviceToHost);
 	LIMAENG::genericErrorCheck("Cuda error during traindata offloading\n");
 }
 

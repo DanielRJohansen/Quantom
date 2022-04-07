@@ -658,7 +658,7 @@ struct CompoundBridgeCompact {
 		for (int i = 0; i < n_anglebonds; i++) {
 			anglebonds[i] = bridge->anglebonds[i];
 		}
-		printf("Loading bridge with %d particles %d singlebonds %d anglebonds\n", n_particles, n_singlebonds, n_anglebonds);
+		printf("Loading bridge with %d particles %d bonds %d angles %d dihedrals\n", n_particles, n_singlebonds, n_anglebonds, n_dihedrals);
 	}
 	
 	
