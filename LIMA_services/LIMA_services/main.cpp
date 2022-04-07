@@ -7,18 +7,10 @@
 using namespace std;
 
 
-const int ATOMS_PER_ROW = 70;	// How many we are interested in loading. This loading is BEFORE we sort by distance
 const int FLOAT3_PER_ATOM = 6;
 const int ROW_START = 100;
 //const int MAX_ROW = 1e+3;
 
-
-struct Int3 {
-	Int3(){}
-	Int3(int x, int y, int z) : x(x), y(y), z(z) {}
-
-	int x, y, z;
-};
 
 struct Float3 {
 	Float3() {}
@@ -83,6 +75,8 @@ struct Float3 {
 };
 
 struct Atom {
+	Atom(){}
+	Atom(int id, Float3 pos, Float3 LJ_force) : id(id), pos(pos), LJ_force(LJ_force){}
 	int id;
 	Float3 pos;
 	Float3 LJ_force;
@@ -90,19 +84,30 @@ struct Atom {
 };
 
 struct Row {
-	Atom atoms[ATOMS_PER_ROW];
+	Row(){}
+	Row(int atoms_per_row) {
+		atoms = new Atom[atoms_per_row];
+	}
+
+	~Row() {
+		//delete[] atoms;
+	}
+	Atom* atoms;
 };
 
 struct selfcenteredDatapoint {
 	selfcenteredDatapoint() {}
-	selfcenteredDatapoint(int id, float mass) :queryatom_id(id), mass(mass){}
+	selfcenteredDatapoint(int id, float mass, int particles_per_step) :queryatom_id(id), mass(mass){
+		atoms_relative = new Atom[particles_per_step];
+		atoms_relative_prev = new Atom[particles_per_step];
+	}
 	int queryatom_id;
 	float mass;
 
 	bool ignore = false;
 
-	Atom atoms_relative[128];	// Sorted with closest neighbor first
-	Atom atoms_relative_prev[128];	// Sorted with closest neighbor first
+	Atom* atoms_relative;	// Sorted with closest neighbor first
+	Atom* atoms_relative_prev;	// Sorted with closest neighbor first
 };
 
 
@@ -181,8 +186,8 @@ void sortAtoms(Atom* atoms, int n_atoms, int* mapping) {
 }
 
 
-void makePositionsRelative(Atom* atoms, int atom_id) {
-	for (int i = 0; i < ATOMS_PER_ROW; i++) {
+void makePositionsRelative(Atom* atoms, int atom_id, int particles_per_step) {
+	for (int i = 0; i < particles_per_step; i++) {
 		if (i == atom_id)
 			continue;
 		atoms[i].pos = atoms[i].pos - atoms[atom_id].pos;
@@ -192,21 +197,21 @@ void makePositionsRelative(Atom* atoms, int atom_id) {
 	atoms[atom_id].pos = Float3(0.f);
 }
 
-selfcenteredDatapoint makeDatapoint(Row* rows, int query_atom_id, int row) {	// Row indicates row to predict, implicitly using the row before..
+selfcenteredDatapoint makeDatapoint(Row* rows, int query_atom_id, int row, int particles_per_step) {	// Row indicates row to predict, implicitly using the row before..
 	Row* row_cur = &rows[row];
 	Row* row_prev = &rows[row - 1];
 
-	selfcenteredDatapoint scdp(query_atom_id, 0);
-	for (int i = 0; i < ATOMS_PER_ROW; i++) {			// Load positions. They are NOT yet relative to query atom
+	selfcenteredDatapoint scdp(query_atom_id, 0, particles_per_step);
+	for (int i = 0; i < particles_per_step; i++) {			// Load positions. They are NOT yet relative to query atom
 		scdp.atoms_relative[i] = row_cur->atoms[i];
 		scdp.atoms_relative_prev[i] = row_prev->atoms[i];
 	}
-	makePositionsRelative(scdp.atoms_relative, query_atom_id);
-	makePositionsRelative(scdp.atoms_relative_prev, query_atom_id);
+	makePositionsRelative(scdp.atoms_relative, query_atom_id, particles_per_step);
+	makePositionsRelative(scdp.atoms_relative_prev, query_atom_id, particles_per_step);
 
-	int* mapping = mergeSortAPI(scdp.atoms_relative, ATOMS_PER_ROW);
-	sortAtoms(scdp.atoms_relative, ATOMS_PER_ROW, mapping);
-	sortAtoms(scdp.atoms_relative_prev, ATOMS_PER_ROW, mapping);
+	int* mapping = mergeSortAPI(scdp.atoms_relative, particles_per_step);		// First generation a sorting mapping
+	sortAtoms(scdp.atoms_relative, particles_per_step, mapping);						// Use mapping to sort both data-arrays, so things match!
+	sortAtoms(scdp.atoms_relative_prev, particles_per_step, mapping);
 	delete[] mapping;
 
 	
@@ -214,32 +219,7 @@ selfcenteredDatapoint makeDatapoint(Row* rows, int query_atom_id, int row) {	// 
 }
 
 
-
-Row parseRow(string* raw_data) {
-	int index = 0;
-	Row row;
-	Float3 data[6];
-	//return Row();
-	for (int i = 0; i < ATOMS_PER_ROW; i++) {
-		for (int ii = 0; ii < FLOAT3_PER_ATOM; ii++) {
-			for (int iii = 0; iii < 3; iii++) {
-				//cout << raw_data[iii + ii * 3 + i * FLOAT3_PER_ATOM * 3] << endl;
-				*data[ii].placeAt(iii) = stod(raw_data[iii + ii * 3 + i * FLOAT3_PER_ATOM * 3]);
-			}
-		}
-
-		row.atoms[i].id = i;
-		row.atoms[i].pos = data[0];
-		row.atoms[i].LJ_force = data[3];
-		//row.atoms[i].pos.print('p');
-		//row.atoms[i].LJ_force.print('F');
-	}
-	
-	return row;
-}
-
-
-void readDataBIN(Row* rows, string path, int N_STEPS) {
+void readDataBIN(Row* rows, string path, int N_STEPS, int particles_per_step) {
 	char* file_path;
 	file_path = &path[0];
 	cout << "Reading from file " << file_path << endl;
@@ -247,68 +227,35 @@ void readDataBIN(Row* rows, string path, int N_STEPS) {
 	FILE* file;
 	fopen_s(&file, file_path, "rb");
 
-	int particles = 128;
 	int f3_per_particle = 6;
-	int n_f3s = N_STEPS * particles * f3_per_particle;
+	int n_f3s = N_STEPS * particles_per_step * f3_per_particle;
 	Float3* buffer = new Float3[n_f3s];
 	fread(buffer, sizeof(Float3), n_f3s, file);
 	fclose(file);
 
 
-	for (int i = 0; i < N_STEPS; i++) {
-		for (int j = 0; j < particles; j++) {
-			if (j >= 70)
-				continue;
-			int buffer_index = j * f3_per_particle + i * particles * f3_per_particle;
-			rows[i].atoms[j].pos = buffer[buffer_index + 0];
-			rows[i].atoms[j].LJ_force = buffer[buffer_index + 3];
-			rows[i].atoms[j].id = j;
+	for (int step = 0; step < N_STEPS; step++) {
+		for (int p = 0; p < particles_per_step; p++) {			
+			int buffer_index = p * f3_per_particle + step * particles_per_step * f3_per_particle;
+
+			rows[step].atoms[p] = Atom(p, buffer[buffer_index + 0], buffer[buffer_index + 3]);	// Need of way of determining whether a particle exists, or is in the buffer!!!!!!!!!!!!!!!!!!!!!
 		}
+		rows[step].atoms[0].pos.print('p');
 	}
 }
 
-void exportDataCSV(selfcenteredDatapoint* data, Int3 dim, string filename) {
-	std::ofstream myfile(filename);
-	printf("\nExporting to file: \t");
-	cout << filename << endl;
 
-
-
-	for (int i = 0; i < dim.x; i++) {								// Step
-		if ((i % 100) == 99)
-			printf("\rWriting row: %d", i + 1);
-
-		selfcenteredDatapoint scdp = data[i];
-		if (scdp.ignore)
-			continue;
-
-		//scdp.atoms_relative[0].LJ_force.print('f');
-		scdp.atoms_relative[0].LJ_force.printToFile(&myfile);				// First print label				3xfloat
-		scdp.atoms_relative_prev[0].LJ_force.printToFile(&myfile);			// Then print prev self force		3xfloat
-
-		for (int ii = 1; ii < dim.y; ii++) {
-			scdp.atoms_relative[ii].pos.printToFile(&myfile);				// Print other atoms pos			69x3xfloat
-			//scdp.atoms_relative[ii].LJ_force.printToFile(&myfile);
-			//scdp.atoms_relative_prev[ii].pos.printToFile(&myfile);
-			scdp.atoms_relative_prev[ii].LJ_force.printToFile(&myfile);		// Print other atoms prev force		69x3xfloat
-		}
-		if (!(i + 1 == dim.x))	// Otherwise it adds an empty line at the bottom, breaking in python loading shit
-			myfile << "\n";
-	}
-	myfile.close();
-}
-
-void exportData(selfcenteredDatapoint* data, Int3 dim, string path) {				// 	exportData(data, Int3(n_datapoints, ATOMS_PER_ROW, 1), path_out);
+void exportData(selfcenteredDatapoint* data, int n_datapoints, int particles_per_datapoint, string path) {				// 	exportData(data, Int3(n_datapoints, ATOMS_PER_ROW, 1), path_out);
 	char* file_path;
 	file_path = &path[0];
 	cout << "Writing to file " << file_path << endl;
 
 	int lines_to_print = 0;	
-	Float3* buffer = new Float3[dim.x * dim.y * 10];	// Times 10 just to be safe
+	Float3* buffer = new Float3[n_datapoints * 2 * (1 + particles_per_datapoint)];	// Times 10 just to be safe
 	uint32_t buffer_ptr = 0;
 
-	for (int i = 0; i < dim.x; i++) {								// Step
-		selfcenteredDatapoint scdp = data[i];
+	for (int step = 0; step < n_datapoints; step++) {								// Step
+		selfcenteredDatapoint scdp = data[step];
 		if (scdp.ignore)
 			continue;
 
@@ -317,7 +264,7 @@ void exportData(selfcenteredDatapoint* data, Int3 dim, string path) {				// 	exp
 		buffer[buffer_ptr++] = scdp.atoms_relative[0].LJ_force;					// First print label				3xfloat
 		buffer[buffer_ptr++] = scdp.atoms_relative_prev[0].LJ_force;			// Then print prev self force		3xfloat
 			
-		for (int ii = 1; ii < dim.y; ii++) {						
+		for (int ii = 1; ii < particles_per_datapoint; ii++) {
 			buffer[buffer_ptr++] = scdp.atoms_relative[ii].pos;				// Print other atoms pos			69x3xfloat
 			buffer[buffer_ptr++] = scdp.atoms_relative_prev[ii].LJ_force;		// Print other atoms prev force		69x3xfloat
 		}
@@ -351,7 +298,7 @@ void makeForceChangePlot(selfcenteredDatapoint* data, int n_datapoints) {
 		else 
 			bin = (int)log2(force_change);
 			
-		//printf("BIN: %d. Force %f\n", bin, force_change);
+		printf("BIN: %d. Force %f\n", bin, force_change);
 		bins[bin]++;
 		if (bin < 0 || bin > 31) {
 			printf("Bin: %d\n");
@@ -408,26 +355,39 @@ int main(int argc, char** argv) {
 		cout << ":" << argv[i] << ":" << endl;
 	}
 
-	string workdir = "D:\\Quantom\LIMANET\sim_out";
+	//string workdir = "D:\\Quantom\LIMANET\sim_out";
+	string workdir = "C:\\PROJECTS\\Quantom\\Simulation\\Steps_1000\\";
+	int N_STEPS = 1000;	// Determines file to read
 	bool shuffle_time_dim = false;
-	int N_STEPS = 100000;	// Determines file to read
+	int n_compounds = 13;
+	int particles_per_compound = 128;
+
+
 
 	printf("argc %d\n", argc);
-	if (argc > 3) {
+	if (argc > 5) {
 		workdir = argv[1];
 		N_STEPS = stoi(argv[2]);
 		shuffle_time_dim = stoi(argv[3]);
+		n_compounds = stoi(argv[4]);
+		int particles_per_compound = stoi(argv[5]);
 	}
-	else {
-		printf("Not enough input arguments for preprocessing\n");
+	else if (argc != 1) {
+		printf("Not enough input arguments for processing\n");
 		exit(1);
 	}
 		
+	int particles_per_step = particles_per_compound * n_compounds;
 
 
 
-	printf("Allocating %.01f GB of RAM\n", ((double)sizeof(Row) * N_STEPS + (double) sizeof(selfcenteredDatapoint) * N_STEPS)/ 1000000000.f);
+
+
+	printf("Allocating %.03f GB of RAM\n", sizeof(Atom) * particles_per_step * N_STEPS * 3 * 1e-9);	// Gives approx size 3 = 1 in row, 2 in scdp
 	Row* rows = new Row[N_STEPS];
+	for (int i = 0; i < N_STEPS; i++)
+		rows[i] = Row(particles_per_step);
+
 	selfcenteredDatapoint* data = new selfcenteredDatapoint[N_STEPS];
 	int n_datapoints = 0;
 	int query_atom = 0;
@@ -439,10 +399,10 @@ int main(int argc, char** argv) {
 
 
 
-	string path_in = workdir + "\\sim_out.bin";
-	readDataBIN(rows, path_in, N_STEPS);
+	string path_in = workdir + "sim_traindata.bin";
+	readDataBIN(rows, path_in, N_STEPS, particles_per_step);
 	for (int row = ROW_START; row < N_STEPS; row += 2) {
-		data[n_datapoints++] = makeDatapoint(rows, query_atom, row);
+		data[n_datapoints++] = makeDatapoint(rows, query_atom, row, particles_per_step);
 	}
 
 
@@ -458,7 +418,7 @@ int main(int argc, char** argv) {
 		shuffle(data, n_datapoints);
 		path_out = path_out + "_shuffled";
 	}
-	exportData(data, Int3(n_datapoints, ATOMS_PER_ROW, 1), path_out + ".bin");
+	exportData(data, n_datapoints, particles_per_step, path_out + ".bin");
 
 
 
