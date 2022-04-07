@@ -307,8 +307,9 @@ void Engine::offloadPositionData() {
 }
 
 void Engine::offloadTrainData() {
-	const int step_offset = (simulation->getStep() - STEPS_PER_TRAINDATATRANSFER) * MAX_COMPOUND_PARTICLES * N_DATAGAN_VALUES;	// fix max_compound to the actual count save LOTS of space!. Might need a file in simout that specifies cnt for loading in other programs...
-	cudaMemcpy(&simulation->traindata_buffer[step_offset], simulation->box->data_GAN, sizeof(Float3) * N_DATAGAN_VALUES * simulation->n_compounds * MAX_COMPOUND_PARTICLES * STEPS_PER_TRAINDATATRANSFER, cudaMemcpyDeviceToHost);
+	int values_per_step = N_DATAGAN_VALUES * MAX_COMPOUND_PARTICLES * simulation->n_compounds;
+	const int step_offset = (simulation->getStep() - STEPS_PER_TRAINDATATRANSFER) * values_per_step;	// fix max_compound to the actual count save LOTS of space!. Might need a file in simout that specifies cnt for loading in other programs...
+	cudaMemcpy(&simulation->traindata_buffer[step_offset], simulation->box->data_GAN, sizeof(Float3) * values_per_step * STEPS_PER_TRAINDATATRANSFER, cudaMemcpyDeviceToHost);
 	LIMAENG::genericErrorCheck("Cuda error during traindata offloading\n");
 }
 
@@ -978,8 +979,8 @@ __global__ void forceKernel(Box* box) {
 		int step_offset = (box->step % STEPS_PER_TRAINDATATRANSFER) * n_compounds_total * MAX_COMPOUND_PARTICLES * N_DATAGAN_VALUES;
 		int compound_offset = blockIdx.x * MAX_COMPOUND_PARTICLES * N_DATAGAN_VALUES;
 		int particle_offset = threadIdx.x * N_DATAGAN_VALUES;
-		//box->data_GAN[0 + particle_offset + compound_offset + step_offset] = compound_state.positions[threadIdx.x];
-		//box->data_GAN[1 + particle_offset + compound_offset + step_offset] = force_LJ_sol;
+		box->data_GAN[0 + particle_offset + compound_offset + step_offset] = compound_state.positions[threadIdx.x];
+		box->data_GAN[1 + particle_offset + compound_offset + step_offset] = force_LJ_sol;
 //		box->data_GAN[1 + threadIdx.x * 6 + step_offset] = force_bond + force_angle;
 //		box->data_GAN[2 + threadIdx.x * 6 + step_offset] = force_LJ_com;
 //		box->data_GAN[3 + threadIdx.x * 6 + step_offset] = force_LJ_sol;

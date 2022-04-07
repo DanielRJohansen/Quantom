@@ -75,7 +75,7 @@ const int MAX_ATOMS_IN_RESIDUE = 32;
 
 // Logging constants
 const int N_DATAGAN_VALUES = 6;
-const int STEPS_PER_TRAINDATATRANSFER = 1000;
+const int STEPS_PER_TRAINDATATRANSFER = 100;
 
 
 

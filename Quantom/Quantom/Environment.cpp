@@ -96,31 +96,31 @@ void Environment::run() {
 }
 
 void Environment::postRunEvents() {
-#ifndef __linux__
-	simulation->out_dir += "\\Steps_" + to_string(simulation->getStep());
+	simulation->out_dir += "\\Steps_" + to_string(simulation->getStep()) + "\\";
 	int check = _mkdir(&(simulation->out_dir[0]));
 
 	Analyzer::AnalyzedPackage analyzed_package = analyzer.analyzeEnergy(simulation);
-	dumpToFile(analyzed_package.energy_data, analyzed_package.n_energy_values, simulation->out_dir + "\\energy.bin");
-	dumpToFile(analyzed_package.temperature_data, analyzed_package.n_temperature_values, simulation->out_dir + "\\temperature.bin");
+	dumpToFile(analyzed_package.energy_data, analyzed_package.n_energy_values, simulation->out_dir + "energy.bin");
+	dumpToFile(analyzed_package.temperature_data, analyzed_package.n_temperature_values, simulation->out_dir + "temperature.bin");
 
 
 	dumpToFile(simulation->traindata_buffer,
 		N_DATAGAN_VALUES * MAX_COMPOUND_PARTICLES * simulation->n_compounds * simulation->getStep(),
-		simulation->out_dir + "\\sim_traindata.bin");
+		simulation->out_dir + "sim_traindata.bin");
 
-	return;
+
+
+#ifndef __linux__
 	string data_processing_command = "C:\\Users\\Daniel\\git_repo\\Quantom\\LIMA_services\\x64\\Debug\\LIMA_services.exe "
 		+ simulation->out_dir + " "
 		+ to_string(simulation->getStep()) + " "
-		+ "0";											// do_shuffle
+		+ "0" + " "											// do_shuffle
+		+ to_string(MAX_COMPOUND_PARTICLES) + " "
+		+ to_string(simulation->n_compounds)
+		;											
 
 	cout << data_processing_command << "\n\n";
 	system(&data_processing_command[0]);		
-#else
-	Analyzer::AnalyzedPackage analyzed_package = analyzer.analyzeEnergy(simulation);
-	dumpToFile(analyzed_package.energy_data, analyzed_package.n_energy_values, simulation->out_dir + "\\energy.bin");
-	dumpToFile(analyzed_package.temperature_data, analyzed_package.n_temperature_values, simulation->out_dir + "\\temperature.bin");
 #endif
 }
 
@@ -216,7 +216,8 @@ template <typename T>
 void Environment::dumpToFile(T* data, int n_datapoints, string file_path_s) {	
 	char* file_path;
 	file_path = &file_path_s[0];
-	cout << "Printing to file " << file_path << endl;
+	printf("Dumping %.03f MB to file ", sizeof(T) * n_datapoints * 1e-6);
+	cout << file_path << endl;
 
 	FILE* file;
 #ifndef __linux__
@@ -228,4 +229,3 @@ void Environment::dumpToFile(T* data, int n_datapoints, string file_path_s) {
 	fwrite(data, sizeof(T), n_datapoints, file);
 	fclose(file);
 }
-
