@@ -9,6 +9,7 @@ using namespace std;
 
 const int FLOAT3_PER_ATOM = 6;
 const int ROW_START = 100;
+const int MAX_NEIGHBORS_OUT = 128;		// AFter sorting, only nearest x neighbors is printed to the out-file
 //const int MAX_ROW = 1e+3;
 
 
@@ -235,16 +236,20 @@ void readDataBIN(Row* rows, string path, int N_STEPS, int particles_per_step) {
 
 
 	for (int step = 0; step < N_STEPS; step++) {
+		if (!(step % 1000))
+			printf("\rReading row %d", step);
+
 		for (int p = 0; p < particles_per_step; p++) {			
 			int buffer_index = p * f3_per_particle + step * particles_per_step * f3_per_particle;
 
 			rows[step].atoms[p] = Atom(p, buffer[buffer_index + 0], buffer[buffer_index + 1]);	// Need of way of determining whether a particle exists, or is in the buffer!!!!!!!!!!!!!!!!!!!!!
 		}
 	}
+	printf("\n");
 }
 
 
-void exportData(selfcenteredDatapoint* data, int n_datapoints, int particles_per_datapoint, string path) {				// 	exportData(data, Int3(n_datapoints, ATOMS_PER_ROW, 1), path_out);
+void exportData(selfcenteredDatapoint* data, int n_datapoints, int particles_per_datapoint, string path, int max_neighbors) {				// 	exportData(data, Int3(n_datapoints, ATOMS_PER_ROW, 1), path_out);
 	char* file_path;
 	file_path = &path[0];
 	cout << "Writing to file " << file_path << endl;
@@ -266,6 +271,9 @@ void exportData(selfcenteredDatapoint* data, int n_datapoints, int particles_per
 		for (int ii = 1; ii < particles_per_datapoint; ii++) {
 			buffer[buffer_ptr++] = scdp.atoms_relative[ii].pos;				// Print other atoms pos			69x3xfloat
 			buffer[buffer_ptr++] = scdp.atoms_relative_prev[ii].LJ_force;		// Print other atoms prev force		69x3xfloat
+
+			if (ii == max_neighbors)
+				break;
 		}
 	}
 	
@@ -278,7 +286,9 @@ void exportData(selfcenteredDatapoint* data, int n_datapoints, int particles_per
 }
 
 void makeForceChangePlot(selfcenteredDatapoint* data, int n_datapoints) {
-	int bins[32] = { 0 };
+	const int n_bins = 22;
+
+	int bins[n_bins] = { 0 };
 	int zeroes = 0;
 	int bin;
 	for (int i = 0; i < n_datapoints; i++) {
@@ -308,9 +318,9 @@ void makeForceChangePlot(selfcenteredDatapoint* data, int n_datapoints) {
 	printf("\n%d zeroes in dataset\n", zeroes);
 
 	printf("x=categorical([");
-	for (int i = 0; i < 32; i++) printf("%u ", (int) pow(2, i));
+	for (int i = 0; i < n_bins; i++) printf("%u ", (int) pow(2, i));
 	printf("]);\ny=[");
-	for (int i = 0; i < 32; i++) printf("%d ", bins[i]);
+	for (int i = 0; i < n_bins; i++) printf("%d ", bins[i]);
 	printf("];\n\n\n");
 }
 
@@ -355,8 +365,8 @@ int main(int argc, char** argv) {
 	}
 
 	//string workdir = "D:\\Quantom\LIMANET\sim_out";
-	string workdir = "C:\\PROJECTS\\Quantom\\Simulation\\Steps_1000\\";
-	int N_STEPS = 1000;	// Determines file to read
+	string workdir = "C:\\PROJECTS\\Quantom\\Simulation\\Steps_100000\\";
+	int N_STEPS = 100000;	// Determines file to read
 	bool shuffle_time_dim = false;
 	int n_compounds = 13;
 	int particles_per_compound = 128;
@@ -401,9 +411,11 @@ int main(int argc, char** argv) {
 	string path_in = workdir + "sim_traindata.bin";
 	readDataBIN(rows, path_in, N_STEPS, particles_per_step);
 	for (int row = ROW_START; row < N_STEPS; row += 2) {
+		if (!((row-ROW_START) % 100))
+			printf("\rProcessing datapoint at row %07d", row);
 		data[n_datapoints++] = makeDatapoint(rows, query_atom, row, particles_per_step);
 	}
-
+	printf("\n\n");
 
 
 
@@ -417,7 +429,7 @@ int main(int argc, char** argv) {
 		shuffle(data, n_datapoints);
 		path_out = path_out + "_shuffled";
 	}
-	exportData(data, n_datapoints, particles_per_step, path_out + ".bin");
+	exportData(data, n_datapoints, particles_per_step, path_out + ".bin", MAX_NEIGHBORS_OUT);
 
 
 
