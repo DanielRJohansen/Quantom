@@ -358,7 +358,6 @@ float Engine::getBoxTemperature() {
 	//double avg_kinE = kinE_sum / (long double)particles_total;
 	double avg_kinE = kinE_sum / (long double)simulation->total_particles;
 	float temperature = avg_kinE * 2.f / (3.f * 8.3145);
-	simulation->temperature_buffer[step / STEPS_PER_THERMOSTAT] = temperature;
 	//printf("\nTemp: %f\n", temperature);
 	return temperature;
 }
@@ -367,6 +366,8 @@ float Engine::getBoxTemperature() {
 void Engine::handleBoxtemp() {
 	const float target_temp = 313.f;				// [k]
 	float temp = getBoxTemperature();
+	simulation->temperature_buffer[simulation->getStep() / STEPS_PER_THERMOSTAT] = temp;
+
 	float temp_scalar = target_temp / temp;
 
 	temp_scalar = min(temp_scalar, 1.1f);		// I just added this to not change any temperatures too rapidly
@@ -961,19 +962,25 @@ __global__ void forceKernel(Box* box) {
 			box->traj_buffer[threadIdx.x + blockIdx.x * MAX_COMPOUND_PARTICLES + step_offset] = compound_state.positions[threadIdx.x];
 		}		
 		__syncthreads();
-/*
-		if (blockIdx.x == LOGBLOCK && threadIdx.x == LOGTHREAD && LOGTYPE == 1) {
-			box->outdata[3 + box->step * 10] = data_ptr[0];	// LJ pot
 
 
-			Float3 pos_temp = compound.particles[threadIdx.x].pos_tsub1;
-			applyHyperpos(&compound_state.positions[threadIdx.x], &pos_temp);
-			box->outdata[4 + box->step * 10] = (compound_state.positions[threadIdx.x] - pos_temp).len() / box->dt;
 
-			box->outdata[5 + box->step * 10] = data_ptr[2];// closest particle
-			box->outdata[6 + box->step * 10] = data_ptr[1];// force.len();
+		if (blockIdx.x == 0 && threadIdx.x == 0) {
+			box->outdata[0 + box->step * 10] = data_ptr[0];	// LJ pot
+
+			Float3 pos_prev_temp = compound.prev_positions[threadIdx.x];			
+			LIMAENG::applyHyperpos(&compound_state.positions[threadIdx.x], &pos_prev_temp);
+			
+
+			box->outdata[0 + box->step * 10] = (compound_state.positions[threadIdx.x] - pos_prev_temp).len() / box->dt;
+			box->outdata[1 + box->step * 10] = LIMAENG::calcKineticEnergy(&compound_state.positions[threadIdx.x], &pos_prev_temp, forcefield_device.particle_parameters[compound.atom_types[threadIdx.x]].mass, box->dt);
+			box->outdata[2 + box->step * 10] = potE_sum;
+			box->outdata[3 + box->step * 10] = force.len();
+
+			//box->outdata[5 + box->step * 10] = data_ptr[2];// closest particle
+			//box->outdata[6 + box->step * 10] = data_ptr[1];// force.len();
 		}
-*/
+
 
 		int n_compounds_total = gridDim.x;
 		int step_offset = (box->step % STEPS_PER_TRAINDATATRANSFER) * n_compounds_total * MAX_COMPOUND_PARTICLES * N_DATAGAN_VALUES;

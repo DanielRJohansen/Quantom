@@ -420,7 +420,7 @@ int main(int argc, char** argv) {
 
 
 	makeForceChangePlot(data, n_datapoints);
-	int n_ignored_datapoints = discardVolatileDatapoints(data, n_datapoints, 5000.f);
+	int n_ignored_datapoints = discardVolatileDatapoints(data, n_datapoints, 1000.f);
 
 
 	//string path_out = "D:\\Quantom\\LIMANET\\sim_out\\atom" + to_string(query_atom) + "_lines" + to_string(n_datapoints - n_ignored_datapoints);

@@ -62,7 +62,7 @@ public:
 	double* potE_buffer;		// For total energy summation
 	Float3* traj_buffer;
 
-	double* outdata;			// Temp, for longging values to whatever
+	float* outdata;			// Temp, for longging values to whatever
 	Float3* data_GAN;			// Only works if theres 1 compounds right now.
 
 

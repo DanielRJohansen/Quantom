@@ -17,6 +17,7 @@ class LIMANET():
         #self.loss = torch.nn.L1Loss()
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.0001)
 
+        self.loss = self.calcLoss2
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         print(self.device)
@@ -39,7 +40,8 @@ class LIMANET():
 
             preds, bases = self.model(inputs)
             #loss = self.loss(outputs, labels)
-            loss = self.calcLoss(preds, bases, labels)
+            #loss = self.calcLoss(preds, bases, labels)
+            loss = self.loss(preds, bases, labels)
             loss.backward()
 
             self.optimizer.step()
@@ -47,6 +49,7 @@ class LIMANET():
             epoch_loss += loss.item()
 
         avg_loss = (epoch_loss-loss.item()) / (len(self.trainloader)-1) # Remove the last batch, as it might not be full size
+        print("train ", len(self.trainloader)-1)
         return avg_loss
 
 
@@ -62,24 +65,26 @@ class LIMANET():
 
             pred, base = self.model(inputs)
 
-            loss = self.calcLoss(pred, base, labels)
+            #loss = self.calcLoss(pred, base, labels)
+            loss = self.loss(pred, base, labels)
             loss_total += loss.item()
             acc = self.calcAccuracy(pred, base, labels)
             acc_total += acc.item()
 
         loss_avg = (loss_total-loss.item()) / (len(self.valloader)-1)  # Remove the last batch, as it might not be full size
         acc_avg = (acc_total - acc.item()) / (len(self.valloader) - 1)  # Remove the last batch, as it might not be full size
+        print("val ", len(self.valloader)-1)
         self.model.train(True)
 
         return loss_avg, acc_avg
 
     def calcEuclideanError(self, predictions, labels):
-        error = predictions.sub(labels)
+        errors = predictions.sub(labels)
         # error = predictions.sub(true_dF)
-        sq_e = torch.square(error)
-        sum_sq_e = torch.sum(sq_e, 1)
-        sum_e = torch.sqrt(sum_sq_e)
-        return sum_e
+        sq_errors = torch.square(errors)
+        sum_sq_errors = torch.sum(sq_errors, 1)
+        sum_errors = torch.sqrt(sum_sq_errors)
+        return sum_errors
 
     def calcLossScalars(self, base, labels):
         # Two ways of putting error in context of force
@@ -90,15 +95,21 @@ class LIMANET():
         scalars = torch.max(scalars, torch.tensor(0.00001))  # Dont let scalar become too small, avoid exploding loss
         return scalars
 
-    def calcLoss(self, predictions, base, labels):
+    def calcLoss1(self, predictions, base, labels):
         euclidean_errors = self.calcEuclideanError(predictions, labels)
         scalars = self.calcLossScalars(base, labels)
         scaled_errors = euclidean_errors.div(scalars)
 
         #mean_err = torch.mean(euclidean_errors)
-        #mean_err = torch.mean(scaled_errors)
-        mean_err = torch.median(scaled_errors)
+        mean_err = torch.mean(scaled_errors)
+        #mean_err = torch.median(scaled_errors)
         return mean_err
+
+    def calcLoss2(self, predictions, base, labels):
+        euclidean_errors = self.calcEuclideanError(predictions, labels)
+        mean_err = torch.mean(euclidean_errors)
+        return mean_err
+
 
     def calcAccuracy(self, predictions, base, labels):
         euclidean_errors = self.calcEuclideanError(predictions, labels)

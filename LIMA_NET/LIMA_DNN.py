@@ -64,7 +64,7 @@ class LIMADNN(nn.Module):
         out = torch.sigmoid(out)
         
         out = out.mul(force_prev)
-        out = out.add(force_prev)
+        #out = out.add(force_prev)
         return out, force_prev
 
     def __forward0neighbors(self, x):
