@@ -39,6 +39,8 @@ class LIMADNN(nn.Module):
 
     def __forward(self, x):
         force_prev = x[:,:3]
+        ones = torch.ones((x.shape[0],3)).to(self.device)
+
         npos = x[:,3:self.n_neighbors*3+3]
         nforce = x[:,self.n_neighbors*3+3:self.n_neighbors*3*2+3]
 
@@ -54,16 +56,18 @@ class LIMADNN(nn.Module):
         posforce = self.fc_forcepos_stack_1(posforce)
         posforce = self.fc_forcepos_stack_2(posforce)
 
-        sforce = self.fc_sforce1(force_prev)
+        #sforce = self.fc_sforce1(force_prev)
+        sforce = self.fc_sforce1(ones)
 
         stack = torch.cat((posforce, sforce), 1)
         stack = self.fc_fullstack1(stack)
         stack = self.fc_fullstack2(stack)
 
         out = self.fc_out(stack)
-        out = torch.sigmoid(out)
+        #out = torch.sigmoid(out)
         
-        out = out.mul(force_prev)
+        #out = out.mul(force_prev)
+
         #out = out.add(force_prev)
         return out, force_prev
 

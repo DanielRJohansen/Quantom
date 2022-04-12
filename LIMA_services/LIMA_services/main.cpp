@@ -8,7 +8,7 @@ using namespace std;
 
 
 const int FLOAT3_PER_ATOM = 6;
-const int ROW_START = 100;
+const int ROW_START = 5000;
 const int MAX_NEIGHBORS_OUT = 128;		// AFter sorting, only nearest x neighbors is printed to the out-file
 //const int MAX_ROW = 1e+3;
 
@@ -354,7 +354,7 @@ void shuffle(selfcenteredDatapoint* data, int n_datapoints) {
 
 
 
-
+// This code should only be run alone for testing! Always let Quantom call this program!!
 int main(int argc, char** argv) {
 
 

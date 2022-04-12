@@ -77,9 +77,14 @@ bool DisplayV2::checkWindowStatus() {
 }
 
 bool DisplayV2::initGLFW() {
+    printf("Initializing display...  ");
+
     /* Initialize the library */
-    if (!glfwInit())
-        return -1;
+    if (!glfwInit()) {
+        printf("GLFW failed to initialize\n");
+        exit(0);
+    }
+        
 
     /* Create a windowed mode window and its OpenGL context */
     window = glfwCreateWindow(1080, 1080, "LIMA - Molecular Dynamics Engine", NULL, NULL);

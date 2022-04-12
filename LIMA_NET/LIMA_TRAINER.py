@@ -45,7 +45,7 @@ class Trainer():
         plt.title("Training - " + str(self.n_neighbors) + " neighbors - "
                   + str(self.net.total_params) + " parameters")
         plt.grid()
-        plt.ylim(0,5)
+        #plt.ylim(0,5)
 
         plt.savefig(self.working_folder + "\\train_plot_"+str(self.n_neighbors)+"N.png")
         plt.show()

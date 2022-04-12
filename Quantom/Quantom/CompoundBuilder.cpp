@@ -4,7 +4,7 @@
 
 
 
-Molecule CompoundBuilder::buildMolecule(string pdb_path, string itp_path, int max_residue_id, int min_residue_id) {
+Molecule CompoundBuilder::buildMolecule(string pdb_path, string itp_path, int max_residue_id, int min_residue_id, bool ignore_hydrogens) {
 	//vector<vector<string>> pdb_data = readFile(pdb_path);
 	//vector<Record_ATOM> atom_data = parsePDB(pdb_path);
 	compound_bridge_bundle = new CompoundBridgeBundle;
@@ -18,12 +18,11 @@ Molecule CompoundBuilder::buildMolecule(string pdb_path, string itp_path, int ma
 	Molecule molecule;
 
 	FFM->buildForcefield();
-	//exit(0);
 
 
 
 	//loadParticles(&compound, &atom_data, max_residue_id, true);
-	loadParticles(&molecule, &atom_data, max_residue_id, min_residue_id, true);
+	loadParticles(&molecule, &atom_data, max_residue_id, min_residue_id, ignore_hydrogens);
 	//printf("%d particles added\n", compound.n_particles);
 	loadTopology(&molecule, &top_data);
 
@@ -203,8 +202,12 @@ void CompoundBuilder::addBond(Molecule* molecule, ParticleRef* maps, vector<stri
 
 	if (!g_bond.spansTwoCompounds()) {
 		Compound* compound = &molecule->compounds[maps[0].compound_id];
-		compound->singlebonds[compound->n_singlebonds++] = PairBond(bondtype->b0, bondtype->kb, maps[0].local_id_compound, maps[1].local_id_compound);
-		
+		if (compound->n_singlebonds == MAX_PAIRBONDS) {
+			printf("Too many bonds in compound\n");
+			exit(0);
+		}
+
+		compound->singlebonds[compound->n_singlebonds++] = PairBond(bondtype->b0, bondtype->kb, maps[0].local_id_compound, maps[1].local_id_compound);		
 	}
 	else {
 		// First, we need to make sure all bond particles are added to the bridge.
@@ -229,6 +232,10 @@ void CompoundBuilder::addAngle(Molecule* molecule, ParticleRef* maps, vector<str
 
 	if (!g_bond.spansTwoCompounds()) {
 		Compound* compound = &molecule->compounds[maps[0].compound_id];
+		if (compound->n_anglebonds == MAX_ANGLEBONDS) {
+			printf("Too many angles in compound\n");
+			exit(0);
+		}
 		compound->anglebonds[compound->n_anglebonds++] = AngleBond(maps[0].local_id_compound, maps[1].local_id_compound, maps[2].local_id_compound, angletype->theta_0, angletype->k_theta);
 	}
 	else {
@@ -252,6 +259,10 @@ void CompoundBuilder::addDihedral(Molecule* molecule, ParticleRef* maps, vector<
 
 	if (!g_bond.spansTwoCompounds()) {
 		Compound* compound = &molecule->compounds[maps[0].compound_id];
+		if (compound->n_dihedrals == MAX_DIHEDRALS) {
+			printf("Too many dihedrals in compound\n");
+			exit(0);
+		}
 		compound->dihedrals[compound->n_dihedrals++] = DihedralBond(maps[0].local_id_compound, maps[1].local_id_compound, maps[2].local_id_compound, maps[3].local_id_compound, dihedraltype->phi_0, dihedraltype->k_phi);
 	}
 	else {

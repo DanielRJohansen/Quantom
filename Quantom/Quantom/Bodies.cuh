@@ -166,13 +166,14 @@ struct GenericBond {					// ONLY used during creation, never on device!
 
 
 struct LJ_Ignores {	// Each particle is associated with 1 of these.
-	uint8_t local_ids[16];
-	uint8_t compound_ids[16];
+	static const int max_ids = 32;
+	uint8_t local_ids[max_ids];
+	uint8_t compound_ids[max_ids];
 	uint8_t n_ignores = 0;
 
 	
 	__host__ void addIgnoreTarget(uint8_t target_id, uint8_t compound_id) {
-		if (n_ignores == 16) {
+		if (n_ignores == max_ids) {
 			printf("Failed to add ignore target!\n");
 			exit(0);
 		}
@@ -186,7 +187,6 @@ struct LJ_Ignores {	// Each particle is associated with 1 of these.
 		n_ignores++;
 	}
 	
-
 	__device__ bool ignore(uint8_t query_local_id, uint8_t query_compound_id) {
 		for (int i = 0; i < n_ignores; i++) {
 			if (local_ids[i] == query_local_id && compound_ids[i] == query_compound_id)
@@ -194,16 +194,6 @@ struct LJ_Ignores {	// Each particle is associated with 1 of these.
 		}
 		return false;
 	}
-	/*
-	__device__ bool ignore(uint8_t query_id, uint8_t compound_id) {
-		if (local_ignores[3] == query_id && connected_compound_id == compound_id)
-			return true;
-		exit(0);
-		return false;
-	}
-	*/
-
-			
 };
 
 // ------------------------------------------------- COMPOUNDS ------------------------------------------------- //
@@ -301,7 +291,7 @@ public:
 
 const int MAX_PAIRBONDS = 128;
 const int MAX_ANGLEBONDS = 256;
-const int MAX_DIHEDRALS = 256;
+const int MAX_DIHEDRALS = 384;
 struct CompoundState {							// Maybe delete this soon?
 	__device__ void setMeta(int n_p) {
 		n_particles = n_p;
@@ -531,6 +521,10 @@ struct CompoundBridge {
 		return false;
 	}
 	void addParticle(ParticleRef* particle_ref, Molecule* molecule) {
+		if (n_particles == MAX_PARTICLES_IN_BRIDGE) {
+			printf("Too many particles in bridge\n");
+			exit(0);
+		}
 		particle_ref->bridge_id = 0;
 		particle_ref->local_id_bridge = n_particles;
 		atom_types[n_particles] = molecule->compounds[particle_ref->compound_id].atom_types[particle_ref->local_id_compound];
@@ -543,8 +537,7 @@ struct CompoundBridge {
 		for (int p = 0; p < bond->n_particles; p++) {
 			if (!particleAlreadyStored(&bond->particles[p])) {
 				addParticle(&bond->particles[p], molecule);
-			}
-				
+			}				
 		}
 	}
 
@@ -657,6 +650,10 @@ struct CompoundBridgeCompact {
 		n_anglebonds = bridge->n_anglebonds;
 		for (int i = 0; i < n_anglebonds; i++) {
 			anglebonds[i] = bridge->anglebonds[i];
+		}
+		n_dihedrals = bridge->n_dihedrals;
+		for (int i = 0; i < n_dihedrals; i++) {
+			dihedrals[i] = bridge->dihedrals[i];
 		}
 		printf("Loading bridge with %d particles %d bonds %d angles %d dihedrals\n", n_particles, n_singlebonds, n_anglebonds, n_dihedrals);
 	}

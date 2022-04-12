@@ -87,7 +87,8 @@ void BoxBuilder::finishBox(Simulation* simulation) {
 	
 
 	int n_points = simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER;
-	printf("Malloc %d MB on device for data buffers\n", (sizeof(double) * simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER + sizeof(Float3) * simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER) / 1000000);
+	printf("Malloc %.2Lf KB on device for data buffers\n", (sizeof(double) * simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER + sizeof(Float3) * simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER) * 1e-3);
+	printf("Malloc %.2Lf MB on host for data buffers\n", (sizeof(double) * simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER + sizeof(Float3) * simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER) * 1e-6);
 	cudaMallocManaged(&simulation->box->potE_buffer, sizeof(double) * simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER);	// Can only log molecules of size 3 for now...
 	simulation->potE_buffer = new double[simulation->total_particles_upperbound * simulation->n_steps];
 
@@ -100,13 +101,16 @@ void BoxBuilder::finishBox(Simulation* simulation) {
 
 
 	// TRAINING DATA and TEMPRARY OUTPUTS
-	long double total_bytes = sizeof(double) * 10 * simulation->n_steps
+	long double total_bytes = sizeof(float) * 10 * simulation->n_steps
 		+ sizeof(Float3) * N_DATAGAN_VALUES * MAX_COMPOUND_PARTICLES * simulation->n_compounds * STEPS_PER_TRAINDATATRANSFER;
-	printf("Reserving %.2lf GB device mem for logging\n", (total_bytes) * 1e-9);
-	cudaMallocManaged(&simulation->box->outdata, sizeof(double) * 10 * simulation->n_steps);	// 10 data streams for 10k steps. 1 step at a time.
-	//cudaMallocManaged(&simulation->box->data_GAN, sizeof(Float3) * 6 * MAX_COMPOUND_PARTICLES * simulation->n_steps);
+	printf("Reserving %.2Lf MB device mem for logging\n", (total_bytes) * 1e-6);
+	cudaMallocManaged(&simulation->box->outdata, sizeof(float) * 10 * simulation->n_steps);	// 10 data streams for 10k steps. 1 step at a time.
 	cudaMallocManaged(&simulation->box->data_GAN, sizeof(Float3) * N_DATAGAN_VALUES * MAX_COMPOUND_PARTICLES * simulation->n_compounds * STEPS_PER_TRAINDATATRANSFER);
-	simulation->traindata_buffer = new Float3[N_DATAGAN_VALUES * MAX_COMPOUND_PARTICLES * simulation->n_compounds * simulation->n_steps];
+
+
+	uint64_t n_traindata_values_host = N_DATAGAN_VALUES * MAX_COMPOUND_PARTICLES * simulation->n_compounds * (uint64_t) simulation->n_steps;
+	printf("Reserving %.2Lf GB host mem for logging\n", sizeof(Float3) * n_traindata_values_host * 1e-9);
+	simulation->traindata_buffer = new Float3[n_traindata_values_host];
 
 
 

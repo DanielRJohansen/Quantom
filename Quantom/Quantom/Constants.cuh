@@ -22,7 +22,6 @@ constexpr float BOX_LEN = 10.f;		// Must be > twice the len of largest compound
 constexpr float BOX_LEN_HALF = BOX_LEN / 2.f;
 
 const int N_SOLVATE_MOLECULES = 1000;	
-const int MAX_RESIDUES_TO_LOAD = 200;
 
 
 
@@ -43,7 +42,7 @@ const int THREADS_PER_COMPOUNDBLOCK = 128; // Must be >= max comp particles
 const int MAX_COMPOUND_PARTICLES = 128;
 
 
-const int SIMULATION_STEPS = 150000;
+const int SIMULATION_STEPS = 200000;
 
 
 

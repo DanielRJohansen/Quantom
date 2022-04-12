@@ -43,7 +43,7 @@ bar(x,log10(y))
 clear 
 clc
 
-workdir = "C:\\PROJECTS\\Quantom\\Simulation\\Steps_150000";
+workdir = "C:\\PROJECTS\\Quantom\\Simulation\\Steps_200000";
 file = fopen(strcat(workdir, "\\energy.bin"), "rb");
 energy_data = fread(file, 'single');
 fclose(file);
@@ -109,7 +109,7 @@ xlabel("time [fs]")
 clear 
 clc
 
-workdir = "C:\\PROJECTS\\Quantom\\Simulation\\Steps_100000";
+workdir = "C:\\PROJECTS\\Quantom\\Simulation\\Steps_200000";
 file = fopen(strcat(workdir, "\\logdata.bin"), "rb");
 data = fread(file, 'single');
 fclose(file);

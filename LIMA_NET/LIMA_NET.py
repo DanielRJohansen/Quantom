@@ -15,9 +15,9 @@ class LIMANET():
         #self.loss = self.calcLoss()
         #self.loss = torch.nn.MSELoss()
         #self.loss = torch.nn.L1Loss()
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.0001)
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001)
 
-        self.loss = self.calcLoss2
+        self.loss = self.calcLoss1
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         print(self.device)
@@ -49,7 +49,6 @@ class LIMANET():
             epoch_loss += loss.item()
 
         avg_loss = (epoch_loss-loss.item()) / (len(self.trainloader)-1) # Remove the last batch, as it might not be full size
-        print("train ", len(self.trainloader)-1)
         return avg_loss
 
 
@@ -73,7 +72,6 @@ class LIMANET():
 
         loss_avg = (loss_total-loss.item()) / (len(self.valloader)-1)  # Remove the last batch, as it might not be full size
         acc_avg = (acc_total - acc.item()) / (len(self.valloader) - 1)  # Remove the last batch, as it might not be full size
-        print("val ", len(self.valloader)-1)
         self.model.train(True)
 
         return loss_avg, acc_avg
@@ -100,7 +98,6 @@ class LIMANET():
         scalars = self.calcLossScalars(base, labels)
         scaled_errors = euclidean_errors.div(scalars)
 
-        #mean_err = torch.mean(euclidean_errors)
         mean_err = torch.mean(scaled_errors)
         #mean_err = torch.median(scaled_errors)
         return mean_err
@@ -110,6 +107,17 @@ class LIMANET():
         mean_err = torch.mean(euclidean_errors)
         return mean_err
 
+    def calcLoss3(self, predictions, base, labels):
+        euclidean_errors = self.calcEuclideanError(predictions, labels)
+        scalars = self.calcLossScalars(base, labels)
+        scaled_errors = euclidean_errors.div(scalars)
+
+        errors = scaled_errors.add(1)
+
+        log_error = torch.log10(errors)
+        mean_err = torch.mean(log_error)
+
+        return mean_err
 
     def calcAccuracy(self, predictions, base, labels):
         euclidean_errors = self.calcEuclideanError(predictions, labels)

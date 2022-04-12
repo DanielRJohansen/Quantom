@@ -3,19 +3,25 @@
 
 
 Environment::Environment() {
+	verifySimulationParameters();
+	simulation = new Simulation();
+
+
 	display = new DisplayV2();
 
 
-	simulation = new Simulation();
-	verifySimulationParameters();
+	
 
 
 	ForceFieldMaker* forcefieldmaker = new ForceFieldMaker();
 	compoundbuilder = new CompoundBuilder(forcefieldmaker);
 
 
-
-	Molecule mol_6lzm_10 = compoundbuilder->buildMolecule(MOL_FOLDER + "conf.gro", MOL_FOLDER + "topol.top", MAX_RESIDUES_TO_LOAD, 0);
+	
+	int min_res_id = 0;
+	int max_res_id = 200;
+	bool ignore_hydrogens = true;
+	Molecule mol_6lzm_10 = compoundbuilder->buildMolecule(MOL_FOLDER + "conf.gro", MOL_FOLDER + "topol.top", max_res_id, min_res_id, ignore_hydrogens);
 
 	boxbuilder.buildBox(simulation);
 	boxbuilder.addSingleMolecule(simulation, &mol_6lzm_10);
@@ -25,15 +31,10 @@ Environment::Environment() {
 	boxbuilder.finishBox(simulation);
 
 
-
-
 	simulation->moveToDevice();	// Only moves the Box to the device
 	verifyBox();
 
 	engine = new Engine(simulation, forcefieldmaker->getNBForcefield());
-
-
-
 }
 
 void Environment::verifySimulationParameters() {	// Not yet implemented
@@ -105,7 +106,7 @@ void Environment::postRunEvents() {
 	dumpToFile(analyzed_package.energy_data, analyzed_package.n_energy_values, simulation->out_dir + "energy.bin");
 	dumpToFile(analyzed_package.temperature_data, analyzed_package.n_temperature_values, simulation->out_dir + "temperature.bin");
 
-	dumpToFile(simulation->box->outdata, simulation->n_steps, simulation->out_dir + "logdata.bin");
+	dumpToFile(simulation->box->outdata, simulation->n_steps * 10, simulation->out_dir + "logdata.bin");
 
 
 	for (int i = 0; i < simulation->getStep(); i++) {
@@ -142,7 +143,6 @@ void Environment::handleStatus(Simulation* simulation) {
 
 
 		time0 = std::chrono::high_resolution_clock::now();
-
 	}
 }
 
@@ -224,7 +224,7 @@ template <typename T>
 void Environment::dumpToFile(T* data, int n_datapoints, string file_path_s) {	
 	char* file_path;
 	file_path = &file_path_s[0];
-	printf("Dumping %.03f MB to file ", sizeof(T) * n_datapoints * 1e-6);
+	printf("Writing %.03f MB to binary file ", sizeof(T) * n_datapoints * 1e-6);
 	cout << file_path << endl;
 
 	FILE* file;

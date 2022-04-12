@@ -144,18 +144,11 @@ void Engine::offloadPositionData(Simulation* simulation) {
 */
 
 
-/*
-bool Engine::neighborWithinCutoff(Float3* pos_a, Float3* pos_b) {
-	Float3 pos_b_temp = *pos_b;
-	LIMAENG::applyHyperpos(pos_a, &pos_b_temp);
-	double dist = (*pos_a - pos_b_temp).len();
-	return (dist < CUTOFF);
-}*/
 
 bool Engine::neighborWithinCutoff(Float3* pos_a, Float3* pos_b, float cutoff_offset) {		// This is used for compounds with a confining_particle_sphere from key_particle BEFORE CUTOFF begins
 	Float3 pos_b_temp = *pos_b;
 	LIMAENG::applyHyperpos(pos_a, &pos_b_temp);
-	double dist = (*pos_a - pos_b_temp).len();
+	float dist = (*pos_a - pos_b_temp).len();
 	return (dist < (CUTOFF + cutoff_offset));
 }
 
@@ -297,18 +290,18 @@ void Engine::updateNeighborLists(Simulation* simulation, NListDataCollection* nl
 
 
 void Engine::offloadLoggingData() {
-	const int step_offset = (simulation->getStep() - STEPS_PER_LOGTRANSFER) * simulation->total_particles_upperbound;	// Tongue in cheek here, i think this is correct...
+	uint64_t step_offset = (simulation->getStep() - STEPS_PER_LOGTRANSFER) * simulation->total_particles_upperbound;	// Tongue in cheek here, i think this is correct...
 	cudaMemcpy(&simulation->potE_buffer[step_offset], simulation->box->potE_buffer, sizeof(double) * simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER, cudaMemcpyDeviceToHost);
 }
 
 void Engine::offloadPositionData() {
-	const int step_offset = (simulation->getStep() - STEPS_PER_LOGTRANSFER) * simulation->total_particles_upperbound;	// Tongue in cheek here, i think this is correct...
+	uint64_t step_offset = (simulation->getStep() - STEPS_PER_LOGTRANSFER) * simulation->total_particles_upperbound;	// Tongue in cheek here, i think this is correct...
 	cudaMemcpy(&simulation->traj_buffer[step_offset], simulation->box->traj_buffer, sizeof(Float3) * simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER, cudaMemcpyDeviceToHost);
 }
 
 void Engine::offloadTrainData() {
-	int values_per_step = N_DATAGAN_VALUES * MAX_COMPOUND_PARTICLES * simulation->n_compounds;
-	const int step_offset = (simulation->getStep() - STEPS_PER_TRAINDATATRANSFER) * values_per_step;	// fix max_compound to the actual count save LOTS of space!. Might need a file in simout that specifies cnt for loading in other programs...
+	uint64_t values_per_step = N_DATAGAN_VALUES * MAX_COMPOUND_PARTICLES * simulation->n_compounds;
+	uint64_t step_offset = (simulation->getStep() - STEPS_PER_TRAINDATATRANSFER) * values_per_step;	// fix max_compound to the actual count save LOTS of space!. Might need a file in simout that specifies cnt for loading in other programs...
 	cudaMemcpy(&simulation->traindata_buffer[step_offset], simulation->box->data_GAN, sizeof(Float3) * values_per_step * STEPS_PER_TRAINDATATRANSFER, cudaMemcpyDeviceToHost);
 	LIMAENG::genericErrorCheck("Cuda error during traindata offloading\n");
 }

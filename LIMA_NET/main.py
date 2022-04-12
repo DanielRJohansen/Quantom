@@ -15,13 +15,13 @@ import torch
 
 
 if __name__ == '__main__':
-    n_neighbors = 2
+    n_neighbors = 32
 
-    workdir = "C:\\PROJECTS\\Quantom\\Simulation\\Steps_150000\\"
+    workdir = "C:\\PROJECTS\\Quantom\\Simulation\\Steps_20000\\"
     data_filepath = workdir + "traindata.bin"
 
     neighbors_per_row = 128
-    dataloader = WaterforceDataloader(data_filepath, neighbors_per_row,batch_size=32, nearest_n_atoms=n_neighbors)
+    dataloader = WaterforceDataloader(data_filepath, neighbors_per_row,batch_size=64, nearest_n_atoms=n_neighbors)
 
     model = LIMADNN(n_neighbors=n_neighbors)
 
@@ -30,4 +30,4 @@ if __name__ == '__main__':
 
     trainer = Trainer(net, workdir, n_neighbors=n_neighbors)
 
-    trainer.train(50)
+    trainer.train(100)
