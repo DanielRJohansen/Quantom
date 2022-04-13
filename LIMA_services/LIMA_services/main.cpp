@@ -72,7 +72,15 @@ struct Float3 {
 		}
 	}
 
+	float _max() {
+		return max(x, max(y, z));
+	}
+	float _min() {
+		return min(x, max(y, z));
+	}
+
 	float x, y, z;
+	//float x=0, y=0, z=0;
 };
 
 struct Atom {
@@ -100,7 +108,8 @@ struct selfcenteredDatapoint {
 	selfcenteredDatapoint() {}
 	selfcenteredDatapoint(int id, float mass, int particles_per_step) :queryatom_id(id), mass(mass){
 		atoms_relative = new Atom[particles_per_step];
-		atoms_relative_prev = new Atom[particles_per_step];
+		atoms_relative_tsub1 = new Atom[particles_per_step];
+		atoms_relative_tsub2 = new Atom[particles_per_step];
 	}
 	int queryatom_id;
 	float mass;
@@ -108,7 +117,8 @@ struct selfcenteredDatapoint {
 	bool ignore = false;
 
 	Atom* atoms_relative;	// Sorted with closest neighbor first
-	Atom* atoms_relative_prev;	// Sorted with closest neighbor first
+	Atom* atoms_relative_tsub1;	// Sorted with closest neighbor first
+	Atom* atoms_relative_tsub2;	// Sorted with closest neighbor first
 };
 
 
@@ -195,24 +205,28 @@ void makePositionsRelative(Atom* atoms, int atom_id, int particles_per_step) {
 		atoms[i].euclidean_dist = atoms[i].pos.len();
 	}
 	atoms[atom_id].euclidean_dist = 0;	// The heliocentric atom always comes first
-	atoms[atom_id].pos = Float3(0.f);
+	atoms[atom_id].pos = Float3(0.f);	// If we erase this pos, we can't get delta positions
 }
 
 selfcenteredDatapoint makeDatapoint(Row* rows, int query_atom_id, int row, int particles_per_step) {	// Row indicates row to predict, implicitly using the row before..
 	Row* row_cur = &rows[row];
-	Row* row_prev = &rows[row - 1];
+	Row* row_tsub1 = &rows[row - 1];
+	Row* row_tsub2 = &rows[row - 2];
 
 	selfcenteredDatapoint scdp(query_atom_id, 0, particles_per_step);
 	for (int i = 0; i < particles_per_step; i++) {			// Load positions. They are NOT yet relative to query atom
 		scdp.atoms_relative[i] = row_cur->atoms[i];
-		scdp.atoms_relative_prev[i] = row_prev->atoms[i];
+		scdp.atoms_relative_tsub1[i] = row_tsub1->atoms[i];
+		scdp.atoms_relative_tsub2[i] = row_tsub2->atoms[i];
 	}
 	makePositionsRelative(scdp.atoms_relative, query_atom_id, particles_per_step);
-	makePositionsRelative(scdp.atoms_relative_prev, query_atom_id, particles_per_step);
+	makePositionsRelative(scdp.atoms_relative_tsub1, query_atom_id, particles_per_step);
+	makePositionsRelative(scdp.atoms_relative_tsub2, query_atom_id, particles_per_step);
 
 	int* mapping = mergeSortAPI(scdp.atoms_relative, particles_per_step);		// First generation a sorting mapping
 	sortAtoms(scdp.atoms_relative, particles_per_step, mapping);						// Use mapping to sort both data-arrays, so things match!
-	sortAtoms(scdp.atoms_relative_prev, particles_per_step, mapping);
+	sortAtoms(scdp.atoms_relative_tsub1, particles_per_step, mapping);
+	sortAtoms(scdp.atoms_relative_tsub2, particles_per_step, mapping);
 	delete[] mapping;
 
 	
@@ -265,12 +279,18 @@ void exportData(selfcenteredDatapoint* data, int n_datapoints, int particles_per
 
 
 		//scdp.atoms_relative[0].LJ_force.print('f');
-		buffer[buffer_ptr++] = scdp.atoms_relative[0].LJ_force;					// First print label				3xfloat
-		buffer[buffer_ptr++] = scdp.atoms_relative_prev[0].LJ_force;			// Then print prev self force		3xfloat
-			
+		buffer[buffer_ptr++] = scdp.atoms_relative[0].LJ_force;													// First print label				
+		buffer[buffer_ptr++] = scdp.atoms_relative[0].pos - scdp.atoms_relative_tsub1[0].pos;					// Then vel
+		buffer[buffer_ptr++] = scdp.atoms_relative_tsub1[0].LJ_force;											// Then print prev self force		
+		buffer[buffer_ptr++] = scdp.atoms_relative_tsub1[0].LJ_force - scdp.atoms_relative_tsub2[0].LJ_force;	// Force change
+		
+	
+
 		for (int ii = 1; ii < particles_per_datapoint; ii++) {
 			buffer[buffer_ptr++] = scdp.atoms_relative[ii].pos;				// Print other atoms pos			69x3xfloat
-			buffer[buffer_ptr++] = scdp.atoms_relative_prev[ii].LJ_force;		// Print other atoms prev force		69x3xfloat
+			buffer[buffer_ptr++] = (scdp.atoms_relative[ii].pos - scdp.atoms_relative_tsub2[ii].pos) * 0.5;
+			buffer[buffer_ptr++] = scdp.atoms_relative_tsub1[ii].LJ_force;		// Print other atoms prev force		69x3xfloat
+			buffer[buffer_ptr++] = scdp.atoms_relative_tsub1[ii].LJ_force - scdp.atoms_relative_tsub2[ii].LJ_force;
 
 			if (ii == max_neighbors)
 				break;
@@ -278,6 +298,16 @@ void exportData(selfcenteredDatapoint* data, int n_datapoints, int particles_per
 	}
 	
 	printf("Ptr val: %u\n", buffer_ptr);
+
+
+	float maxVal = 0; 
+	float minVal = 0; 
+	for (int i = 0; i < buffer_ptr; i++) {
+		maxVal = max(maxVal, buffer[i]._max());
+		minVal = min(minVal, buffer[i]._min());
+	}
+
+	printf("Max: %f Min: %f\n", maxVal, minVal);
 
 	FILE* file;
 	fopen_s(&file, file_path, "wb");
@@ -292,7 +322,7 @@ void makeForceChangePlot(selfcenteredDatapoint* data, int n_datapoints) {
 	int zeroes = 0;
 	int bin;
 	for (int i = 0; i < n_datapoints; i++) {
-		float force_change = (data[i].atoms_relative[0].LJ_force - data[i].atoms_relative_prev[0].LJ_force).len();
+		float force_change = (data[i].atoms_relative[0].LJ_force - data[i].atoms_relative_tsub1[0].LJ_force).len();				// Only the forces changes that the NN must predict!
 		
 		if (force_change < 1.f) {
 			bin = 0;
@@ -327,7 +357,7 @@ void makeForceChangePlot(selfcenteredDatapoint* data, int n_datapoints) {
 int discardVolatileDatapoints(selfcenteredDatapoint* data, int n_datapoints, float cuttoff_value) {	// Removes datapoints where the change in force is too large for the NN to handle..
 	int n_ignored = 0;
 	for (int i = 0; i < n_datapoints; i++) {
-		float force_change = (data[i].atoms_relative[0].LJ_force - data[i].atoms_relative_prev[0].LJ_force).len();
+		float force_change = (data[i].atoms_relative[0].LJ_force - data[i].atoms_relative_tsub1[0].LJ_force).len();		// It's okay we only do with the one that the NN has to predict!
 		if (force_change > cuttoff_value) {
 			data[i].ignore = true;
 			n_ignored++;
@@ -365,8 +395,8 @@ int main(int argc, char** argv) {
 	}
 
 	//string workdir = "D:\\Quantom\LIMANET\sim_out";
-	string workdir = "C:\\PROJECTS\\Quantom\\Simulation\\Steps_100000\\";
-	int N_STEPS = 100000;	// Determines file to read
+	string workdir = "C:\\PROJECTS\\Quantom\\Simulation\\Steps_200000\\";
+	int N_STEPS = 200000;	// Determines file to read
 	bool shuffle_time_dim = false;
 	int n_compounds = 13;
 	int particles_per_compound = 128;

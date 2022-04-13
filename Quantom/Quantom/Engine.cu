@@ -397,10 +397,11 @@ void Engine::step() {
 		forceKernel << < simulation->box->n_compounds, THREADS_PER_COMPOUNDBLOCK >> > (simulation->box);
 	}
 	
+#ifdef ENABLE_WATER
 	if (simulation->n_solvents > 0) { 
 		solventForceKernel << < BLOCKS_PER_SOLVENTKERNEL, THREADS_PER_SOLVENTBLOCK >> > (simulation->box); 
 	}
-		
+#endif
 	cudaDeviceSynchronize();
 
 	auto t1 = std::chrono::high_resolution_clock::now();
@@ -626,11 +627,12 @@ __device__ Float3 computerIntermolecularLJForces(Float3* self_pos, uint8_t atomt
 
 		int neighborparticle_atomtype = neighbor_compound->atom_types[neighborparticle_id];
 
-
+		
 
 		force += calcLJForce(self_pos, &neighbor_positions[neighborparticle_id], data_ptr, potE_sum,
-			(forcefield_device.particle_parameters[atomtype_self].sigma + forcefield_device.particle_parameters[neighborparticle_atomtype].sigma) * 0.5f,
-			(forcefield_device.particle_parameters[atomtype_self].epsilon + forcefield_device.particle_parameters[neighborparticle_atomtype].epsilon) * 0.5,
+			0.15,200,
+	//		(forcefield_device.particle_parameters[atomtype_self].sigma + forcefield_device.particle_parameters[neighborparticle_atomtype].sigma) * 0.5f,
+		//	(forcefield_device.particle_parameters[atomtype_self].epsilon + forcefield_device.particle_parameters[neighborparticle_atomtype].epsilon) * 0.5,
 			//atomtype_self, atomtypes_others[i]
 			global_id_self, neighbor_compound->particle_global_ids[neighborparticle_id]
 		);
@@ -885,10 +887,13 @@ __global__ void forceKernel(Box* box) {
 
 
 	// --------------------------------------------------------------- Intermolecular forces --------------------------------------------------------------- //
-	for (int neighborcompound_id = 0; neighborcompound_id < box->n_compounds; neighborcompound_id++) {
+	
+	//for (int neighborcompound_id = 0; neighborcompound_id < box->n_compounds; neighborcompound_id++) {
+	for (int i = 0; i < neighborlist.n_compound_neighbors; i++) {
+		int neighborcompound_id = neighborlist.neighborcompound_ids[i];
 
-		if (neighborcompound_id == blockIdx.x)	// Only needed untill we have proper neighbor lists
-			continue;
+		//if (neighborcompound_id == blockIdx.x)	// Only needed untill we have proper neighbor lists
+//			continue;
 		int neighborcompound_particles = box->compound_state_array[neighborcompound_id].n_particles;
 
 		if (threadIdx.x < neighborcompound_particles) {
@@ -897,8 +902,8 @@ __global__ void forceKernel(Box* box) {
 			LIMAENG::applyHyperpos(&compound_state.positions[0], &utility_buffer[threadIdx.x]);
 		}
 		__syncthreads();				// CRITICAL
+		//continue;
 		if (threadIdx.x < compound.n_particles) {
-
 			force += computerIntermolecularLJForces(&compound_state.positions[threadIdx.x], compound.atom_types[threadIdx.x], &compound.lj_ignore_list[threadIdx.x], &potE_sum, compound.particle_global_ids[threadIdx.x], data_ptr,
 				&box->compounds[neighborcompound_id], utility_buffer, neighborcompound_id);
 
@@ -911,6 +916,7 @@ __global__ void forceKernel(Box* box) {
 
 
 	// --------------------------------------------------------------- Solvation forces --------------------------------------------------------------- //
+#ifdef ENABLE_WATER
 	for (int i = threadIdx.x; i < neighborlist.n_solvent_neighbors; i += blockDim.x) {
 		utility_buffer[i] = box->solvents[neighborlist.neighborsolvent_ids[i]].pos;
 		LIMAENG::applyHyperpos(&compound_state.positions[0], &utility_buffer[i]);
@@ -921,6 +927,7 @@ __global__ void forceKernel(Box* box) {
 		force_LJ_sol = computeSolventToCompoundLJForces(&compound_state.positions[threadIdx.x], neighborlist.n_solvent_neighbors, utility_buffer, data_ptr, &potE_sum, compound.atom_types[threadIdx.x]);
 		force += force_LJ_sol;
 	}		
+#endif
 	// ------------------------------------------------------------------------------------------------------------------------------------------------ //
 
 

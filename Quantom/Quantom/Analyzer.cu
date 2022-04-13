@@ -226,7 +226,6 @@ Float3* Analyzer::analyzeCompoundEnergy(Simulation* simulation, uint64_t n_steps
 	cudaDeviceSynchronize();
 
 
-	printf("This energy analysis is only valid if just 1 compound exists!\n");
 	for (uint64_t step = 0; step < n_steps; step++) {
 		for (uint64_t i = 0; i < simulation->box->n_compounds; i++) {
 			//if (host_data[i + step * 256].x > 10000)

@@ -8,7 +8,7 @@
 //#define LIMA_SAFERUN		// Use this for?
 #define LIMA_VERBOSE
 
-
+#define ENABLE_WATER
 
 
 
@@ -18,10 +18,10 @@
 
 // SImulation specifics
 
-constexpr float BOX_LEN = 10.f;		// Must be > twice the len of largest compound
+constexpr float BOX_LEN = 8.f;		// Must be > twice the len of largest compound
 constexpr float BOX_LEN_HALF = BOX_LEN / 2.f;
 
-const int N_SOLVATE_MOLECULES = 1000;	
+const int N_SOLVATE_MOLECULES = 2000;	
 
 
 
@@ -42,7 +42,7 @@ const int THREADS_PER_COMPOUNDBLOCK = 128; // Must be >= max comp particles
 const int MAX_COMPOUND_PARTICLES = 128;
 
 
-const int SIMULATION_STEPS = 200000;
+const int SIMULATION_STEPS = 100000;
 
 
 

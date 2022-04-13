@@ -15,7 +15,7 @@ class LIMANET():
         #self.loss = self.calcLoss()
         #self.loss = torch.nn.MSELoss()
         #self.loss = torch.nn.L1Loss()
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001)
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.0001)
 
         self.loss = self.calcLoss1
 
@@ -30,6 +30,8 @@ class LIMANET():
 
 
     def train_one_epoch(self):
+        #self.model.train()
+
         epoch_loss = 0
         for i, data in enumerate(self.trainloader):
             inputs, labels = data
@@ -42,6 +44,8 @@ class LIMANET():
             #loss = self.loss(outputs, labels)
             #loss = self.calcLoss(preds, bases, labels)
             loss = self.loss(preds, bases, labels)
+
+
             loss.backward()
 
             self.optimizer.step()
@@ -54,9 +58,10 @@ class LIMANET():
 
     def validate(self):
         self.model.train(False)
+        #self.model.eval()
+
         loss_total = 0
         acc_total = 0
-
         for i, data in enumerate(self.valloader):
             inputs, labels = data
             inputs = inputs.to(self.device)
@@ -82,6 +87,8 @@ class LIMANET():
         sq_errors = torch.square(errors)
         sum_sq_errors = torch.sum(sq_errors, 1)
         sum_errors = torch.sqrt(sum_sq_errors)
+
+
         return sum_errors
 
     def calcLossScalars(self, base, labels):
@@ -100,11 +107,16 @@ class LIMANET():
 
         mean_err = torch.mean(scaled_errors)
         #mean_err = torch.median(scaled_errors)
+
+
+
         return mean_err
 
     def calcLoss2(self, predictions, base, labels):
         euclidean_errors = self.calcEuclideanError(predictions, labels)
         mean_err = torch.mean(euclidean_errors)
+
+
         return mean_err
 
     def calcLoss3(self, predictions, base, labels):
@@ -133,3 +145,27 @@ class LIMANET():
 
         mean_acc = torch.mean(bounded_acc)
         return mean_acc
+
+    def saveModel(self, working_folder):
+        path = working_folder + "model.pt"
+        torch.save(self.model, path)
+
+
+
+"""
+           #if (mean_err == 'inf'):
+        #print(predictions)
+        if (mean_err > 100000):
+            print(mean_err)
+            print(predictions)
+            print(labels)
+            print(euclidean_errors)
+            exit()
+
+        if (torch.sum(torch.isnan(mean_err))):
+            print("Nan numbers!")
+            print(mean_err)
+            print(predictions)
+            print(labels)
+            exit()
+"""

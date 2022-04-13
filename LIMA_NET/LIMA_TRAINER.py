@@ -9,6 +9,7 @@ class Trainer():
         self.working_folder = working_folder
         self.n_neighbors = n_neighbors
 
+        self.best_acc = 0
 
     def train(self, n_epochs):
         val_loss_hist = []
@@ -26,6 +27,10 @@ class Trainer():
             vloss, vacc = self.net.validate()
             val_loss_hist.append(vloss)
             val_acc_hist.append(vacc)
+
+
+            if (vacc > self.best_acc):
+                self.net.saveModel(self.working_folder)
 
             print("Epoch ", e, " train-loss: ", train_loss_hist[-1], " val-loss: ", val_loss_hist[-1], " mean accuracy: ", val_acc_hist[-1], " time: ", time()-t0)
         
@@ -45,10 +50,14 @@ class Trainer():
         plt.title("Training - " + str(self.n_neighbors) + " neighbors - "
                   + str(self.net.total_params) + " parameters")
         plt.grid()
-        #plt.ylim(0,5)
+        plt.ylim(0,3)
 
         plt.savefig(self.working_folder + "\\train_plot_"+str(self.n_neighbors)+"N.png")
         plt.show()
         
-        
+
+
+
+    #def loadModel(self, path):
+
 

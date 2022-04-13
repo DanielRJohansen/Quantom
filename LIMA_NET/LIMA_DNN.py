@@ -3,9 +3,75 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-class LIMADNN(nn.Module):
+
+
+def makeAtomBlock(inputs, outputs):
+    return nn.Sequential(
+            nn.Linear(inputs, 16),
+            #nn.BatchNorm1d(32),
+            nn.ReLU(),
+            #nn.Linear(32, 32),
+            #nn.ReLU(),
+            #nn.Linear(32, 16),
+            # nn.BatchNorm1d(16),
+            #nn.ReLU(),
+            nn.Linear(16, outputs),
+            nn.ReLU()
+        )
+
+class LIMADNN2(nn.Module):
     def __init__(self, n_neighbors):
-        super(LIMADNN, self).__init__()
+        super(LIMADNN2, self).__init__()
+
+        if (n_neighbors > 0):  # Model can't handle 0 neighbors, so we fake and add a flaot3(0,0,0)
+            self.n_neighbors = n_neighbors
+            self.forward = self.__forward
+        else:
+            self.n_neighbors = 1
+            self.forward = self.__forward0neighbors
+
+
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+        self.state_size = 16
+        self.blockout_size = 8
+
+#        self.query_atom_block = makeAtomBlock(12, self.state_size)
+
+        self.atom_block = makeAtomBlock(12, self.blockout_size)
+
+        self.state_layer = nn.Linear(self.blockout_size, self.state_size)
+        self.out_layer = nn.Linear(self.state_size, 3)
+
+    def __forward(self, x):
+        force_prev = x[:, 0, 6:9]
+
+        #state = self.query_atom_block(x[:,0,:])
+        queryblock_out = self.atom_block(x[:,0,:])
+        state = self.state_layer(queryblock_out)
+
+        #state = torch.ones(self.state_size, dtype=torch.float32).to(self.device)
+
+        for i in range(0, x.shape[1]):
+            block_out = self.atom_block(x[ : , i, : ])
+            state_addition = self.state_layer(block_out)
+            state.add(state_addition)
+
+
+        out = self.out_layer(state)
+
+        return out, force_prev
+
+    def __forward0neighbors(self, x):
+        zeroes = torch.zeros((x.shape[0], 6), dtype=torch.float32).to(self.device)
+        x = torch.cat((x, zeroes), dim=1)
+
+        return self.__forward(x)
+
+
+class LIMADNN1(nn.Module):
+    def __init__(self, n_neighbors):
+        super(LIMADNN1, self).__init__()
 
         if (n_neighbors > 0):              # Model can't handle 0 neighbors, so we fake and add a flaot3(0,0,0)
             self.n_neighbors = n_neighbors
@@ -45,16 +111,20 @@ class LIMADNN(nn.Module):
         nforce = x[:,self.n_neighbors*3+3:self.n_neighbors*3*2+3]
 
         npos = self.fc_npos1(npos)
+        npos = F.relu(npos)
         npos = self.fc_npos2(npos)
         npos = F.relu(npos)
         
         nforce = self.fc_nforce1(nforce)
+        nforce = F.relu(nforce)
         nforce = self.fc_nforce2(nforce)
         nforce = F.relu(nforce)
         
         posforce = torch.cat((npos, nforce), 1)
         posforce = self.fc_forcepos_stack_1(posforce)
+        posforce = F.relu(posforce)
         posforce = self.fc_forcepos_stack_2(posforce)
+        posforce = F.relu(posforce)
 
         #sforce = self.fc_sforce1(force_prev)
         sforce = self.fc_sforce1(ones)
@@ -76,3 +146,6 @@ class LIMADNN(nn.Module):
         x = torch.cat((x, zeroes), dim=1)
 
         return self.__forward(x)
+
+
+
