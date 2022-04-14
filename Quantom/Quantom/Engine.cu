@@ -8,11 +8,8 @@ __constant__ ForceField forcefield_device;
 Engine::Engine() {}
 Engine::Engine(Simulation* simulation, ForceField forcefield_host) {
 	LIMAENG::genericErrorCheck("Error before engine initialization.\n");
-
 	this->simulation = simulation;
-
 	nlist_data_collection = new NListDataCollection(simulation);
-
 
 
 
@@ -290,8 +287,9 @@ void Engine::updateNeighborLists(Simulation* simulation, NListDataCollection* nl
 
 
 void Engine::offloadLoggingData() {
-	uint64_t step_offset = (simulation->getStep() - STEPS_PER_LOGTRANSFER) * simulation->total_particles_upperbound;	// Tongue in cheek here, i think this is correct...
-	cudaMemcpy(&simulation->potE_buffer[step_offset], simulation->box->potE_buffer, sizeof(double) * simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER, cudaMemcpyDeviceToHost);
+	uint64_t step_offset = (simulation->getStep() - STEPS_PER_LOGTRANSFER) ;	// Tongue in cheek here, i think this is correct...
+	cudaMemcpy(&simulation->potE_buffer[step_offset * simulation->total_particles_upperbound], simulation->box->potE_buffer, sizeof(double) * simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER, cudaMemcpyDeviceToHost);
+	cudaMemcpy(&simulation->logging_data[step_offset * 10], simulation->box->outdata, sizeof(float) * 10 * STEPS_PER_LOGTRANSFER, cudaMemcpyDeviceToHost);
 }
 
 void Engine::offloadPositionData() {
@@ -965,17 +963,16 @@ __global__ void forceKernel(Box* box) {
 
 
 
-		if (blockIdx.x == 0 && threadIdx.x == 0) {
-			box->outdata[0 + box->step * 10] = data_ptr[0];	// LJ pot
-
+		if (blockIdx.x == 0 && threadIdx.x == 0) {			
 			Float3 pos_prev_temp = compound.prev_positions[threadIdx.x];			
 			LIMAENG::applyHyperpos(&compound_state.positions[threadIdx.x], &pos_prev_temp);
 			
+			int step_offset = (box->step % STEPS_PER_LOGTRANSFER) * 10;
 
-			box->outdata[0 + box->step * 10] = (compound_state.positions[threadIdx.x] - pos_prev_temp).len() / box->dt;
-			box->outdata[1 + box->step * 10] = LIMAENG::calcKineticEnergy(&compound_state.positions[threadIdx.x], &pos_prev_temp, forcefield_device.particle_parameters[compound.atom_types[threadIdx.x]].mass, box->dt);
-			box->outdata[2 + box->step * 10] = potE_sum;
-			box->outdata[3 + box->step * 10] = force.len();
+			box->outdata[0 + step_offset] = (compound_state.positions[threadIdx.x] - pos_prev_temp).len() / box->dt;
+			box->outdata[1 + step_offset] = LIMAENG::calcKineticEnergy(&compound_state.positions[threadIdx.x], &pos_prev_temp, forcefield_device.particle_parameters[compound.atom_types[threadIdx.x]].mass, box->dt);
+			box->outdata[2 + step_offset] = potE_sum;
+			box->outdata[3 + step_offset] = force.len();
 
 			//box->outdata[5 + box->step * 10] = data_ptr[2];// closest particle
 			//box->outdata[6 + box->step * 10] = data_ptr[1];// force.len();

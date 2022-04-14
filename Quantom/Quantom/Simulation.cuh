@@ -132,8 +132,8 @@ public:
 	double* potE_buffer;	// Not really a buffer yet, just one large array that holds full simulation data
 	Float3* traj_buffer;
 	float* temperature_buffer;
-	Float3* traindata_buffer;
-
+	Float3* traindata_buffer;		// Position and force data for all particles, for NN training
+	float* logging_data;				// Used for debugging/logging any values. 10 floats per step!
 
 	uint32_t total_particles_upperbound = 0;
 	uint32_t total_compound_particles = 0;			// Precise number, but DO NOT EVER USE IN INDEXING!!

@@ -66,6 +66,7 @@ void Environment::verifyBox() {
 			exit(1);
 		}
 	}
+	printf("Environment::verifyBox success\n");
 }
 
 
@@ -94,7 +95,7 @@ void Environment::run() {
 	printf("\n\n\n########################## SIMULATION FINISHED ##########################\n\n\n\n");
 
 	if (simulation->finished || simulation->box->critical_error_encountered) {
-		postRunEvents();
+		//postRunEvents();
 	}
 }
 
@@ -106,7 +107,7 @@ void Environment::postRunEvents() {
 	dumpToFile(analyzed_package.energy_data, analyzed_package.n_energy_values, simulation->out_dir + "energy.bin");
 	dumpToFile(analyzed_package.temperature_data, analyzed_package.n_temperature_values, simulation->out_dir + "temperature.bin");
 
-	dumpToFile(simulation->box->outdata, simulation->n_steps * 10, simulation->out_dir + "logdata.bin");
+	dumpToFile(simulation->logging_data, simulation->n_steps * 10, simulation->out_dir + "logdata.bin");
 
 
 	for (int i = 0; i < simulation->getStep(); i++) {
@@ -133,6 +134,8 @@ void Environment::postRunEvents() {
 #endif
 }
 
+
+
 void Environment::handleStatus(Simulation* simulation) {
 	if (!(simulation->getStep() % simulation->steps_per_render)) {
 		printf("\r\tStep #%06d", simulation->box->step);
@@ -146,13 +149,11 @@ void Environment::handleStatus(Simulation* simulation) {
 	}
 }
 
+
+
 void Environment::handleDisplay(Simulation* simulation) {	
 	if (!(simulation->getStep() % simulation->steps_per_render)) {
 		display->render(simulation);
-
-		//interface->handleEvents();
-		//if (interface->quit)
-			//display->terminate();
 	}
 }
 

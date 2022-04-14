@@ -36,6 +36,7 @@ public:
 		float kinE = 0.5 * mass * vel * vel;
 		return kinE;
 	}
+
 	static void __host__ genericErrorCheck(const char* text) {
 		cudaDeviceSynchronize();
 		cudaError_t cuda_status = cudaGetLastError();
@@ -61,7 +62,6 @@ struct NListDataCollection {
 		solvent_neighborlists = new NeighborList[MAX_SOLVENTS];
 		cudaMemcpy(compound_neighborlists, simulation->box->compound_neighborlists, sizeof(NeighborList) * n_compounds, cudaMemcpyDeviceToHost);
 		cudaMemcpy(solvent_neighborlists, simulation->box->solvent_neighborlists, sizeof(NeighborList) * n_solvents, cudaMemcpyDeviceToHost);
-
 	}
 	/*
 	void preparePositionData() {
