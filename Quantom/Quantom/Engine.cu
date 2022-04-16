@@ -375,17 +375,17 @@ void Engine::handleBoxtemp() {
 	const float target_temp = 313.f;				// [k]
 	float temp = getBoxTemperature();
 	temp = temp == 0.f ? 1 : temp;																			// So we avoid dividing by 0
-	simulation->temperature_buffer[simulation->getStep() / STEPS_PER_THERMOSTAT] = temp;
+	simulation->temperature_buffer[simulation->n_temp_values++] = temp;
 
 	float temp_scalar = target_temp / temp;
 		// I just added this to not change any temperatures too rapidly
 	temp_scalar = min(temp_scalar, 1.1f);
 	temp_scalar = max(temp_scalar, 0.9f);
 
-	if (PRINT_TEMP) { printf("\n %d Temperature: %f\n", (simulation->getStep() - 1) / STEPS_PER_THERMOSTAT, temp); }
+	if (PRINT_TEMP || temp > 1000.f || temp < 100.f) { printf("\n %d Temperature: %f\n", (simulation->getStep() - 1) / STEPS_PER_THERMOSTAT, temp); }
 		
 	if (temp > target_temp/4.f && temp < target_temp*4.f || true) {
-		if (APPLY_THERMOSTAT) {
+		if (APPLY_THERMOSTAT && simulation->getStep() > 400) {
 			
 			simulation->box->thermostat_scalar = temp_scalar;
 
@@ -411,7 +411,7 @@ void Engine::step() {
 	cudaDeviceSynchronize();
 
 	if (simulation->box->bridge_bundle->n_bridges > 0) {																		// TODO: Illegal access to device mem!!
-		//compoundBridgeKernel << < simulation->box->bridge_bundle->n_bridges, MAX_PARTICLES_IN_BRIDGE >> > (simulation->box);	// Must come before forceKernel()
+		compoundBridgeKernel << < simulation->box->bridge_bundle->n_bridges, MAX_PARTICLES_IN_BRIDGE >> > (simulation->box);	// Must come before forceKernel()
 	}
 		
 	cudaDeviceSynchronize();
@@ -899,11 +899,7 @@ __global__ void forceKernel(Box* box) {
 		force += computeAnglebondForces(&compound, compound_state.positions, utility_buffer, &potE_sum);
 		force += computeDihedralForces(&compound, compound_state.positions, utility_buffer, &potE_sum);
 		
-		
-		if (potE_sum != potE_sum) {
-			printf("bonds %f", potE_sum);
-			box->critical_error_encountered = true;
-		}
+
 		for (int i = 0; i < compound.n_particles; i++) {
 
 			if (i != threadIdx.x && !compound.lj_ignore_list[threadIdx.x].ignore((uint8_t) i, (uint8_t) blockIdx.x) && threadIdx.x < compound.n_particles) {
@@ -922,10 +918,7 @@ __global__ void forceKernel(Box* box) {
 		}
 	}
 	// ----------------------------------------------------------------------------------------------------------------------------------------------- //
-	if (potE_sum != potE_sum) {
-		printf("intra %f   active %d\n", potE_sum, threadIdx.x < compound.n_particles);
-		box->critical_error_encountered = true;
-	}
+
 
 	// --------------------------------------------------------------- Intermolecular forces --------------------------------------------------------------- //
 	
@@ -953,10 +946,6 @@ __global__ void forceKernel(Box* box) {
 	}
 	// ------------------------------------------------------------------------------------------------------------------------------------------------------ //
 
-	if (potE_sum != potE_sum) {
-		printf("inter");
-		box->critical_error_encountered = true;
-	}
 
 
 	// --------------------------------------------------------------- Solvation forces --------------------------------------------------------------- //
@@ -973,11 +962,9 @@ __global__ void forceKernel(Box* box) {
 #endif
 	// ------------------------------------------------------------------------------------------------------------------------------------------------ //
 
-	if (potE_sum != potE_sum) {
-		printf("sol");
-		box->critical_error_encountered = true;
-	}
-	
+
+
+
 	// ------------------------------------------------------------ Integration ------------------------------------------------------------ //
 	if (threadIdx.x < compound.n_particles) {
 		integratePosition(&compound_state.positions[threadIdx.x], &compound.prev_positions[threadIdx.x], &force, forcefield_device.particle_parameters[compound.atom_types[threadIdx.x]].mass, box->dt, &box->thermostat_scalar, threadIdx.x);		
@@ -1005,9 +992,7 @@ __global__ void forceKernel(Box* box) {
 		if (threadIdx.x < compound.n_particles || 1) {																							// TODO: Remove || 1
 			int step_offset = (box->step % STEPS_PER_LOGTRANSFER) * box->total_particles_upperbound;
 			int compound_offset = blockIdx.x * MAX_COMPOUND_PARTICLES;
-			//printf(" block id %d\n", blockIdx.x);
-			box->potE_buffer[threadIdx.x + compound_offset + step_offset] = potE_sum;//data_ptr[0] + data_ptr[2];			// Should be += since bridge sets value first
-			//box->potE_buffer[threadIdx.x + 0 * MAX_COMPOUND_PARTICLES + step_offset] = potE_sum;
+			box->potE_buffer[threadIdx.x + compound_offset + step_offset] = potE_sum;			// TODO: Should be += since bridge sets value first
 			box->traj_buffer[threadIdx.x + compound_offset + step_offset] = compound_state.positions[threadIdx.x];
 		}		
 		__syncthreads();
@@ -1022,7 +1007,7 @@ __global__ void forceKernel(Box* box) {
 
 			box->outdata[0 + step_offset] = (compound_state.positions[threadIdx.x] - pos_prev_temp).len() / box->dt;
 			box->outdata[1 + step_offset] = LIMAENG::calcKineticEnergy(&compound_state.positions[threadIdx.x], &pos_prev_temp, forcefield_device.particle_parameters[compound.atom_types[threadIdx.x]].mass, box->dt);
-			box->outdata[2 + step_offset] = potE_sum;
+			box->outdata[2 + step_offset] = potE_sum;																											// This does NOT take bridge potE into account!!!!!!!
 			box->outdata[3 + step_offset] = force.len();
 
 			//box->outdata[5 + box->step * 10] = data_ptr[2];// closest particle
@@ -1077,7 +1062,6 @@ __global__ void solventForceKernel(Box* box) {
 	data_ptr[2] = 9999.f;
 	Float3 force(0,0,0);
 
-	//printf("mass %f\n", forcefield_device.particle_parameters[ATOMTYPE_SOL].mass);
 
 	Solvent* solvent = &solvents[threadIdx.x];
 	//Float3 solvent_pos;
@@ -1124,7 +1108,6 @@ __global__ void solventForceKernel(Box* box) {
 
 	if (thread_active) {
 		int p_index = MAX_COMPOUND_PARTICLES + solvent_index;
-		//integratePosition(&solvent.pos, &solvent.pos_tsub1, &force, SOLVENT_MASS, box->dt, &box->thermostat_scalar, p_index);
 		integratePosition(&solvent->pos, &solvent->pos_tsub1, &force, forcefield_device.particle_parameters[ATOMTYPE_SOL].mass, box->dt, &box->thermostat_scalar, p_index);
 		applyPBC(&solvent->pos);	// forcePositionToInsideBox	// This break the integration, as that doesn't accound for PBC in the vel conservation
 	}

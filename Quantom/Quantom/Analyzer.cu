@@ -166,7 +166,7 @@ Analyzer::AnalyzedPackage Analyzer::analyzeEnergy(Simulation* simulation) {	// C
 	*/
 
 	// We need to split up the analyser into steps, as we cannot store all positions traj on device at once.
-	uint64_t max_steps_per_kernel = 300;
+	uint64_t max_steps_per_kernel = 1000;
 	uint64_t particles_per_step = simulation->total_particles_upperbound;
 	uint64_t max_values_per_kernel = (max_steps_per_kernel +2) * particles_per_step;							// Pad steps with 2 for vel calculation
 	printf("Analyzer malloc %.2f MB on device\n", (sizeof(Float3) + sizeof(double)) * (max_values_per_kernel) * 1e-6);
@@ -177,9 +177,7 @@ Analyzer::AnalyzedPackage Analyzer::analyzeEnergy(Simulation* simulation) {	// C
 		uint64_t step_offset = i * max_steps_per_kernel + 1;												// offset one since we can't analyse step 1
 		uint64_t steps_in_kernel = min(max_steps_per_kernel, analysable_steps - step_offset);
 		uint64_t values_in_kernel = (steps_in_kernel + 2) * particles_per_step;
-		printf("Steps %llu\n", steps_in_kernel);
 
-		printf("Trans from %d\n", (step_offset - 1) * particles_per_step);
 		cudaMemcpy(traj_buffer_device, &simulation->traj_buffer[(step_offset-1) * particles_per_step], sizeof(Float3) * values_in_kernel, cudaMemcpyHostToDevice);		// -1 to additional datap for vel calculation. +2 for -1 and -1 for vel calculation
 		cudaMemcpy(potE_buffer_device, &simulation->potE_buffer[(step_offset-1) * particles_per_step], sizeof(double) * values_in_kernel, cudaMemcpyHostToDevice);
 
@@ -192,14 +190,11 @@ Analyzer::AnalyzedPackage Analyzer::analyzeEnergy(Simulation* simulation) {	// C
 		Float3* average_compound_energy = analyzeCompoundEnergy(simulation, steps_in_kernel);	//avg energy PER PARTICLE in compound
 		for (uint64_t ii = 0; ii < steps_in_kernel; ii++) {
 			uint64_t step = step_offset - 1 + ii;	// -1 because index 0 is unused
-			//average_energy[step] = average_solvent_energy[ii];
-		
-			average_energy[step] = (average_solvent_energy[ii] * simulation->box->n_solvents * 0.f + average_compound_energy[ii] * simulation->total_compound_particles) * (1.f / (simulation->total_particles));
+			average_energy[step] = (average_solvent_energy[ii] * simulation->box->n_solvents + average_compound_energy[ii] * simulation->total_compound_particles) * (1.f / (simulation->total_particles));
 			//printf("avg %f\n", average_energy[step].x);
 			//average_energy[i].print('E');
 		}
 		delete[] average_solvent_energy, average_compound_energy;
-		//delete[] average_solvent_energy;
 	}
 
 
@@ -208,7 +203,7 @@ Analyzer::AnalyzedPackage Analyzer::analyzeEnergy(Simulation* simulation) {	// C
 
 
 	printf("\n########## Finished analyzing energies ##########\n\n");
-	return AnalyzedPackage(average_energy, analysable_steps, simulation->temperature_buffer, simulation->getStep() / STEPS_PER_THERMOSTAT);;
+	return AnalyzedPackage(average_energy, analysable_steps, simulation->temperature_buffer, simulation->n_temp_values);;
 }
 
 Float3* Analyzer::analyzeSolvateEnergy(Simulation* simulation, uint64_t n_steps) {
@@ -221,9 +216,7 @@ Float3* Analyzer::analyzeSolvateEnergy(Simulation* simulation, uint64_t n_steps)
 	for (int i = 0; i < n_steps; i++)
 		average_solvent_energy[i] = Float3(0.f);
 
-	printf("max sols :   %d   blocks %d spare: %d\n", simulation->blocks_per_solventkernel * THREADS_PER_SOLVENTBLOCK, simulation->blocks_per_solventkernel, simulation->blocks_per_solventkernel * THREADS_PER_SOLVENTBLOCK - simulation->n_solvents);
-	//printf("Fix this to do analyzing >256\n");
-	//exit(1);
+	
 	monitorSolventEnergyKernel << < block_dim, THREADS_PER_SOLVENTBLOCK >> > (simulation->box, traj_buffer_device, potE_buffer_device, data_out);
 	cudaDeviceSynchronize();
 	cudaMemcpy(average_solvent_energy_blocked, data_out, sizeof(Float3) * simulation->blocks_per_solventkernel * n_steps, cudaMemcpyDeviceToHost);
@@ -243,7 +236,6 @@ Float3* Analyzer::analyzeSolvateEnergy(Simulation* simulation, uint64_t n_steps)
 	cudaFree(data_out);
 	delete[] average_solvent_energy_blocked;
 	LIMAENG::genericErrorCheck("Cuda error during analyzeSolvateEnergy\n");
-	printf("Did solvate");
 	return average_solvent_energy;
 }
 
@@ -286,7 +278,6 @@ Float3* Analyzer::analyzeCompoundEnergy(Simulation* simulation, uint64_t n_steps
 	cudaFree(data_out);
 	delete[] host_data;
 	LIMAENG::genericErrorCheck("Cuda error during analyzeCompoundEnergy\n");
-	printf("Did compound");
 
 	return average_compound_energy;
 }

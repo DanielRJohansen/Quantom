@@ -138,6 +138,7 @@ public:
 	double* potE_buffer;	// Not really a buffer yet, just one large array that holds full simulation data
 	Float3* traj_buffer;
 	float* temperature_buffer;
+	int n_temp_values = 0;
 	Float3* traindata_buffer;		// Position and force data for all particles, for NN training
 	float* logging_data;				// Used for debugging/logging any values. 10 floats per step!
 
