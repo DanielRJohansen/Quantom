@@ -3,8 +3,8 @@
 
 
 Environment::Environment() {
-	verifySimulationParameters();
 	simulation = new Simulation();
+	verifySimulationParameters();
 
 
 	display = new DisplayV2();
@@ -95,7 +95,7 @@ void Environment::run() {
 	printf("\n\n\n########################## SIMULATION FINISHED ##########################\n\n\n\n");
 
 	if (simulation->finished || simulation->box->critical_error_encountered) {
-		//postRunEvents();
+		postRunEvents();
 	}
 }
 
@@ -103,9 +103,7 @@ void Environment::postRunEvents() {
 	simulation->out_dir += "\\Steps_" + to_string(simulation->getStep()) + "\\";
 	int check = _mkdir(&(simulation->out_dir[0]));
 
-	Analyzer::AnalyzedPackage analyzed_package = analyzer.analyzeEnergy(simulation);
-	dumpToFile(analyzed_package.energy_data, analyzed_package.n_energy_values, simulation->out_dir + "energy.bin");
-	dumpToFile(analyzed_package.temperature_data, analyzed_package.n_temperature_values, simulation->out_dir + "temperature.bin");
+	
 
 	dumpToFile(simulation->logging_data, simulation->n_steps * 10, simulation->out_dir + "logdata.bin");
 
@@ -119,6 +117,10 @@ void Environment::postRunEvents() {
 		simulation->out_dir + "sim_traindata.bin");
 
 
+
+	Analyzer::AnalyzedPackage analyzed_package = analyzer.analyzeEnergy(simulation);
+	dumpToFile(analyzed_package.energy_data, analyzed_package.n_energy_values, simulation->out_dir + "energy.bin");
+	dumpToFile(analyzed_package.temperature_data, analyzed_package.n_temperature_values, simulation->out_dir + "temperature.bin");
 
 #ifndef __linux__
 	string data_processing_command = "C:\\Users\\Daniel\\git_repo\\Quantom\\LIMA_services\\x64\\Debug\\LIMA_services.exe "

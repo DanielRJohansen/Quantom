@@ -432,6 +432,13 @@ struct Compound {
 			particle_global_ids[threadIdx.x] = compound->particle_global_ids[threadIdx.x]; 
 //#endif
 		}
+		else {
+			prev_positions[threadIdx.x] = Float3(-1.f);
+			atom_types[threadIdx.x] = 0;
+			//lj_ignore_list[threadIdx.x] = compound->lj_ignore_list[threadIdx.x];
+			forces[threadIdx.x] = Float3(0.f);
+			particle_global_ids[threadIdx.x] = 0;
+		}
 		for (int i = 0; (i * blockDim.x) < n_singlebonds; i++) {
 			int index = i * blockDim.x + threadIdx.x;
 			if (index < n_singlebonds)

@@ -47,6 +47,7 @@ void DisplayV2::render(Simulation* simulation) {
 #ifdef ENABLE_DISPLAY
     auto start = std::chrono::high_resolution_clock::now();
 
+    //return;
     RenderBall* balls = rasterizer.render(simulation);
     glClear(GL_COLOR_BUFFER_BIT);
 
