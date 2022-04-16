@@ -21,7 +21,7 @@ const string OUT_DIR = "../../Simulation/";
 
 
 
-const int BLOCKS_PER_SOLVENTKERNEL = ceil((float)N_SOLVATE_MOLECULES / (float)THREADS_PER_SOLVENTBLOCK);
+//const int BLOCKS_PER_SOLVENTKERNEL = ceil((float)N_SOLVATE_MOLECULES / (float)THREADS_PER_SOLVENTBLOCK);
 
 
 
@@ -111,10 +111,16 @@ public:
 	__host__ void copyBoxVariables() {
 		n_compounds = box->n_compounds;
 		n_bridges = box->bridge_bundle->n_bridges;
+
+
 		n_solvents = box->n_solvents;
+		blocks_per_solventkernel = ceil((float)n_solvents / (float)THREADS_PER_SOLVENTBLOCK);
+
+
 		compounds_host = new Compound[n_compounds];
 		for (int i = 0; i < n_compounds; i++)
 			compounds_host[i] = box->compounds[i];
+
 	}
 	__host__ void incStep() {
 		step++;
@@ -159,6 +165,9 @@ public:
 	string out_dir = OUT_DIR;
 	
 
+
+	//int blocks_per_solventkernel = ceil((float)n_solvents / (float)THREADS_PER_SOLVENTBLOCK);
+	int blocks_per_solventkernel = 0;
 private:
 	int step = 0;
 

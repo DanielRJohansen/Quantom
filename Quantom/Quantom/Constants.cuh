@@ -42,7 +42,7 @@ const int THREADS_PER_COMPOUNDBLOCK = 128; // Must be >= max comp particles
 const int MAX_COMPOUND_PARTICLES = 128;
 
 
-const int SIMULATION_STEPS = 600;
+const int SIMULATION_STEPS = 6000;
 
 
 
@@ -51,7 +51,7 @@ const int STEPS_PER_NLIST_UPDATE = 200;
 
 
 
-const int STEPS_PER_RENDER = 10;
+const int STEPS_PER_RENDER = 30;
 
 
 // THERMOSTAT PARAMETERS

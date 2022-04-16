@@ -43,7 +43,7 @@ bar(x,log10(y))
 clear 
 clc
 
-workdir = "C:\\PROJECTS\\Quantom\\Simulation\\Steps_600";
+workdir = "C:\\PROJECTS\\Quantom\\Simulation\\Steps_6000";
 file = fopen(strcat(workdir, "\\energy.bin"), "rb");
 energy_data = fread(file, 'single');
 fclose(file);
