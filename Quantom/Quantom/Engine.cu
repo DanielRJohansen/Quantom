@@ -295,23 +295,6 @@ void Engine::offloadLoggingData() {
 	cudaMemcpy(&simulation->traj_buffer[step_offset * simulation->total_particles_upperbound], simulation->box->traj_buffer, sizeof(Float3) * simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER, cudaMemcpyDeviceToHost);
 
 	cudaMemcpy(&simulation->logging_data[step_offset * 10], simulation->box->outdata, sizeof(float) * 10 * STEPS_PER_LOGTRANSFER, cudaMemcpyDeviceToHost);
-
-	for (int i = step_offset * simulation->total_particles_upperbound; i < step_offset * simulation->total_particles_upperbound + simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER; i++) {
-		
-		int p = (int)simulation->total_particles_upperbound;
-		int step = i / (int)simulation->total_particles_upperbound;
-		//int pid = step == 0 ? i : i % step;
-		int pid = i % p;
-
-
-		/*
-		if (simulation->potE_buffer[i] != 0.f)
-			printf("\n%d %d %d boxstep %d  %f\n",i, step, pid, simulation->getStep(), simulation->potE_buffer[i]);
-		if (simulation->potE_buffer[i] != 0)
-			exit(0);
-		*/
-	}
-	//printf("\n\n\n");
 }
 
 void Engine::offloadPositionData() {
@@ -603,6 +586,8 @@ __device__ void calcDihedralbondForces(Float3* pos_left, Float3* pos_lm, Float3*
 	Float3 normal2 = (*pos_lm-*pos_rm).cross((*pos_right-*pos_rm));
 
 
+
+
 	float torsion = Float3::getAngle(normal1, normal2);
 	float error = (torsion - dihedral->phi_0);	// *360.f / 2.f * PI;	// Check whether k_phi is in radians or degrees
 
@@ -610,6 +595,15 @@ __device__ void calcDihedralbondForces(Float3* pos_left, Float3* pos_lm, Float3*
 
 	*potE += 0.5 * dihedral->k_phi * error * error * 0.5;
 	double force_scalar = dihedral->k_phi * (error);
+	if (abs(force_scalar) > 183300) {
+		pos_left->print('L');
+		pos_lm->print('l');
+		pos_rm->print('r');
+		pos_right->print('R');
+		printf("torsion %f      ref %f     error %f     force: %f\n", torsion, dihedral->phi_0, error, force_scalar);
+	}
+		
+
 
 
 	results[0] = normal1 * force_scalar * -1.f;
@@ -897,8 +891,9 @@ __global__ void forceKernel(Box* box) {
 		__syncthreads();
 		force += computePairbondForces(&compound, compound_state.positions, utility_buffer, &potE_sum);
 		force += computeAnglebondForces(&compound, compound_state.positions, utility_buffer, &potE_sum);
+#ifdef ENABLE_DIHEDRALS
 		force += computeDihedralForces(&compound, compound_state.positions, utility_buffer, &potE_sum);
-		
+#endif
 
 		for (int i = 0; i < compound.n_particles; i++) {
 
@@ -940,7 +935,6 @@ __global__ void forceKernel(Box* box) {
 		if (threadIdx.x < compound.n_particles) {
 			force += computerIntermolecularLJForces(&compound_state.positions[threadIdx.x], compound.atom_types[threadIdx.x], &compound.lj_ignore_list[threadIdx.x], &potE_sum, compound.particle_global_ids[threadIdx.x], data_ptr,
 				&box->compounds[neighborcompound_id], utility_buffer, neighborcompound_id);
-
 		}
 		__syncthreads();				// CRITICAL			
 	}
@@ -1179,7 +1173,9 @@ __global__ void compoundBridgeKernel(Box* box) {
 		__syncthreads();	
 		force += computePairbondForces(&bridge, positions, utility_buffer, &potE_sum);
 		force += computeAnglebondForces(&bridge, positions, utility_buffer, &potE_sum);
+#ifdef ENABLE_DIHEDRALS
 		force += computeDihedralForces(&bridge, positions, utility_buffer, &potE_sum);
+#endif
 	}
 	__syncthreads();
 

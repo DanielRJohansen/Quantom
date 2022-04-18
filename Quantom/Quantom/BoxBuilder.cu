@@ -50,6 +50,8 @@ void BoxBuilder::addSingleMolecule(Simulation* simulation, Molecule* molecule) {
 
 	simulation->box->bridge_bundle = new CompoundBridgeBundleCompact;
 	*simulation->box->bridge_bundle = *molecule->compound_bridge_bundle;					// TODO: Breaks if multiple compounds are added, as only one bridgebundle can exist for now!
+
+
 }
 
 void BoxBuilder::addScatteredMolecules(Simulation* simulation, Compound* molecule, int n_copies)

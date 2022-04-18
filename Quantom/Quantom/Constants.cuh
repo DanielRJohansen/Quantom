@@ -11,14 +11,26 @@
 #define ENABLE_WATER
 
 
+//#define ENABLE_DIHEDRALS
 
 
+
+
+
+
+
+
+
+
+
+// Debugging
+const bool print_compound_positions = false;
 
 
 
 // SImulation specifics
 
-constexpr float BOX_LEN = 8.f;		// Must be > twice the len of largest compound
+constexpr float BOX_LEN = 7.f;		// Must be > twice the len of largest compound
 constexpr float BOX_LEN_HALF = BOX_LEN / 2.f;
 
 const int N_SOLVATE_MOLECULES = 2000;	
