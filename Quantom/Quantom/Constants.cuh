@@ -11,7 +11,7 @@
 #define ENABLE_WATER
 
 
-//#define ENABLE_DIHEDRALS
+#define ENABLE_DIHEDRALS
 
 
 
