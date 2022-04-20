@@ -649,9 +649,9 @@ __device__ Float3 computerIntermolecularLJForces(Float3* self_pos, uint8_t atomt
 		
 
 		force += calcLJForce(self_pos, &neighbor_positions[neighborparticle_id], data_ptr, potE_sum,
-			0.15,200,
-	//		(forcefield_device.particle_parameters[atomtype_self].sigma + forcefield_device.particle_parameters[neighborparticle_atomtype].sigma) * 0.5f,
-		//	(forcefield_device.particle_parameters[atomtype_self].epsilon + forcefield_device.particle_parameters[neighborparticle_atomtype].epsilon) * 0.5,
+			//0.15,200,
+			(forcefield_device.particle_parameters[atomtype_self].sigma + forcefield_device.particle_parameters[neighborparticle_atomtype].sigma) * 0.5f,
+			(forcefield_device.particle_parameters[atomtype_self].epsilon + forcefield_device.particle_parameters[neighborparticle_atomtype].epsilon) * 0.5,
 			//atomtype_self, atomtypes_others[i]
 			global_id_self, neighbor_compound->particle_global_ids[neighborparticle_id]
 		);

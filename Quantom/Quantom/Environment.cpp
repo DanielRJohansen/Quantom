@@ -118,7 +118,7 @@ void Environment::postRunEvents() {
 
 	
 
-	dumpToFile(simulation->logging_data, simulation->n_steps * 10, simulation->out_dir + "logdata.bin");
+	dumpToFile(simulation->logging_data, 10 * simulation->getStep(), simulation->out_dir + "logdata.bin");
 
 
 	for (int i = 0; i < simulation->getStep(); i++) {

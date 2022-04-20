@@ -43,7 +43,7 @@ bar(x,log10(y))
 clear 
 clc
 
-workdir = "C:\\PROJECTS\\Quantom\\Simulation\\Steps_6000";
+workdir = "C:\\PROJECTS\\Quantom\\Simulation\\Steps_124606";
 file = fopen(strcat(workdir, "\\energy.bin"), "rb");
 energy_data = fread(file, 'single');
 fclose(file);
@@ -85,7 +85,7 @@ xlabel("time [fs]")
 %label("Kinetic energy")
 
 %xlim([00 2700])
-%ylim([000 20000])
+ylim([-inf 20000])
 
 initial_temperature = kinE(1) * 2/(3*8.3145)
 final_temperature = kinE(length(kinE)) * 2/(3*8.3145)
@@ -96,7 +96,7 @@ hold off
 nexttile
 t = (1:length(temp_data));
 plot(t, temp_data)
-ylim([0 inf])
+%ylim([0 inf])
 title("Temperature")
 ylabel("Temperature [k]")
 xlabel("time [fs]")
@@ -109,7 +109,7 @@ xlabel("time [fs]")
 clear 
 clc
 
-workdir = "C:\\PROJECTS\\Quantom\\Simulation\\Steps_200000";
+workdir = "C:\\PROJECTS\\Quantom\\Simulation\\Steps_124606";
 file = fopen(strcat(workdir, "\\logdata.bin"), "rb");
 data = fread(file, 'single');
 fclose(file);
