@@ -11,7 +11,7 @@
 #define ENABLE_WATER
 
 
-//#define ENABLE_DIHEDRALS
+#define ENABLE_DIHEDRALS
 
 
 
@@ -51,7 +51,7 @@ const int THREADS_PER_SOLVENTBLOCK = 128;	// Must be >= N_SOLVATE_MOLECULES
 const int THREADS_PER_COMPOUNDBLOCK = MAX_COMPOUND_PARTICLES; // Must be >= max comp particles
 
 
-const int SIMULATION_STEPS = 400000;
+const int SIMULATION_STEPS = 350000;
 
 
 
@@ -82,7 +82,7 @@ const int MAX_ATOMS_IN_RESIDUE = 32;
 
 
 // Logging constants
-const int N_DATAGAN_VALUES = 6;
+const int N_DATAGAN_VALUES = 3;
 const int STEPS_PER_TRAINDATATRANSFER = 100;
 
 

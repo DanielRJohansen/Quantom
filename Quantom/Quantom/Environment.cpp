@@ -127,7 +127,7 @@ void Environment::postRunEvents() {
 
 	if (!simulation->box->critical_error_encountered) {
 		dumpToFile(simulation->traindata_buffer,
-			N_DATAGAN_VALUES * MAX_COMPOUND_PARTICLES * simulation->n_compounds * simulation->getStep(),
+			(uint64_t) N_DATAGAN_VALUES * MAX_COMPOUND_PARTICLES * simulation->n_compounds * simulation->getStep(),
 			simulation->out_dir + "sim_traindata.bin");
 	}
 	
@@ -244,10 +244,10 @@ void Environment::makeVirtualTrajectory(string trj_path, string waterforce_path)
 
 
 template <typename T>
-void Environment::dumpToFile(T* data, int n_datapoints, string file_path_s) {	
+void Environment::dumpToFile(T* data, uint64_t n_datapoints, string file_path_s) {	
 	char* file_path;
 	file_path = &file_path_s[0];
-	printf("Writing %.03f MB to binary file ", sizeof(T) * n_datapoints * 1e-6);
+	printf("Writing %.03Lf MB to binary file ", (long double) sizeof(T) * n_datapoints * 1e-6);
 	cout << file_path << endl;
 
 	FILE* file;

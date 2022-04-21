@@ -7,10 +7,16 @@
 using namespace std;
 
 
-const int FLOAT3_PER_ATOM = 6;
+const int FLOAT3_PER_ATOM = 3;
 const int ROW_START = 5000;
 const int MAX_NEIGHBORS_OUT = 128;		// AFter sorting, only nearest x neighbors is printed to the out-file
 //const int MAX_ROW = 1e+3;
+float BOX_LEN = 7.f;
+float BOX_LEN_HALF = BOX_LEN/2.f;
+
+
+
+
 
 
 struct Float3 {
@@ -121,6 +127,12 @@ struct selfcenteredDatapoint {
 	Atom* atoms_relative_tsub2;	// Sorted with closest neighbor first
 };
 
+void applyHyperpos(Float3* static_particle, Float3* movable_particle) {
+	for (int i = 0; i < 3; i++) {
+		*movable_particle->placeAt(i) += BOX_LEN * ((static_particle->at(i) - movable_particle->at(i)) > BOX_LEN_HALF);
+		*movable_particle->placeAt(i) -= BOX_LEN * ((static_particle->at(i) - movable_particle->at(i)) < -BOX_LEN_HALF);	// use at not X!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	}
+}
 
 Atom* merge(const Atom* left, int n_left, const Atom* right, int n_right) {
 	Atom* merged = new Atom[n_left + n_right];
@@ -201,6 +213,8 @@ void makePositionsRelative(Atom* atoms, int atom_id, int particles_per_step) {
 	for (int i = 0; i < particles_per_step; i++) {
 		if (i == atom_id)
 			continue;
+
+		applyHyperpos(&atoms[atom_id].pos, &atoms[i].pos);
 		atoms[i].pos = atoms[i].pos - atoms[atom_id].pos;
 		atoms[i].euclidean_dist = atoms[i].pos.len();
 	}
@@ -242,8 +256,9 @@ void readDataBIN(Row* rows, string path, int N_STEPS, int particles_per_step) {
 	FILE* file;
 	fopen_s(&file, file_path, "rb");
 
-	int f3_per_particle = 6;
-	int n_f3s = N_STEPS * particles_per_step * f3_per_particle;
+	
+	uint64_t n_f3s = N_STEPS * particles_per_step * FLOAT3_PER_ATOM;
+	printf("Allocating data-buffer of size %.2Lf GB\n", (long double)n_f3s * sizeof(Float3) * 1e-9);
 	Float3* buffer = new Float3[n_f3s];
 	fread(buffer, sizeof(Float3), n_f3s, file);
 	fclose(file);
@@ -254,7 +269,7 @@ void readDataBIN(Row* rows, string path, int N_STEPS, int particles_per_step) {
 			printf("\rReading row %d", step);
 
 		for (int p = 0; p < particles_per_step; p++) {			
-			int buffer_index = p * f3_per_particle + step * particles_per_step * f3_per_particle;
+			uint64_t buffer_index = p * FLOAT3_PER_ATOM + step * particles_per_step * FLOAT3_PER_ATOM;
 
 			rows[step].atoms[p] = Atom(p, buffer[buffer_index + 0], buffer[buffer_index + 1]);	// Need of way of determining whether a particle exists, or is in the buffer!!!!!!!!!!!!!!!!!!!!!
 		}
@@ -395,8 +410,9 @@ int main(int argc, char** argv) {
 	}
 
 	//string workdir = "D:\\Quantom\LIMANET\sim_out";
-	string workdir = "C:\\PROJECTS\\Quantom\\Simulation\\Steps_200000\\";
-	int N_STEPS = 200000;	// Determines file to read
+	int N_STEPS = 350000;	// Determines file to read
+	string workdir = "C:\\PROJECTS\\Quantom\\Simulation\\Steps_" + to_string(N_STEPS) + "\\";
+	
 	bool shuffle_time_dim = false;
 	int n_compounds = 13;
 	int particles_per_compound = 128;
@@ -422,7 +438,7 @@ int main(int argc, char** argv) {
 
 
 
-	printf("Allocating %.03f GB of RAM\n", sizeof(Atom) * particles_per_step * N_STEPS * 3 * 1e-9);	// Gives approx size 3 = 1 in row, 2 in scdp
+	printf("Allocating %.02Lf GB of RAM\n", (long double) sizeof(Atom) * particles_per_step * N_STEPS * 3 * 1e-9);	// Gives approx size 3 = 1 in row, 2 in scdp
 	Row* rows = new Row[N_STEPS];
 	for (int i = 0; i < N_STEPS; i++)
 		rows[i] = Row(particles_per_step);

@@ -74,7 +74,7 @@ private:
 
 	// These should be in interface maybe?
 	template <typename T>
-	void dumpToFile(T* data, int n_datapoints, string file_path);
+	void dumpToFile(T* data, uint64_t n_datapoints, string file_path);
 
 
 

@@ -100,13 +100,14 @@ struct AngleBond {
 struct DihedralBond {
 	DihedralBond() {}
 	//DihedralBond(float phi_0, float k_phi) : phi_0(phi_0), k_phi(k_phi) {}
-	DihedralBond(int id1, int id2, int id3, int id4, float phi_0, float k_phi) : phi_0(phi_0), k_phi(k_phi) {
+	DihedralBond(int id1, int id2, int id3, int id4, float phi_0, float k_phi, int n) : phi_0(phi_0), k_phi(k_phi), n(n) {
 		atom_indexes[0] = id1;
 		atom_indexes[1] = id2;
 		atom_indexes[2] = id3;
 		atom_indexes[3] = id4;
 	}
 	float phi_0, k_phi;
+	uint8_t n;
 	uint32_t atom_indexes[4];
 	const static int n_atoms = 4;
 };

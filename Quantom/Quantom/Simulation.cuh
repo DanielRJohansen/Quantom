@@ -126,7 +126,7 @@ public:
 		step++;
 		box->step++;
 	}
-	__host__ inline int getStep() {
+	__host__ inline uint64_t getStep() {
 		return step;
 	}
 	~Simulation() {}
@@ -170,7 +170,7 @@ public:
 	//int blocks_per_solventkernel = ceil((float)n_solvents / (float)THREADS_PER_SOLVENTBLOCK);
 	int blocks_per_solventkernel = 0;
 private:
-	int step = 0;
+	uint64_t step = 0;
 
 
 };
