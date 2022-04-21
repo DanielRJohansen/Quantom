@@ -210,12 +210,12 @@ public:
 
 
 		file << FFOutHelpers::titleH2("Dihedrals");
-		file << FFOutHelpers::titleH3("{Atom IDs \t Atomtypes \t phi_0 [rad] \t k_phi [J/(mol * rad^2)]}");
+		file << FFOutHelpers::titleH3("{Atom IDs \t Atomtypes \t phi_0 [rad] \t k_phi [J/(mol * rad^2)] \t n}");
 		file << FFOutHelpers::parserTitle("dihedrals");
 		for (Dihedraltype dihedral : dihedrals) {
 			file << to_string(dihedral.id1) << ';' << to_string(dihedral.id2) << ';' << to_string(dihedral.id3) << ';' << to_string(dihedral.id4) << ';'
 				<< dihedral.type1 << ';' << dihedral.type2 << ';' << dihedral.type3 << ';' << dihedral.type4 << ';'
-				<< to_string(dihedral.phi0) << ';' << to_string(dihedral.kphi) << endl;
+				<< to_string(dihedral.phi0) << ';' << to_string(dihedral.kphi) << ';' << to_string(dihedral.n) << endl;
 		}
 		file << FFOutHelpers::endBlock();
 
@@ -273,10 +273,10 @@ public:
 
 
 		file << FFOutHelpers::titleH2("Dihedraltype parameters");
-		file << FFOutHelpers::titleH3("{atom_types \t phi_0 [rad] \t k_phi [J/(mol)] **i am not sure k_phi is correct unit** \t }");
+		file << FFOutHelpers::titleH3("{atom_types \t phi_0 [rad] \t k_phi [J/(mol)] \t n}");
 		file << FFOutHelpers::parserTitle("ff_dihedraltypes");
 		for (Dihedraltype dihedral : dihedraltypes) {
-			file << dihedral.type1 << ';' << dihedral.type2 << ';' << dihedral.type3 << ';' << dihedral.type4 << ';' << to_string(dihedral.phi0) << ';' << to_string(dihedral.kphi) << endl;
+			file << dihedral.type1 << ';' << dihedral.type2 << ';' << dihedral.type3 << ';' << dihedral.type4 << ';' << to_string(dihedral.phi0) << ';' << to_string(dihedral.kphi) << ';' << to_string(dihedral.n) << endl;
 		}
 		file << FFOutHelpers::endBlock();
 

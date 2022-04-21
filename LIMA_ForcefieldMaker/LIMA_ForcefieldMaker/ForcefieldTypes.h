@@ -690,7 +690,7 @@ struct Dihedraltype {
 	Dihedraltype(string t1, string t2, string t3, string t4) : type1(t1), type2(t2), type3(t3), type4(t4) {
 		sort();
 	}
-	Dihedraltype(string t1, string t2, string t3, string t4, float phi0, float kphi) : type1(t1), type2(t2), type3(t3), type4(t4), phi0(phi0), kphi(kphi) {
+	Dihedraltype(string t1, string t2, string t3, string t4, float phi0, float kphi, int n) : type1(t1), type2(t2), type3(t3), type4(t4), phi0(phi0), kphi(kphi), n(n) {
 		sort();
 	}
 	Dihedraltype(int id1, int id2, int id3, int id4) : id1(id1), id2(id2), id3(id3), id4(id4) {
@@ -700,6 +700,7 @@ struct Dihedraltype {
 	int id1, id2, id3, id4;			// bonds from .top only has these values! 
 	float phi0;
 	float kphi;
+	int n;
 
 
 	void flip() {
@@ -737,7 +738,7 @@ struct Dihedraltype {
 
 			switch (current_state) {
 			case FTHelpers::FF_DIHEDRALTYPES:
-				dihedraltypes.push_back(Dihedraltype(row[0], row[1], row[2], row[3], stof(row[4]), stof(row[5])));
+				dihedraltypes.push_back(Dihedraltype(row[0], row[1], row[2], row[3], stof(row[4]), stof(row[5]), stoi(row[6])));
 				break;
 			default:
 				break;
@@ -830,6 +831,7 @@ struct Dihedraltype {
 
 			dihedral->phi0 = appropriateForcefield.phi0;
 			dihedral->kphi = appropriateForcefield.kphi;
+			dihedral->n = appropriateForcefield.n;
 		}
 		printf("\n");
 	}

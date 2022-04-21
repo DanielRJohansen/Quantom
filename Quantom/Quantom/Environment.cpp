@@ -125,9 +125,12 @@ void Environment::postRunEvents() {
 		//simulation->traindata_buffer[0 + i * N_DATAGAN_VALUES * MAX_COMPOUND_PARTICLES * simulation->n_compounds].print();
 	}
 
-	dumpToFile(simulation->traindata_buffer,
-		N_DATAGAN_VALUES * MAX_COMPOUND_PARTICLES * simulation->n_compounds * simulation->getStep(),
-		simulation->out_dir + "sim_traindata.bin");
+	if (!simulation->box->critical_error_encountered) {
+		dumpToFile(simulation->traindata_buffer,
+			N_DATAGAN_VALUES * MAX_COMPOUND_PARTICLES * simulation->n_compounds * simulation->getStep(),
+			simulation->out_dir + "sim_traindata.bin");
+	}
+	
 
 	printf("temp %f \n", simulation->temperature_buffer[0]);
 
@@ -138,6 +141,8 @@ void Environment::postRunEvents() {
 	printf("temp %f %f\n", analyzed_package.temperature_data[0], analyzed_package.temperature_data[analyzed_package.n_temperature_values - 1]);
 
 #ifndef __linux__
+	if (simulation->box->critical_error_encountered) return;
+
 	string data_processing_command = "C:\\Users\\Daniel\\git_repo\\Quantom\\LIMA_services\\x64\\Debug\\LIMA_services.exe "
 		+ simulation->out_dir + " "
 		+ to_string(simulation->getStep()) + " "

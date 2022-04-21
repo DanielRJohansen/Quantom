@@ -179,7 +179,7 @@ hold off
 
 %% Torsion force
 
-phi = [-3.314:0.01:3.14];
+phi = [-3.14:0.01:3.14];
 
 k = 7696.720215;
 ref = 0;
@@ -187,18 +187,20 @@ ref = 0;
 a = k*(cos(1*phi-ref)+1);
 b = k*(cos(2*phi-ref)+1);
 c = k*(cos(3*phi-ref)+1);
-d = a+b+c;
-dd = -k*(sin(phi-ref) + 2.*sin(2.*phi-ref)*2 + 3.*sin(3.*phi-ref)*3);
+d = k*(cos(4*phi-ref)+1);
+P = a+b+c;
+F = -k*(sin(phi-ref) + sin(2.*phi-ref)*2 + sin(3.*phi-ref)*3);
 
 
 %plot(phi, a)
 
 %plot(phi, b)
 %plot(phi, c)
-plot(phi, d)
+plot(phi, P)
 hold on
-plot(phi, dd)
+plot(phi, F)
 grid 
+hold off
 %% LJ plot
 clc
 sigma = 0.3923;

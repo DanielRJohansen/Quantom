@@ -160,7 +160,8 @@ private:
 					row[2],
 					row[3],
 					stof(row[6]) * 2 * 3.1415f / 360.f,					// convert degress to rads
-					stof(row[4]) * 4183.f							// convert kcal/(mol) to J/(mol)			// Shouldn't this be per rad^2?????
+					stof(row[4]) * 4183.f,							// convert kcal/(mol) to J/(mol)			// Shouldn't this be per rad^2?????
+					stoi(row[5])
 				);
 				if (isDuplicate(dihedraltype, ff_dihedraltypes))
 					continue;

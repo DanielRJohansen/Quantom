@@ -11,13 +11,7 @@
 #define ENABLE_WATER
 
 
-#define ENABLE_DIHEDRALS
-
-
-
-
-
-
+//#define ENABLE_DIHEDRALS
 
 
 
@@ -49,9 +43,12 @@ constexpr float CUTOFF = 1.f;	//nm/
 
 
 // OPTIMIZATION PARAMETERS
-const int THREADS_PER_SOLVENTBLOCK = 128;	// Must be >= N_SOLVATE_MOLECULES
-const int THREADS_PER_COMPOUNDBLOCK = 128; // Must be >= max comp particles
 const int MAX_COMPOUND_PARTICLES = 128;
+
+
+
+const int THREADS_PER_SOLVENTBLOCK = 128;	// Must be >= N_SOLVATE_MOLECULES
+const int THREADS_PER_COMPOUNDBLOCK = MAX_COMPOUND_PARTICLES; // Must be >= max comp particles
 
 
 const int SIMULATION_STEPS = 400000;
@@ -67,9 +64,9 @@ const int STEPS_PER_RENDER = 100;
 
 
 // THERMOSTAT PARAMETERS
-const int STEPS_PER_LOGTRANSFER = 50;
+const int STEPS_PER_LOGTRANSFER = 10;
 //const int STEPS_PER_TRAJTRANSFER = 100;
-const int STEPS_PER_THERMOSTAT = 50;
+const int STEPS_PER_THERMOSTAT = 100;
 const bool ENABLE_BOXTEMP = true;
 const bool APPLY_THERMOSTAT = true;										// Switch to using forcefield_host first
 const bool PRINT_TEMP = false;
