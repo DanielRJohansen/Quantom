@@ -17,7 +17,9 @@ import torch
 if __name__ == '__main__':
 
     workdir = "C:\\PROJECTS\\Quantom\\Simulation\\Steps_350000\\"
-    data_filepath = workdir + "traindata.bin"
+    #data_filepath = workdir + "traindata.bin"
+    data_filepath = workdir + "traindata_queries10.bin"
+
 
     neighbors_per_row = 32                  # in dataset
 
@@ -25,7 +27,7 @@ if __name__ == '__main__':
     n_bins = 8
 
     #dataloader = WaterforceDataloader(data_filepath, neighbors_per_row,batch_size=256, nearest_n_atoms=n_neighbors, prepper_id=2)
-    dataloader = WaterforceDataloader(data_filepath, neighbors_per_row, batch_size=1024, nearest_n_atoms=n_neighbors, prepper_id=4, bins=n_bins)
+    dataloader = WaterforceDataloader(data_filepath, neighbors_per_row, batch_size=1024, nearest_n_atoms=n_neighbors, prepper_id=4, bins=n_bins, n_queries=10)
 
 #    model = LIMADNN1(n_neighbors=n_neighbors)
  #   model = LIMADNN2(n_neighbors=n_neighbors)
