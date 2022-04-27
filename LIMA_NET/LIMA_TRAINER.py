@@ -34,7 +34,7 @@ class Trainer():
 
             print("Epoch ", e, " train-loss: ", train_loss_hist[-1], " val-loss: ", val_loss_hist[-1], " mean accuracy: ", val_acc_hist[-1], " time: ", time()-t0)
         
-        
+        self.net.visualizePredictions()
         self.makePlot(train_loss_hist, train_acc_hist, val_loss_hist, val_acc_hist, n_epochs)
         
         
@@ -50,11 +50,15 @@ class Trainer():
         plt.title("Training - " + str(self.n_neighbors) + " neighbors - "
                   + str(self.net.total_params) + " parameters")
         plt.grid()
-        plt.ylim(0,3)
+       # plt.ylim(0,3)
 
         plt.savefig(self.working_folder + "\\train_plot_"+str(self.n_neighbors)+"N.png")
         plt.show()
         
+
+
+
+
 
 
 

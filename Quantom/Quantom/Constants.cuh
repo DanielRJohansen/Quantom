@@ -51,7 +51,7 @@ const int THREADS_PER_SOLVENTBLOCK = 128;	// Must be >= N_SOLVATE_MOLECULES
 const int THREADS_PER_COMPOUNDBLOCK = MAX_COMPOUND_PARTICLES; // Must be >= max comp particles
 
 
-const int SIMULATION_STEPS = 350000;
+const int SIMULATION_STEPS = 5000;
 
 
 

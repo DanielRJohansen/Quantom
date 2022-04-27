@@ -889,7 +889,7 @@ __global__ void forceKernel(Box* box) {
 	
 	//Float3 force(0.f);
 	Float3 force = compound.forces[threadIdx.x];
-	Float3 force_LJ_sol;
+	Float3 force_LJ_sol(-1.f);
 	// ------------------------------------------------------------ Intramolecular Operations ------------------------------------------------------------ //
 	{
 
@@ -1021,6 +1021,9 @@ __global__ void forceKernel(Box* box) {
 		int particle_offset = threadIdx.x * N_DATAGAN_VALUES;
 		box->data_GAN[0 + particle_offset + compound_offset + step_offset] = compound_state.positions[threadIdx.x];
 		box->data_GAN[1 + particle_offset + compound_offset + step_offset] = force_LJ_sol;
+
+		if (threadIdx.x >= compound.n_particles)
+			box->data_GAN[0 + particle_offset + compound_offset + step_offset] = Float3(-1.f);
 //		box->data_GAN[1 + threadIdx.x * 6 + step_offset] = force_bond + force_angle;
 //		box->data_GAN[2 + threadIdx.x * 6 + step_offset] = force_LJ_com;
 //		box->data_GAN[3 + threadIdx.x * 6 + step_offset] = force_LJ_sol;

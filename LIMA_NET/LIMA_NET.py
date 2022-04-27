@@ -1,24 +1,32 @@
+import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import math
-import numpy as nn
+import numpy as np
 
 class LIMANET():
-    def __init__(self, model, inputsize, dataloader):
+    def __init__(self, model, inputsize, dataloader, lr=0.0001):
         self.model = model
 
         self.dataloader = dataloader
         self.trainloader = dataloader.trainloader
         self.valloader = dataloader.valloader
 
+        self.bin_means = dataloader.bin_means
+
         #self.loss = self.calcLoss()
         #self.loss = torch.nn.MSELoss()
         #self.loss = torch.nn.L1Loss()
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.0001)
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=lr)
+        #self.optimizer = torch.optim.SGD(self.model.parameters(), lr=0.001)
 
-        self.loss = self.calcLoss1
+        self.loss = self.calcLoss4
+        self.accuracy = self.calcAccuracy2
 
+        self.BCE = nn.BCELoss()
+        #self.MSE = nn.MSELoss()
+        #self.loss = nn.MSELoss()
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         print(self.device)
 
@@ -29,25 +37,25 @@ class LIMANET():
         print("Total parameters: ", self.total_params)
 
 
+
+
+
     def train_one_epoch(self):
         #self.model.train()
 
         epoch_loss = 0
         for i, data in enumerate(self.trainloader):
             inputs, labels = data
+            labels = labels[:, 3:]
             inputs = inputs.to(self.device)
             labels = labels.to(self.device)
 
             self.optimizer.zero_grad()
 
             preds, bases = self.model(inputs)
-            #loss = self.loss(outputs, labels)
-            #loss = self.calcLoss(preds, bases, labels)
+
             loss = self.loss(preds, bases, labels)
-
-
             loss.backward()
-
             self.optimizer.step()
 
             epoch_loss += loss.item()
@@ -64,6 +72,7 @@ class LIMANET():
         acc_total = 0
         for i, data in enumerate(self.valloader):
             inputs, labels = data
+            labels = labels[:,3:]
             inputs = inputs.to(self.device)
             labels = labels.to(self.device)
 
@@ -72,7 +81,8 @@ class LIMANET():
             #loss = self.calcLoss(pred, base, labels)
             loss = self.loss(pred, base, labels)
             loss_total += loss.item()
-            acc = self.calcAccuracy(pred, base, labels)
+            acc = self.accuracy(pred, base, labels)
+
             acc_total += acc.item()
 
         loss_avg = (loss_total-loss.item()) / (len(self.valloader)-1)  # Remove the last batch, as it might not be full size
@@ -116,20 +126,43 @@ class LIMANET():
         euclidean_errors = self.calcEuclideanError(predictions, labels)
         mean_err = torch.mean(euclidean_errors)
 
-
         return mean_err
 
     def calcLoss3(self, predictions, base, labels):
-        euclidean_errors = self.calcEuclideanError(predictions, labels)
-        scalars = self.calcLossScalars(base, labels)
-        scaled_errors = euclidean_errors.div(scalars)
+        return self.MSE(predictions, labels)
 
-        errors = scaled_errors.add(1)
+    def calcWeightedMean(self, x, weights):
+        if torch.sum(weights == 0):
+            print("Weights equal 0")
+        return torch.mean(x*weights)/torch.sum(weights)
 
-        log_error = torch.log10(errors)
-        mean_err = torch.mean(log_error)
+    def calcWeightedVariance(self, x, mean, weights):
+        return torch.sum( torch.square(x-mean) * weights ) / torch.sum(weights)
 
-        return mean_err
+    def calcVariances(self, pred, labels):
+        labels = labels[:, 0]
+        vars = []
+
+        for i in range(pred.shape[1]):
+            #mean = self.calcWeightedMean(labels, pred[:,i])
+            mean = self.bin_means[i]
+            var = self.calcWeightedVariance(labels, mean, pred[:,i])
+            vars.append(var)
+
+        vars = torch.stack(vars)
+        vars = torch.nan_to_num_(vars)
+
+        return vars
+
+
+    def calcLoss4(self, pred, base, labels):
+        return self.BCE(pred, labels)
+
+        #variances = self.calcVariances(pred, labels)
+        #return torch.sum(variances)
+
+        #return torch.sum(torch.square(variances))
+
 
     def calcAccuracy(self, predictions, base, labels):
         euclidean_errors = self.calcEuclideanError(predictions, labels)
@@ -146,9 +179,70 @@ class LIMANET():
         mean_acc = torch.mean(bounded_acc)
         return mean_acc
 
+    def calcAccuracy2(self, pred, base, labels):
+        return torch.tensor(1)
+
+        #variances = self.calcVariances(pred, labels)
+        #return torch.mean(variances)
+
+
     def saveModel(self, working_folder):
         path = working_folder + "model.pt"
         torch.save(self.model, path)
+
+
+    def getBinnedForces(self, dataloader):
+        labels_all = []
+        predictions_all = []
+
+        for i, data in enumerate(dataloader):
+            inputs, labels = data
+            labels = labels[:, 0]
+            inputs = inputs.to(self.device)
+            labels = labels.to(self.device)
+
+            pred, base = self.model(inputs)
+
+            labels_all.append(labels)
+            predictions_all.append(pred)
+
+        # labels_all = torch.cat(labels_all)[:,0]
+        labels_all = torch.cat(labels_all)
+        predictions_all = torch.cat(predictions_all, dim=0)
+
+        predictions = torch.argmax(predictions_all, dim=1)
+
+        forces = []
+        for i in range(predictions_all.shape[1]):
+            forces.append(labels_all[torch.where(predictions == i)].cpu().numpy())
+
+        return forces
+
+    def visualizePredictions(self):
+
+        force_bins_training = self.getBinnedForces(self.trainloader)
+        force_bins_validation = self.getBinnedForces(self.valloader)
+
+
+        plt.figure()
+
+        for i in range(len(force_bins_training)):
+            plt.subplot(211)
+            plt.hist(force_bins_training[i], bins=10, histtype='step')
+            plt.yscale('log')
+            plt.title("Training data")
+            plt.subplot(212)
+            plt.hist(force_bins_validation[i], bins=10, histtype='step')
+            plt.yscale('log')
+            plt.title("Validation data")
+
+
+        plt.show()
+
+
+
+
+
 
 
 

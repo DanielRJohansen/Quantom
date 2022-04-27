@@ -8,8 +8,8 @@ using namespace std;
 
 
 const int FLOAT3_PER_ATOM = 3;
-const int ROW_START = 5000;
-const int MAX_NEIGHBORS_OUT = 128;		// AFter sorting, only nearest x neighbors is printed to the out-file
+const int ROW_START = 500;
+const int MAX_NEIGHBORS_OUT = 32;		// AFter sorting, only nearest x neighbors is printed to the out-file
 //const int MAX_ROW = 1e+3;
 float BOX_LEN = 7.f;
 float BOX_LEN_HALF = BOX_LEN/2.f;
@@ -410,7 +410,7 @@ int main(int argc, char** argv) {
 	}
 
 	//string workdir = "D:\\Quantom\LIMANET\sim_out";
-	int N_STEPS = 350000;	// Determines file to read
+	int N_STEPS = 5000;	// Determines file to read
 	string workdir = "C:\\PROJECTS\\Quantom\\Simulation\\Steps_" + to_string(N_STEPS) + "\\";
 	
 	bool shuffle_time_dim = false;

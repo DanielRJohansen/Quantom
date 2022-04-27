@@ -2,19 +2,107 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+def makeBlock(inputs, outputs, size):
+    return nn.Sequential(
+        nn.Linear(inputs, size),
+        nn.ReLU(),
+        nn.Linear(size, size),
+        nn.ReLU(),
+        nn.Linear(size, outputs),
+    )
+
+
+class LIMADNN4(nn.Module):
+    def __init__(self, n_neighbors, n_bins):
+        super(LIMADNN4, self).__init__()
+
+        self.n_neighbors = n_neighbors
+
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+        self.out_bins = n_bins
+        self.block = makeBlock((self.n_neighbors) * 3, self.out_bins, 128)
+
+
+
+
+    def forward(self, x):
+
+        x = x.view(x.shape[0], x.shape[1]*x.shape[2])
+        out = self.block(x)
+        out = F.softmax(out, dim=1)
+        return out, 1           # return 1 because loss expects a "base"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class LIMADNN3(nn.Module):
+    def __init__(self, n_neighbors):
+        super(LIMADNN3, self).__init__()
+
+        self.n_neighbors = n_neighbors
+        self.forward = self.__forward
+
+
+
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+        self.state_size = 16
+        self.block = makeBlock((self.n_neighbors+1)*12, 3, 32)
+
+
+
+    def __forward(self, x):
+        force_prev = x[:, 0, 6:9]
+        forcechange_prev = x[:, 0, 9:12]
+
+        x = x.view(x.shape[0], x.shape[1]*x.shape[2])
+
+        change_pred = self.block(x)
+
+
+        #change_pred = self.out_layer(x)
+        out = force_prev.add(forcechange_prev.mul(change_pred))
+
+        #out = self.out_layer(x)
+        #out = out.add(force_prev)
+
+
+
+        return out, force_prev+forcechange_prev
+
+
+
+
+
+
+
 
 
 
 def makeAtomBlock(inputs, outputs):
     return nn.Sequential(
             nn.Linear(inputs, 16),
-            #nn.BatchNorm1d(32),
+            #nn.BatchNorm1d(),
             nn.ReLU(),
-            #nn.Linear(32, 32),
-            #nn.ReLU(),
-            #nn.Linear(32, 16),
+            nn.Linear(16, 16),
+            nn.ReLU(),
+            nn.Linear(16, 32),
+            nn.ReLU(),
+            nn.Linear(32, 16),
             # nn.BatchNorm1d(16),
-            #nn.ReLU(),
+            nn.ReLU(),
             nn.Linear(16, outputs),
             nn.ReLU()
         )
@@ -44,7 +132,10 @@ class LIMADNN2(nn.Module):
         self.out_layer = nn.Linear(self.state_size, 3)
 
     def __forward(self, x):
+        print(x.shape)
+        exit()
         force_prev = x[:, 0, 6:9]
+        forcechange_prev = x[:, 0, 9:12]
 
         #state = self.query_atom_block(x[:,0,:])
         queryblock_out = self.atom_block(x[:,0,:])
@@ -60,7 +151,7 @@ class LIMADNN2(nn.Module):
 
         out = self.out_layer(state)
 
-        return out, force_prev
+        return out, force_prev+forcechange_prev
 
     def __forward0neighbors(self, x):
         zeroes = torch.zeros((x.shape[0], 6), dtype=torch.float32).to(self.device)
