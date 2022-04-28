@@ -60,7 +60,7 @@ def prepData4(input_data, nearest_n_atoms):
 
 
 class WaterforceDataloader():
-    def __init__(self, data_filepath, neighbors_per_row, nearest_n_atoms=128, batch_size=64, prepper_id=0, bins=16, n_queries=1):
+    def __init__(self, data_filepath, neighbors_per_row, nearest_n_atoms=128, batch_size=64, prepper_id=0, bins=16):
         preppers = [prepData1, prepData2, prepData3, prepData4]
         data_prepper = preppers[prepper_id-1]
 

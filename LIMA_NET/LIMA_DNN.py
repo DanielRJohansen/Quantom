@@ -4,10 +4,10 @@ import torch.nn.functional as F
 
 def makeBlock(inputs, outputs, size):
     return nn.Sequential(
+        nn.BatchNorm1d(inputs),
         nn.Linear(inputs, size),
         nn.ReLU(),
-        nn.Linear(size, size),
-        nn.ReLU(),
+
         nn.Linear(size, outputs),
     )
 
@@ -21,7 +21,7 @@ class LIMADNN4(nn.Module):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
         self.out_bins = n_bins
-        self.block = makeBlock((self.n_neighbors) * 3, self.out_bins, 128)
+        self.block = makeBlock((self.n_neighbors) * 3, self.out_bins, 64)
 
 
 

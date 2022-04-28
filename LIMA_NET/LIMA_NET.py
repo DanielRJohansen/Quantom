@@ -180,7 +180,7 @@ class LIMANET():
         return mean_acc
 
     def calcAccuracy2(self, pred, base, labels):
-        return torch.tensor(1)
+        return torch.tensor(0)
 
         #variances = self.calcVariances(pred, labels)
         #return torch.mean(variances)
@@ -228,11 +228,11 @@ class LIMANET():
 
         for i in range(len(force_bins_training)):
             plt.subplot(211)
-            plt.hist(force_bins_training[i], bins=10, histtype='step')
+            plt.hist(force_bins_training[i], bins=8, histtype='step')
             plt.yscale('log')
             plt.title("Training data")
             plt.subplot(212)
-            plt.hist(force_bins_validation[i], bins=10, histtype='step')
+            plt.hist(force_bins_validation[i], bins=8, histtype='step')
             plt.yscale('log')
             plt.title("Validation data")
 

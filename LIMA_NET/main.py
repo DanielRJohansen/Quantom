@@ -18,16 +18,16 @@ if __name__ == '__main__':
 
     workdir = "C:\\PROJECTS\\Quantom\\Simulation\\Steps_350000\\"
     #data_filepath = workdir + "traindata.bin"
-    data_filepath = workdir + "traindata_queries10.bin"
+    data_filepath = workdir + "traindata_queries30.bin"
 
 
     neighbors_per_row = 32                  # in dataset
 
     n_neighbors = 16                        # To train with
-    n_bins = 8
+    n_bins = 32
 
     #dataloader = WaterforceDataloader(data_filepath, neighbors_per_row,batch_size=256, nearest_n_atoms=n_neighbors, prepper_id=2)
-    dataloader = WaterforceDataloader(data_filepath, neighbors_per_row, batch_size=1024, nearest_n_atoms=n_neighbors, prepper_id=4, bins=n_bins, n_queries=10)
+    dataloader = WaterforceDataloader(data_filepath, neighbors_per_row, batch_size=512, nearest_n_atoms=n_neighbors, prepper_id=4, bins=n_bins)
 
 #    model = LIMADNN1(n_neighbors=n_neighbors)
  #   model = LIMADNN2(n_neighbors=n_neighbors)
@@ -38,4 +38,4 @@ if __name__ == '__main__':
 
     trainer = Trainer(net, workdir, n_neighbors=n_neighbors)
 
-    trainer.train(100)
+    trainer.train(50)

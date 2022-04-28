@@ -299,7 +299,7 @@ void readDataBIN(Row* rows, string path, int N_STEPS, int particles_per_step) {
 
 
 
-void appendToBuffer(selfcenteredDatapoint* scdp, int n_datapoints, int particles_per_datapoint, int max_neighbors, Float3* buffer) {
+void appendToBuffer(selfcenteredDatapoint* scdp, int particles_per_datapoint, int max_neighbors, Float3* buffer) {
 	//int lines_to_print = 0;
 	//Float3* buffer = new Float3[n_datapoints * 2 * (1 + particles_per_datapoint)];	// Times 10 just to be safe
 	
@@ -524,45 +524,48 @@ int main(int argc, char** argv) {
 
 
 	int spacing = 2;
-	int n_queries = 10;
-	uint64_t datapoints_per_query = ceil((double)N_STEPS - (double)ROW_START) / (double)spacing;
-	uint64_t total_datapoints = datapoints_per_query * n_queries;
+	int n_queries = 30;
+	//uint64_t datapoints_per_query = ceil((double)N_STEPS - (double)ROW_START) / (double)spacing;
+	//uint64_t total_datapoints = datapoints_per_query * n_queries;
 	int f3_per_datapoint = 4 + 4 * MAX_NEIGHBORS_OUT;
+	uint64_t steps_total_out = ceil((double)N_STEPS - (double)ROW_START) / (double)spacing;
+	uint64_t f3_per_step = f3_per_datapoint * n_queries;
+	uint64_t f3_total = steps_total_out * f3_per_step;
 
 
-	uint64_t f3_per_query = f3_per_datapoint * datapoints_per_query;
+	//uint64_t f3_per_query = f3_per_datapoint * datapoints_per_query;
 
 
-	printf("Allocating %.02Lf GB of RAM for out-buffer\n", (long double)sizeof(Float3) * total_datapoints * f3_per_datapoint * 1e-9);	// Gives approx size 3 = 1 in row, 2 in scdp
-	Float3* buffer = new Float3[total_datapoints * f3_per_datapoint];	// Times 10 just to be safe
+	//printf("Allocating %.02Lf GB of RAM for out-buffer\n", (long double)sizeof(Float3) * total_datapoints * f3_per_datapoint * 1e-9);	// Gives approx size 3 = 1 in row, 2 in scdp
+	printf("Allocating %.02Lf GB of RAM for out-buffer\n", (long double)sizeof(Float3) * steps_total_out * f3_per_step * 1e-9);	// Gives approx size 3 = 1 in row, 2 in scdp
+	Float3* buffer = new Float3[steps_total_out * f3_per_step];	// Times 10 just to be safe
 
-	for (int query_id = 0; query_id < n_queries; query_id++) {
-		int step_index = 0;
+	int step_index = 0;
+	for (int row = ROW_START; row < N_STEPS; row += spacing) {
+		if (!((row - ROW_START) % 100))
+			printf("\rProcessing datapoint at row %07d", row);
 
-		for (int row = ROW_START; row < N_STEPS; row += spacing) {
-			if (!((row - ROW_START) % 100))
-				printf("\rProcessing datapoint for query atom %04d at row %07d", query_id, row);
+		for (int query_id = 0; query_id < n_queries; query_id++) {
+			
 			selfcenteredDatapoint scdp = makeDatapoint(rows, query_id, row, particles_per_step);
 
-			uint64_t buffer_index = query_id * f3_per_query + step_index * f3_per_datapoint;
-			appendToBuffer(&scdp, datapoints_per_query, particles_per_step, MAX_NEIGHBORS_OUT, &buffer[buffer_index]);
+			//uint64_t buffer_index = query_id * f3_per_query + step_index * f3_per_datapoint;
+
+			uint64_t buffer_index = query_id * f3_per_datapoint + step_index * f3_per_step;
+
+			//printf("Buffer_in")
+			appendToBuffer(&scdp, particles_per_step, MAX_NEIGHBORS_OUT, &buffer[buffer_index]);
 			scdp.freeMem();
-			step_index++;
 		}
-		printf("\n\n");
+		step_index++;
 		//printf("\n Pos of n1 %f\n", data[0].atoms_relative[3].pos.x);
 
 		//appendToBuffer(data, datapoints_per_query, particles_per_step, MAX_NEIGHBORS_OUT, &buffer[query_id * f3_per_query]);
-
-
-		for (int i = 0; i < step_index; i++) {
-			//data[i].freeMem();
-		}
 	}
-
+	printf("\n\n");
 	string path_out = workdir + "\\traindata_queries" + to_string(n_queries);
 
-	exportData(path_out + ".bin", buffer, n_queries * f3_per_query);
+	exportData(path_out + ".bin", buffer, f3_total);
 
 
 
