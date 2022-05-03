@@ -5,15 +5,19 @@ import torch.nn.functional as F
 import math
 import numpy as np
 
+from LIMA_TOOLS import *
+
+
+
 class LIMANET():
-    def __init__(self, model, inputsize, dataloader, lr=0.0001):
+    def __init__(self, model, inputsize, dataloader, bins, lr=0.0001):
         self.model = model
 
         self.dataloader = dataloader
         self.trainloader = dataloader.trainloader
         self.valloader = dataloader.valloader
 
-        self.bin_means = dataloader.bin_means
+        self.bins = bins
 
         #self.loss = self.calcLoss()
         #self.loss = torch.nn.MSELoss()
@@ -24,12 +28,14 @@ class LIMANET():
         self.loss = self.calcLoss4
         self.accuracy = self.calcAccuracy2
 
-        self.BCE = nn.BCELoss()
+
         #self.MSE = nn.MSELoss()
         #self.loss = nn.MSELoss()
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         print(self.device)
 
+        self.BCE = nn.BCELoss(weight=dataloader.bin_weights.to(self.device))
+        #self.BCE = nn.BCELoss()
 
         self.model = self.model.to(self.device)
         print(model)
@@ -46,7 +52,7 @@ class LIMANET():
         epoch_loss = 0
         for i, data in enumerate(self.trainloader):
             inputs, labels = data
-            labels = labels[:, 3:]
+            labels = labels[:, 3:]                                  # First 3 values are force xyz, next n values are onehot encodings
             inputs = inputs.to(self.device)
             labels = labels.to(self.device)
 
@@ -72,7 +78,7 @@ class LIMANET():
         acc_total = 0
         for i, data in enumerate(self.valloader):
             inputs, labels = data
-            labels = labels[:,3:]
+            labels = labels[:,3:]                               # First 3 values are force xyz, next n values are onehot encodings
             inputs = inputs.to(self.device)
             labels = labels.to(self.device)
 
@@ -198,6 +204,7 @@ class LIMANET():
         for i, data in enumerate(dataloader):
             inputs, labels = data
             labels = labels[:, 0]
+
             inputs = inputs.to(self.device)
             labels = labels.to(self.device)
 
@@ -212,29 +219,101 @@ class LIMANET():
 
         predictions = torch.argmax(predictions_all, dim=1)
 
+
+
         forces = []
         for i in range(predictions_all.shape[1]):
             forces.append(labels_all[torch.where(predictions == i)].cpu().numpy())
 
         return forces
 
-    def visualizePredictions(self):
+    def noPred(self, dataloader):
+        labels_all = []
+        #predictions_all = []
 
-        force_bins_training = self.getBinnedForces(self.trainloader)
-        force_bins_validation = self.getBinnedForces(self.valloader)
+        x_prev = []
+
+        for i, data in enumerate(dataloader):
+            inputs, labels = data
+
+            labels_all.append(labels[:,0])
+            x_prev.append(inputs[:,:,0])
+
+        labels_all = torch.cat(labels_all, dim=0)
+        x_prev = torch.cat(x_prev, dim=0)
 
 
+        #print("xprev: ", x_prev.shape)
+        onehots = onehotEncoder(x_prev, self.bins.bin_centers)
+
+
+
+        forces = []
+        for i in range(onehots.shape[1]):
+            #forces.append(labels_all[torch.where(onehots == i)].cpu().numpy())
+            forces.append(labels_all[torch.where(onehots[:,i])].cpu().numpy())
+
+        return forces
+
+
+        # labels_all = torch.cat(labels_all)[:,0]
+        #labels_all = torch.cat(labels_all)
+        #predictions_all = torch.cat(predictions_all, dim=0)
+
+        #predictions = torch.argmax(predictions_all, dim=1)
+
+
+
+
+    def doHists(self, force_bins_training, force_bins_validation):
         plt.figure()
 
         for i in range(len(force_bins_training)):
             plt.subplot(211)
-            plt.hist(force_bins_training[i], bins=8, histtype='step')
+            plt.hist(force_bins_training[i], bins=10, histtype='step')
             plt.yscale('log')
             plt.title("Training data")
+
             plt.subplot(212)
-            plt.hist(force_bins_validation[i], bins=8, histtype='step')
+            plt.hist(force_bins_validation[i], bins=10, histtype='step')
             plt.yscale('log')
             plt.title("Validation data")
+
+
+
+        plt.show()
+
+
+
+    def visualizePredictions(self):
+
+        force_bins_training = self.getBinnedForces(self.trainloader)
+        force_bins_validation = self.getBinnedForces(self.valloader)
+        forcebins_nopred = self.noPred(self.trainloader)
+
+
+
+        #self.doHists(force_bins_training, force_bins_validation)
+        self.doHists(force_bins_training, forcebins_nopred)
+
+        plt.figure()
+        plt.subplot(311)
+        plt.boxplot(force_bins_training, vert=False)
+        #print("mean ", np.mean(force_bins_training[i]))
+        #print("std", np.std(force_bins_training[i]))
+        #print("std", np.std(force_bins_validation[i]))
+        plt.title("Training data")
+
+
+        plt.subplot(312)
+        plt.boxplot(force_bins_validation, vert=False)
+        plt.title("Validation data")
+
+yy
+        plt.subplot(313)
+        plt.boxplot(forcebins_nopred, vert=False)
+        plt.title("No prediction data")
+
 
 
         plt.show()

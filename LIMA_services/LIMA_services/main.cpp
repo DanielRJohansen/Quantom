@@ -17,7 +17,7 @@ float BOX_LEN_HALF = BOX_LEN/2.f;
 
 
 
-
+float max_dif = 0;
 
 struct Float3 {
 	Float3() {}
@@ -305,8 +305,12 @@ void appendToBuffer(selfcenteredDatapoint* scdp, int particles_per_datapoint, in
 	
 	uint32_t buffer_ptr_rel = 0;
 
-	//if (scdp->ignore)	// No longer usable since a´ll queries must have the same amount of datapoints
-		//continue;
+	if (scdp->ignore)	
+		return;
+
+	float force_dif = scdp->atoms_relative[0].LJ_force.x - scdp->atoms_relative_tsub1[0].LJ_force.x;
+	max_dif = max(abs(force_dif), max_dif);
+	
 
 
 	//scdp->atoms_relative[0].LJ_force.print('f');
@@ -330,7 +334,6 @@ void appendToBuffer(selfcenteredDatapoint* scdp, int particles_per_datapoint, in
 
 	//printf("\nPtr val: %u\n", buffer_ptr);
 
-	return;
 }
 
 
@@ -444,6 +447,17 @@ int discardVolatileDatapoints(selfcenteredDatapoint* data, int n_datapoints, flo
 	return n_ignored;
 }
 
+int discardVolatileDatapoint(selfcenteredDatapoint* scdp, float cuttoff_value) {	// Removes datapoints where the change in force is too large for the NN to handle..
+	float force_change = (scdp->atoms_relative[0].LJ_force - scdp->atoms_relative_tsub1[0].LJ_force).len();		// It's okay we only do with the one that the NN has to predict!
+	if (force_change > cuttoff_value) {
+		scdp->ignore = true;
+		return 1;
+	}
+	
+	//printf("\n%d datapoints cuttoff due to force change magnitude\n", n_ignored);
+	return 0;
+}
+
 
 #include <algorithm>
 
@@ -524,7 +538,7 @@ int main(int argc, char** argv) {
 
 
 	int spacing = 2;
-	int n_queries = 30;
+	int n_queries = 2;
 	//uint64_t datapoints_per_query = ceil((double)N_STEPS - (double)ROW_START) / (double)spacing;
 	//uint64_t total_datapoints = datapoints_per_query * n_queries;
 	int f3_per_datapoint = 4 + 4 * MAX_NEIGHBORS_OUT;
@@ -552,7 +566,7 @@ int main(int argc, char** argv) {
 			//uint64_t buffer_index = query_id * f3_per_query + step_index * f3_per_datapoint;
 
 			uint64_t buffer_index = query_id * f3_per_datapoint + step_index * f3_per_step;
-
+			discardVolatileDatapoint(&scdp, 1e+4);
 			//printf("Buffer_in")
 			appendToBuffer(&scdp, particles_per_step, MAX_NEIGHBORS_OUT, &buffer[buffer_index]);
 			scdp.freeMem();
@@ -563,6 +577,9 @@ int main(int argc, char** argv) {
 		//appendToBuffer(data, datapoints_per_query, particles_per_step, MAX_NEIGHBORS_OUT, &buffer[query_id * f3_per_query]);
 	}
 	printf("\n\n");
+
+	printf("Max force dif %f\n", max_dif);
+
 	string path_out = workdir + "\\traindata_queries" + to_string(n_queries);
 
 	exportData(path_out + ".bin", buffer, f3_total);

@@ -11,18 +11,31 @@ def makeBlock(inputs, outputs, size):
         nn.Linear(size, outputs),
     )
 
+def makeBlock1(inputs, outputs, size):
+    return nn.Sequential(
+        nn.Linear(inputs, size),
+        #nn.BatchNorm1d(size),
+        nn.Linear(size, size//2),
+        nn.ReLU(),
+        nn.Linear(size // 2, size // 4),
+        nn.ReLU(),
+        nn.Linear(size // 4, outputs),
+    )
+
 
 class LIMADNN4(nn.Module):
-    def __init__(self, n_neighbors, n_bins):
+    def __init__(self, n_neighbors, n_bins, inputsize):
         super(LIMADNN4, self).__init__()
 
-        self.n_neighbors = n_neighbors
+        #self.n_neighbors = n_neighbors
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
         self.out_bins = n_bins
-        self.block = makeBlock((self.n_neighbors) * 3, self.out_bins, 64)
+        #self.block = makeBlock((self.n_neighbors) * 3, self.out_bins, 64)
 
+        #self.block = makeBlock1((self.n_neighbors) * 3, self.out_bins, 256)
+        self.block = makeBlock(inputsize, self.out_bins, 64)
 
 
 
