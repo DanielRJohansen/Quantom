@@ -143,7 +143,7 @@ void Environment::postRunEvents() {
 #ifndef __linux__
 	if (simulation->box->critical_error_encountered) return;
 
-	string data_processing_command = "C:\\Users\\Daniel\\git_repo\\Quantom\\LIMA_services\\x64\\Debug\\LIMA_services.exe "
+	string data_processing_command = "C:\\Users\\Daniel\\git_repo\\Quantom\\LIMA_services\\x64\\Release\\LIMA_services.exe "
 		+ simulation->out_dir + " "
 		+ to_string(simulation->getStep()) + " "
 		+ "0" + " "											// do_shuffle

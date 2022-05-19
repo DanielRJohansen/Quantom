@@ -445,7 +445,7 @@ int main(int argc, char** argv) {
 	}
 
 	//string workdir = "D:\\Quantom\LIMANET\sim_out";
-	int N_STEPS = 350000;	// Determines file to read
+	int N_STEPS = 5000;	// Determines file to read
 	string workdir = "C:\\PROJECTS\\Quantom\\Simulation\\Steps_" + to_string(N_STEPS) + "\\";
 	
 	bool shuffle_time_dim = false;
