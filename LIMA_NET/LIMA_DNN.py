@@ -4,7 +4,7 @@ import torch.nn.functional as F
 
 def makeBlock(inputs, outputs, size):
     return nn.Sequential(
-        nn.BatchNorm1d(inputs),
+        #nn.BatchNorm1d(inputs),
         nn.Linear(inputs, size),
         nn.ReLU(),
 
@@ -35,7 +35,7 @@ class LIMADNN4(nn.Module):
         #self.block = makeBlock((self.n_neighbors) * 3, self.out_bins, 64)
 
         #self.block = makeBlock1((self.n_neighbors) * 3, self.out_bins, 256)
-        self.block = makeBlock(inputsize, self.out_bins, 64)
+        self.block = makeBlock1(inputsize, self.out_bins, 64)
 
 
 

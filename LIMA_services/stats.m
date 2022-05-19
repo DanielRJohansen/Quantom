@@ -178,48 +178,63 @@ xlabel("time [fs]")
 hold off
 
 %% Torsion force
-
+% CN1;NN2;CN9;HN9;0.000000;794.770020;3
 phi = [-3.14:0.01:3.14];
 
-k = 7696.720215;
+%k = -7696.720215;
+k = -794.77
 ref = 0;
 
 a = k*(cos(1*phi-ref)+1);
 b = k*(cos(2*phi-ref)+1);
 c = k*(cos(3*phi-ref)+1);
-d = a+b+c;
-dd = -k*(sin(phi-ref) + 2.*sin(2.*phi-ref)*2 + 3.*sin(3.*phi-ref)*3);
+%d = a+b+c;
+%dd = -k*(sin(phi-ref) + 2.*sin(2.*phi-ref)*2 + 3.*sin(3.*phi-ref)*3);
 
 
 %plot(phi, a)
 
 %plot(phi, b)
 %plot(phi, c)
-plot(phi, a)
+plot(phi, a, LineWidth=1)
 hold on
+plot(phi, a+b, LineWidth=1)
+plot(phi, a+b+c, LineWidth=1)
 %plot(phi, dd)
-plot(phi, -k*sin(phi-ref))
+%plot(phi, -k*sin(phi-ref))
+ylabel("Potential Energy [J/mol]")
+xlabel("Torsion [rad]")
+legend("n=1", "n=2", "n=3")
+%title("Torsion Potential")
 grid 
 hold off
 %% LJ plot
 clc
-sigma = 0.3923;
-epsilon = 0.5986*1000;
+%sigma = 0.3923;
+%epsilon = 0.5986*1000;
+
+%Carbon:
+sigma = 0.4
+epsilon = 460
 %x = 0.35:0.001:1;
-x = 0.244:0.001:1;
+x = 0.365:0.001:0.9;
 
 
 
 y = 4 * epsilon * ((sigma./x).^12 - (sigma./x).^6);
 dy = 24 .* epsilon .* 1./(x) .* (sigma./x).^6 .*(1-2.*(sigma./x).^6);
 
-tiledlayout(2,1)
+%tiledlayout(2,1)
 
-nexttile
-plot(x,y)
-ylabel("[J]")
-xlabel("[nm]")
+%nexttile
 
+plot(x,y, LineWidth=1.5)
+title("Lennard-Jones potential between carbon atoms")
+xlim([-inf, inf])
+ylabel("Energy [J]")
+xlabel("Distance [nm]")
+grid
+%%
 nexttile
 plot(x,dy)
 ylabel("[N]")

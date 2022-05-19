@@ -293,8 +293,8 @@ class LIMANET():
 
 
 
-        #self.doHists(force_bins_training, force_bins_validation)
-        self.doHists(force_bins_training, forcebins_nopred)
+        self.doHists(force_bins_training, force_bins_validation)
+        #self.doHists(force_bins_training, forcebins_nopred)
 
         plt.figure()
         plt.subplot(311)
@@ -309,7 +309,7 @@ class LIMANET():
         plt.boxplot(force_bins_validation, vert=False)
         plt.title("Validation data")
 
-yy
+
         plt.subplot(313)
         plt.boxplot(forcebins_nopred, vert=False)
         plt.title("No prediction data")

@@ -51,18 +51,16 @@ def prepData3(input_data, nearest_n_atoms):
 
 
 def prepData4(input_data, nearest_n_atoms):
-    #data = input_data[:,9:]                                             # Remove query atom on all steps/rows
-    #data = data.reshape((data.shape[0], data.shape[1] // 12, 12))       # Place neighors along new dimension
+    data = input_data[:,9:]                                             # Remove query atom on all steps/rows
+    data = data.reshape((data.shape[0], data.shape[1] // 12, 12))       # Place neighors along new dimension
 
-    data = input_data[:, :9].reshape((input_data.shape[0], 1, 9))
+    #data = input_data[:, :9].reshape((input_data.shape[0], 1, 9))
 
-    #data = data[:,:,:3]                                                 # Remove all neighbor data except pos
+    data = data[:,:,:3]                                                 # Remove all neighbor data except pos
     #data = np.concatenate((data[:,:,:3], data[:,:,6:9]), axis=2)                                         # Remove all neighbor data except pos
-    print("Before ", data[0,0,:])
-    data = data[:,:,3:4]
 
-    print("After ", data[0, 0, :])
-    print("Data shape: ",  data.shape)
+    #data = data[:,:,3:4]
+
     return torch.from_numpy(data)
 
 
@@ -123,18 +121,18 @@ class WaterforceDataloader():
 
 
 
-        print(data.shape)
+        print("Inputdata shape ", data.shape)
 
-        ts1 = data[:,0,0]
+        #ts1 = data[:,0,0]
+        ts1 = raw_data[:, 6]
         t0 = labels[:,0]
 
         dif = torch.abs(t0 - ts1)
 
         index = torch.argmax(dif)
 
-        print(index, ts1[index], t0[index], dif[index])
-        print(torch.max(dif))
-        #exit()
+        print("Max label dif. Index: ", index, ts1[index], t0[index], " Dif ", dif[index])
+
 
 
     def printMetaInfo(self, data, labels, datapoints_total):

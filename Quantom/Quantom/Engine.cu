@@ -582,8 +582,8 @@ __device__ void calcAnglebondForces(Float3* pos_left, Float3* pos_middle, Float3
 }
 
 __device__ void calcDihedralbondForces(Float3* pos_left, Float3* pos_lm, Float3* pos_rm, Float3* pos_right, DihedralBond* dihedral, Float3* results, float* potE) {
-	Float3 normal1 = (*pos_left-*pos_lm).cross((*pos_rm-*pos_lm));
-	Float3 normal2 = (*pos_lm-*pos_rm).cross((*pos_right-*pos_rm));
+	Float3 normal1 = (*pos_left-*pos_lm).cross((*pos_rm-*pos_lm));		// Should this not be normalized????
+	Float3 normal2 = (*pos_lm-*pos_rm).cross((*pos_right-*pos_rm));			// Is inward or outward? Refactor!!!
 
 
 
@@ -595,7 +595,7 @@ __device__ void calcDihedralbondForces(Float3* pos_left, Float3* pos_lm, Float3*
 
 	*potE += 0.5 * dihedral->k_phi * error * error * 0.5;
 	//double force_scalar = dihedral->k_phi * (error);
-	double force_scalar = sinf(torsion - dihedral->phi_0);
+	double force_scalar = sinf(torsion - dihedral->phi_0);		// Should be -sinf? (cos)' = -sin??!?!
 	force_scalar *= dihedral->k_phi;
 	if (abs(force_scalar) > 183300) {
 		pos_left->print('L');
@@ -985,6 +985,11 @@ __global__ void forceKernel(Box* box) {
 	// ------------------------------------------------------------------------------------------------------------------------------------------------------------------ //
 	
 
+
+
+
+
+	
 
 	
 	// ------------------------------------ DATA LOG ------------------------------- //	

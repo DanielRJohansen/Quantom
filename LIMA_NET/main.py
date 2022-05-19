@@ -38,15 +38,15 @@ def getBins(n=7, min=-4e+5, max=4e+5):
 
 if __name__ == '__main__':
 
-    n_bins = 3                          # Must be uneven
+    n_bins = 7                          # Must be uneven
     bins = getBins(n_bins)
-    normalize_data=False
+    normalize_data = True
 
 
 
     workdir = "C:\\PROJECTS\\Quantom\\Simulation\\Steps_350000\\"
     #data_filepath = workdir + "traindata.bin"
-    data_filepath = workdir + "traindata_queries2.bin"
+    data_filepath = workdir + "traindata_queries30.bin"
 
 
     neighbors_per_row = 32                  # in dataset
@@ -64,4 +64,4 @@ if __name__ == '__main__':
 
     trainer = Trainer(net, workdir, n_neighbors=n_neighbors)
 
-    trainer.train(10)
+    trainer.train(500)

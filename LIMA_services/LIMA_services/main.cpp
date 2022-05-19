@@ -344,55 +344,13 @@ void exportData( string path, Float3* buffer, uint64_t buffer_len) {				// 	expo
 	file_path = &path[0];
 	cout << "Writing to file " << file_path << endl;
 
-	/*
-	int lines_to_print = 0;	
-	Float3* buffer = new Float3[n_datapoints * 2 * (1 + particles_per_datapoint)];	// Times 10 just to be safe
-	uint32_t buffer_ptr = 0;
-
-	for (int step = 0; step < n_datapoints; step++) {								// Step
-		selfcenteredDatapoint scdp = data[step];
-		if (scdp.ignore)
-			continue;
-
-
-		//scdp.atoms_relative[0].LJ_force.print('f');
-		buffer[buffer_ptr++] = scdp.atoms_relative[0].LJ_force;													// First print label				
-		buffer[buffer_ptr++] = scdp.atoms_relative[0].pos - scdp.atoms_relative_tsub1[0].pos;					// Then vel
-		buffer[buffer_ptr++] = scdp.atoms_relative_tsub1[0].LJ_force;											// Then print prev self force		
-		buffer[buffer_ptr++] = scdp.atoms_relative_tsub1[0].LJ_force - scdp.atoms_relative_tsub2[0].LJ_force;	// Force change
-		
-	
-
-		for (int ii = 1; ii < particles_per_datapoint; ii++) {
-			buffer[buffer_ptr++] = scdp.atoms_relative[ii].pos;				// Print other atoms pos			69x3xfloat
-			buffer[buffer_ptr++] = (scdp.atoms_relative[ii].pos - scdp.atoms_relative_tsub2[ii].pos) * 0.5;
-			buffer[buffer_ptr++] = scdp.atoms_relative_tsub1[ii].LJ_force;		// Print other atoms prev force		69x3xfloat
-			buffer[buffer_ptr++] = scdp.atoms_relative_tsub1[ii].LJ_force - scdp.atoms_relative_tsub2[ii].LJ_force;
-
-			if (ii == max_neighbors)
-				break;
-		}
-	}
-	
-	printf("Ptr val: %u\n", buffer_ptr);
-
-
-	float maxVal = 0; 
-	float minVal = 0; 
-	for (int i = 0; i < buffer_ptr; i++) {
-		maxVal = max(maxVal, buffer[i]._max());
-		minVal = min(minVal, buffer[i]._min());
-	}
-
-	printf("Max: %f Min: %f\n", maxVal, minVal);
-	*/
-
 
 	FILE* file;
 	fopen_s(&file, file_path, "wb");
 	//fwrite(buffer, sizeof(Float3), buffer_ptr, file);
 	fwrite(buffer, sizeof(Float3), buffer_len, file);
 	fclose(file);
+	printf("Write successful\n");
 }
 
 void makeForceChangePlot(selfcenteredDatapoint* data, int n_datapoints) {
@@ -538,7 +496,7 @@ int main(int argc, char** argv) {
 
 
 	int spacing = 2;
-	int n_queries = 2;
+	int n_queries = 30;
 	//uint64_t datapoints_per_query = ceil((double)N_STEPS - (double)ROW_START) / (double)spacing;
 	//uint64_t total_datapoints = datapoints_per_query * n_queries;
 	int f3_per_datapoint = 4 + 4 * MAX_NEIGHBORS_OUT;
