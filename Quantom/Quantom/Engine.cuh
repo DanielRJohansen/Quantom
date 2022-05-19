@@ -13,7 +13,7 @@
 
 
 
-__global__ void forceKernel(Box* box);
+__global__ void compoundKernel(Box* box);
 __global__ void solventForceKernel(Box* box);
 __global__ void compoundBridgeKernel(Box* box);
 

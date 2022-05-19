@@ -394,12 +394,12 @@ void Engine::step() {
 	cudaDeviceSynchronize();
 
 	if (simulation->box->bridge_bundle->n_bridges > 0) {																		// TODO: Illegal access to device mem!!
-		compoundBridgeKernel << < simulation->box->bridge_bundle->n_bridges, MAX_PARTICLES_IN_BRIDGE >> > (simulation->box);	// Must come before forceKernel()
+		compoundBridgeKernel << < simulation->box->bridge_bundle->n_bridges, MAX_PARTICLES_IN_BRIDGE >> > (simulation->box);	// Must come before compoundKernel()
 	}
 		
 	cudaDeviceSynchronize();
 	if (simulation->n_compounds > 0) {
-		forceKernel << < simulation->box->n_compounds, THREADS_PER_COMPOUNDBLOCK >> > (simulation->box);
+		compoundKernel << < simulation->box->n_compounds, THREADS_PER_COMPOUNDBLOCK >> > (simulation->box);
 	}
 	cudaDeviceSynchronize();
 
@@ -582,21 +582,38 @@ __device__ void calcAnglebondForces(Float3* pos_left, Float3* pos_middle, Float3
 }
 
 __device__ void calcDihedralbondForces(Float3* pos_left, Float3* pos_lm, Float3* pos_rm, Float3* pos_right, DihedralBond* dihedral, Float3* results, float* potE) {
-	Float3 normal1 = (*pos_left-*pos_lm).cross((*pos_rm-*pos_lm));		// Should this not be normalized????
-	Float3 normal2 = (*pos_lm-*pos_rm).cross((*pos_right-*pos_rm));			// Is inward or outward? Refactor!!!
+	Float3 normal1 = (*pos_left-*pos_lm).cross((*pos_rm-*pos_lm)).norm();		// Should this not be normalized????
+	Float3 normal2 = (*pos_lm-*pos_rm).cross((*pos_right-*pos_rm)).norm();			// Is inward or outward? Refactor!!!
+	// Both vectors point "left". If pos_left+n1 is closer to pos_right than pos_left-n1, then n1 is pointing inwards, and n2 outwards. Also vice-versa.
 
+	if (((*pos_left + normal1) - *pos_right).len() < ((*pos_left - normal1) - *pos_right).len())
+		normal2 *= -1;
+	else
+		normal1 *= -1;
+
+	// Now both normals are pointing inwards
 
 
 
 	float torsion = Float3::getAngle(normal1, normal2);
+
+	//printf("Torsion %f\n", normal1.len());
 	float error = (torsion - dihedral->phi_0);	// *360.f / 2.f * PI;	// Check whether k_phi is in radians or degrees
 
 	//error = (error / (2.f * PI)) * 360.f;
 
+	
+
 	*potE += 0.5 * dihedral->k_phi * error * error * 0.5;
 	//double force_scalar = dihedral->k_phi * (error);
-	double force_scalar = sinf(torsion - dihedral->phi_0);		// Should be -sinf? (cos)' = -sin??!?!
-	force_scalar *= dihedral->k_phi;
+
+	//double force_scalar = sinf(torsion - dihedral->phi_0);		// Should be -sinf? (cos)' = -sin??!?!
+
+	float force_scalar = dihedral->k_phi * -sinf(dihedral->n * torsion - dihedral->phi_0);
+
+
+	//printf("Torsion %f ref %f force_scalar %f\n", torsion, dihedral->phi_0, force_scalar);
+	//force_scalar *= dihedral->k_phi;
 	if (abs(force_scalar) > 183300) {
 		pos_left->print('L');
 		pos_lm->print('l');
@@ -611,7 +628,7 @@ __device__ void calcDihedralbondForces(Float3* pos_left, Float3* pos_lm, Float3*
 	//results[0] = normal1 * force_scalar * -1.f;
 	//results[3] = normal2 * force_scalar;
 	results[0] = normal1 * force_scalar;
-	results[3] = normal2 * force_scalar*-1.f;
+	results[3] = normal2 * force_scalar;
 	// Not sure about the final two forces, for now we'll jsut split the sum of opposite forces between them.
 	results[1] = (results[0] + results[3]) * -1.f * 0.5;
 	results[2] = (results[0] + results[3]) * -1.f * 0.5;
@@ -855,7 +872,7 @@ __device__ void integratePosition(Float3* pos, Float3* pos_tsub1, Float3* force,
 
 
 
-__global__ void forceKernel(Box* box) {
+__global__ void compoundKernel(Box* box) {
 	__shared__ Compound compound;
 	__shared__ CompoundState compound_state;
 	__shared__ NeighborList neighborlist;
