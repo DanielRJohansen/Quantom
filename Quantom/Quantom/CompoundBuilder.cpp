@@ -4,13 +4,13 @@
 
 
 
-Molecule CompoundBuilder::buildMolecule(string pdb_path, string itp_path, int max_residue_id, int min_residue_id, bool ignore_hydrogens) {
+Molecule CompoundBuilder::buildMolecule(string gro_path, string itp_path, int max_residue_id, int min_residue_id, bool ignore_hydrogens) {
 	//vector<vector<string>> pdb_data = readFile(pdb_path);
 	//vector<Record_ATOM> atom_data = parsePDB(pdb_path);
 	compound_bridge_bundle = new CompoundBridgeBundle;
 	particle_id_maps = new ParticleRef[MAX_ATOMS];
 
-	vector<Record_ATOM> atom_data = parseGRO(pdb_path);
+	vector<Record_ATOM> atom_data = parseGRO(gro_path);
 	vector<vector<string>> top_data = parseTOP(itp_path);
 
 
@@ -48,6 +48,35 @@ Molecule CompoundBuilder::buildMolecule(string pdb_path, string itp_path, int ma
 }
 
 
+vector<Float3> CompoundBuilder::getSolventPositions(string gro_path) {
+	vector<Record_ATOM> atom_data = parseGRO(gro_path);
+	
+	vector<Float3> solvent_positions;
+	for (Record_ATOM record : atom_data) {
+		if (record.residue_name == "SOL" && record.atom_name[0] == 'O') {	// Easy solution, just say Oxygen is the center of the solvent. Ignore the hydrogens
+			solvent_positions.push_back(record.coordinate);
+		
+		}
+	}
+	return solvent_positions;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -83,7 +112,8 @@ void CompoundBuilder::loadParticles(Molecule* molecule, vector<CompoundBuilder::
 		if (ignore_protons && record.atom_name[0] == 'H')
 			continue;
 
-
+		if (record.residue_name == "SOL")
+			continue;
 		
 
 
@@ -384,6 +414,7 @@ vector<CompoundBuilder::Record_ATOM> CompoundBuilder::parsePDB(string path)
 
 vector<CompoundBuilder::Record_ATOM> CompoundBuilder::parseGRO(string path)
 {
+	cout << "Reading particles from file" << path << endl;
 	fstream file;
 	file.open(path);
 	int line_cnt = 0;
@@ -406,6 +437,9 @@ vector<CompoundBuilder::Record_ATOM> CompoundBuilder::parseGRO(string path)
 
 		ResidueComboId res = parseResidueID(words.at(0));
 
+		if (words.size() == 5)
+			words = splitAtomnameFromId(words);									// Disgusting function, and i hate GROMACS for making me do this!
+
 		if (!res.valid || words.size() != 6)
 			continue;
 
@@ -422,6 +456,7 @@ vector<CompoundBuilder::Record_ATOM> CompoundBuilder::parseGRO(string path)
 		records.push_back(record);
 	}
 
+	file.close();
 	
 
 	return records;

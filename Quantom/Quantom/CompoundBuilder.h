@@ -39,9 +39,9 @@ class CompoundBuilder
 public:
 	CompoundBuilder() {}
 	CompoundBuilder(ForceFieldMaker* ffm) { FFM = ffm; }
-	Molecule buildMolecule(string pdb_path, string itp_path, int max_residue_id=INT16_MAX, int min_residue_id=0, bool ignore_hydrogens=true);
+	Molecule buildMolecule(string gro_path, string itp_path, int max_residue_id=INT16_MAX, int min_residue_id=0, bool ignore_hydrogens=true);
 
-
+	vector<Float3> getSolventPositions(string gro_path);
 
 
 private:
@@ -49,6 +49,11 @@ private:
 	//IDMap* particle_id_maps;
 	ParticleRef* particle_id_maps;
 	CompoundBridgeBundle* compound_bridge_bundle;
+
+
+
+
+
 
 
 	struct Record_ATOM;
@@ -82,14 +87,35 @@ private:
 	ResidueComboId parseResidueID(string s);
 	inline bool isAsciiNumber(char c) { return (c > 47 && c < 58); }
 	void countElements(Molecule* molecule);
+	vector<string> splitAtomnameFromId(vector<string> words) {
+		vector<string> words_;
+		words_.push_back(words.at(0));
+		if (words.at(1)[0] == 'O') {	// This is the most painful code i've been forced to write my entire life..
+			words_.push_back("OW");
+			words_.push_back(&words.at(1)[2]);
+		}
+		else {
+			words_.push_back("HW");		// should be followed by 1 or 2, too lazy to implement
+			words_.push_back(&words.at(1)[3]);
+		}
+		for (int i = 2; i < 5; i++)
+			words_.push_back(words.at(i));
+		
+		return words_;
+
+	}
 
 
 
 
 
-	struct ResidueComboId {
+
+
+	struct ResidueComboId {	// Combined name and id.
 		ResidueComboId(){}
-		ResidueComboId(int id, string name) : id(id), name(name) { valid = true; }
+		ResidueComboId(int id, string name) : id(id), name(name) { 
+			valid = true; 
+		}
 		bool valid = false;
 		int id;
 		string name;

@@ -604,13 +604,13 @@ __device__ void calcDihedralbondForces(Float3* pos_left, Float3* pos_lm, Float3*
 
 	
 
-	*potE += 0.5 * dihedral->k_phi * error * error * 0.5;
+	//*potE += 0.5 * dihedral->k_phi * error * error * 0.5;
 	//double force_scalar = dihedral->k_phi * (error);
 
 	//double force_scalar = sinf(torsion - dihedral->phi_0);		// Should be -sinf? (cos)' = -sin??!?!
 
-	float force_scalar = dihedral->k_phi * -sinf(dihedral->n * torsion - dihedral->phi_0);
-
+	float force_scalar = dihedral->k_phi * sinf(dihedral->n * torsion - dihedral->phi_0);
+	*potE = dihedral->k_phi * (1 - cosf(dihedral->n * torsion - dihedral->phi_0));
 
 	//printf("Torsion %f ref %f force_scalar %f\n", torsion, dihedral->phi_0, force_scalar);
 	//force_scalar *= dihedral->k_phi;
@@ -634,16 +634,6 @@ __device__ void calcDihedralbondForces(Float3* pos_left, Float3* pos_lm, Float3*
 	results[2] = (results[0] + results[3]) * -1.f * 0.5;
 
 
-	if (dihedral->n < 0 || dihedral->n > 6)
-		printf("%d\n", dihedral->n);
-	/*
-	if (blockIdx.x == 0 && threadIdx.x == 30) {
-		printf("Torsion %f error %f force_scalar %f, phi0 %f kphi %f\n", torsion, error, force_scalar, dihedral->phi_0, dihedral->k_phi);
-		results[0].print('0');
-		results[1].print('1');
-		results[3].print('3');
-	}
-	*/
 }
 
 

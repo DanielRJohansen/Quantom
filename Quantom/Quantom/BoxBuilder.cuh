@@ -1,6 +1,7 @@
 #pragma once
 #include "Bodies.cuh"
 #include "Simulation.cuh"
+#include <vector>
 
 class BoxBuilder
 {
@@ -14,6 +15,7 @@ public:
 	void addDoubleMembrane(Simulation* simulation, Compound* molecule);
 	void finishBox(Simulation* simulation);
 	int solvateBox(Simulation* simulation);					// Returns # of solvate compounds placed
+	int solvateBox(Simulation* simulation, vector<Float3> *solvate_positions);	// Returns # of solvate compounds placed
 
 
 
@@ -73,7 +75,8 @@ private:
 
 
 
-
+	Float3 most_recent_offset_applied = Float3(0.f);	// If molecule is offset, each solvent from .gro file must be aswell
+														// Not a clean solution, i know.. :(
 
 
 

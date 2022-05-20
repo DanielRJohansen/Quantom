@@ -182,12 +182,12 @@ hold off
 phi = [-3.14:0.01:3.14];
 
 %k = -7696.720215;
-k = -794.77
+k = 794.77
 ref = 0;
 
-a = k*(cos(1*phi-ref)+1);
-b = k*(cos(2*phi-ref)+1);
-c = k*(cos(3*phi-ref)+1);
+a = k*(1-cos(1*phi-ref));
+b = k*(1-cos(2*phi-ref));
+c = k*(1-cos(3*phi-ref));
 %d = a+b+c;
 %dd = -k*(sin(phi-ref) + 2.*sin(2.*phi-ref)*2 + 3.*sin(3.*phi-ref)*3);
 
@@ -198,8 +198,12 @@ c = k*(cos(3*phi-ref)+1);
 %plot(phi, c)
 plot(phi, a, LineWidth=1)
 hold on
-plot(phi, a+b, LineWidth=1)
-plot(phi, a+b+c, LineWidth=1)
+%plot(phi, a+b, LineWidth=1)
+%plot(phi, a+b+c, LineWidth=1)
+
+plot(phi, b, LineWidth=1)
+plot(phi, c, LineWidth=1)
+
 %plot(phi, dd)
 %plot(phi, -k*sin(phi-ref))
 ylabel("Potential Energy [J/mol]")

@@ -22,11 +22,16 @@ Environment::Environment() {
 	int max_res_id = 200;
 	bool ignore_hydrogens = true;
 	Molecule mol_6lzm_10 = compoundbuilder->buildMolecule(MOL_FOLDER + "conf.gro", MOL_FOLDER + "topol.top", max_res_id, min_res_id, ignore_hydrogens);
+	vector<Float3> solvent_positions = compoundbuilder->getSolventPositions(MOL_FOLDER + "box7.gro");
+
 
 	boxbuilder.buildBox(simulation);
 	boxbuilder.addSingleMolecule(simulation, &mol_6lzm_10);
+	boxbuilder.solvateBox(simulation, &solvent_positions);
+	//exit(1);
+
 	//boxbuilder.addScatteredMolecules(simulation, &mol_dpc, N_LIPID_COPIES);
-	boxbuilder.solvateBox(simulation);	// Always do after placing compounds
+	//boxbuilder.solvateBox(simulation);	// Always do after placing compounds
 	delete[] mol_6lzm_10.compounds;
 	boxbuilder.finishBox(simulation);
 

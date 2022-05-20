@@ -37,7 +37,7 @@ const int N_SOLVATE_MOLECULES = 2000;
 
 
 const int MAX_SOLVENTS = 0xFFFF;
-constexpr float CUTOFF = 1.f;	//nm/
+constexpr float CUTOFF = 0.6f;	//nm/
 //const int MAX_ATOM_TYPES = 16;
 
 
@@ -47,11 +47,11 @@ const int MAX_COMPOUND_PARTICLES = 128;
 
 
 
-const int THREADS_PER_SOLVENTBLOCK = 128;	// Must be >= N_SOLVATE_MOLECULES
+const int THREADS_PER_SOLVENTBLOCK = 128;	
 const int THREADS_PER_COMPOUNDBLOCK = MAX_COMPOUND_PARTICLES; // Must be >= max comp particles
 
 
-const int SIMULATION_STEPS = 5000;
+const int SIMULATION_STEPS = 30000;
 
 
 

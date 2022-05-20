@@ -36,6 +36,12 @@ void BoxBuilder::addSingleMolecule(Simulation* simulation, Molecule* molecule) {
 	Float3 desired_molecule_center = Float3(BOX_LEN_HALF);
 	Float3 offset = desired_molecule_center - molecule->calcCOM();
 
+
+	printf("Molecule offset for centering: ");
+	offset.print(' ');
+	most_recent_offset_applied = offset;			// Needed so solvents can be offset identically later. Not needed if making solvent positions using LIMA
+
+
 	for (int c = 0; c < molecule->n_compounds; c++) {
 		Compound* compound = &molecule->compounds[c];
 		for (int i = 0; i < compound->n_particles; i++) {
@@ -51,7 +57,7 @@ void BoxBuilder::addSingleMolecule(Simulation* simulation, Molecule* molecule) {
 	simulation->box->bridge_bundle = new CompoundBridgeBundleCompact;
 	*simulation->box->bridge_bundle = *molecule->compound_bridge_bundle;					// TODO: Breaks if multiple compounds are added, as only one bridgebundle can exist for now!
 
-
+	printf("Molecule added to box\n");
 }
 
 void BoxBuilder::addScatteredMolecules(Simulation* simulation, Compound* molecule, int n_copies)
@@ -68,6 +74,7 @@ void BoxBuilder::finishBox(Simulation* simulation) {
 
 	// Need this variable both on host and device
 	simulation->total_particles_upperbound = simulation->box->n_compounds * MAX_COMPOUND_PARTICLES + simulation->box->n_solvents;											// BAD AMBIGUOUS AND WRONG CONSTANTS
+	printf("%d\n", simulation->total_particles_upperbound);
 	simulation->box->total_particles_upperbound = simulation->total_particles_upperbound;											// BAD AMBIGUOUS AND WRONG CONSTANTS
 
 
@@ -84,6 +91,7 @@ void BoxBuilder::finishBox(Simulation* simulation) {
 	
 	// Permanent Outputs for energy & trajectory analysis
 	int n_points = simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER;
+	printf("n points %d\n", n_points);
 	printf("Malloc %.2Lf KB on device for data buffers\n", (sizeof(double) * simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER + sizeof(Float3) * simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER) * 1e-3);
 	printf("Malloc %.2Lf MB on host for data buffers\n", (sizeof(double) * simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER + sizeof(Float3) * simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER) * 1e-6);
 	cudaMallocManaged(&simulation->box->potE_buffer, sizeof(double) * simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER);	// Can only log molecules of size 3 for now...
@@ -136,10 +144,7 @@ void BoxBuilder::finishBox(Simulation* simulation) {
 
 
 
-void BoxBuilder::placeSingleMolecule(Simulation* simulation, Compound* main_compound)
-{
 
-}
 
 int BoxBuilder::solvateBox(Simulation* simulation)
 {
@@ -184,6 +189,31 @@ int BoxBuilder::solvateBox(Simulation* simulation)
 	return simulation->box->n_solvents;
 }
 
+int BoxBuilder::solvateBox(Simulation* simulation, vector<Float3>* solvent_positions)	// Accepts the position of the center or Oxygen of a solvate molecule. No checks are made wh
+{
+	simulation->box->solvents = new Solvent[MAX_SOLVENTS];
+
+
+	for (Float3 sol_pos : *solvent_positions) {
+		if (simulation->box->n_solvents == MAX_SOLVENTS) {
+			printf("Too many solvents added!\n\n\n\n");
+			exit(1);
+		}
+
+		sol_pos += most_recent_offset_applied;			// So solvents are re-aligned with an offsat molecule.
+
+		if (spaceAvailable(simulation->box, sol_pos)) {						// Should i check? Is this what energy-min is for?
+			simulation->box->solvents[simulation->box->n_solvents++] = createSolvent(sol_pos, simulation->dt);
+		}
+		//else 
+			//printf("no room\n");
+	}
+
+
+	simulation->total_particles += simulation->box->n_solvents;
+	printf("%d solvents added to box\n", simulation->box->n_solvents);
+	return simulation->box->n_solvents;
+}
 
 
 

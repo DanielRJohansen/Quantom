@@ -9,7 +9,8 @@
 
 
 #ifndef __linux__
-const string MOL_FOLDER = "C:\\PROJECTS\\Quantom\\molecules\\t4lys_full\\";
+//const string MOL_FOLDER = "C:\\PROJECTS\\Quantom\\molecules\\t4lys_full\\";
+const string MOL_FOLDER = "C:\\PROJECTS\\Quantom\\Simulation\\Molecule\\";
 const string OUT_DIR = "C:\\PROJECTS\\Quantom\\Simulation\\";
 #else
 //const string MOL_FOLDER = "../Compounds/t4lys/";
