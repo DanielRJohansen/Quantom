@@ -10,7 +10,7 @@ from LIMA_TOOLS import *
 
 
 class LIMANET():
-    def __init__(self, model, inputsize, dataloader, bins, lr=0.0001):
+    def __init__(self, model, inputsize, dataloader, bins=None, lr=0.0001):
         self.model = model
 
         self.dataloader = dataloader
@@ -25,7 +25,7 @@ class LIMANET():
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=lr)
         #self.optimizer = torch.optim.SGD(self.model.parameters(), lr=0.001)
 
-        self.loss = self.calcLoss5
+        self.loss = self.calcLoss6
         self.accuracy = self.calcAccuracy2
 
 
@@ -34,7 +34,9 @@ class LIMANET():
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         print(self.device)
 
-        self.BCE = nn.BCELoss(weight=dataloader.bin_weights.to(self.device))
+        #self.BCE = nn.BCELoss(weight=dataloader.bin_weights.to(self.device))
+        #self.CELoss = nn.CrossEntropyLoss()
+        self.CELoss = F.binary_cross_entropy_with_logits
         #self.BCE = nn.BCELoss()
 
         self.model = self.model.to(self.device)
@@ -54,7 +56,7 @@ class LIMANET():
             inputs, labels = data
 
             #labels = labels[:, 3:]                                  # First 3 values are force xyz, next n values are onehot encodings
-            labels = labels[:,0]                                    # only forward x force
+            #labels = labels[:,0]                                    # only forward x force
 
             inputs = inputs.to(self.device)
             labels = labels.to(self.device)
@@ -83,7 +85,7 @@ class LIMANET():
             inputs, labels = data
 
             #labels = labels[:,3:]                               # First 3 values are force xyz, next n values are onehot encodings
-            labels = labels[:,0]                                # Only forward x force
+            #labels = labels[:,0]                                # Only forward x force
 
             inputs = inputs.to(self.device)
             labels = labels.to(self.device)
@@ -216,6 +218,13 @@ class LIMANET():
 
 
 
+    def calcLoss6(self, pred, base, labels):
+        #print(labels.shape)
+        labels = labels[:,3:]
+        #print(labels.shape)
+        #print(labels)
+        #exit()
+        return self.CELoss(pred, labels)
 
 
     def calcAccuracy(self, predictions, base, labels):

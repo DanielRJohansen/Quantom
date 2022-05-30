@@ -1,4 +1,5 @@
 import torch
+import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
 import math
@@ -65,8 +66,10 @@ def prepData4(input_data, nearest_n_atoms):
 
 
 
+
+
 class WaterforceDataloader():
-    def __init__(self, data_filepath, neighbors_per_row, bin_centers, nearest_n_atoms=128, batch_size=64, prepper_id=0, norm_data=True):
+    def __init__(self, data_filepath, neighbors_per_row, bin_centers=None, nearest_n_atoms=128, batch_size=64, prepper_id=0, norm_data=True):
         preppers = [prepData1, prepData2, prepData3, prepData4]
         data_prepper = preppers[prepper_id-1]
 
@@ -100,12 +103,15 @@ class WaterforceDataloader():
         # Now make bins of the data
         self.datapoint_max = torch.max(torch.abs(labels[0:self.n_train, 0]))     # temp, now it only checks x forces!
         self.datapoint_min = self.datapoint_max*-1
-        onehot_labels = self.makeBinaryLabels(labels, bin_centers)
+        #onehot_labels = self.makeBinaryLabels(labels, bin_centers)
+        directionvectors_labels = self.makeDiscreteDirectionsLabels(labels)
 
-        self.bin_weights = self.assignWeightsToBins(onehot_labels)                  # The weights depend on the (training) dataset
+
+        #self.bin_weights = self.assignWeightsToBins(onehot_labels)                  # The weights depend on the (training) dataset
 
         #labels = [labels, onehot_labels]
-        labels = torch.cat((labels, onehot_labels), dim=1)    # First 3 values are force xyz, next n values are onehot encodings
+        #labels = torch.cat((labels, onehot_labels), dim=1)    # First 3 values are force xyz, next n values are onehot encodings
+        labels = torch.cat((labels, directionvectors_labels), dim=1)
 
         if norm_data:
             data = self.normalizeData(data, self.n_train)                   # Normalize AFTER making labels
@@ -155,26 +161,46 @@ class WaterforceDataloader():
         return bin_means
 
     def makeBinaryLabels(self, labels, bin_means):
-            #errors = torch.zeros((labels.shape[0], len(bin_means)), dtype=torch.float32)
-        #errors = []
-
-        #for i in range(len(bin_means)):
-        #    errors.append(torch.square(labels[:,0]-bin_means[i]))
-        #errors = torch.stack(errors, 1)
-
-        #max_vals = torch.min(errors, dim=1).values.view(-1,1)
-        #max_vals = torch.repeat_interleave(max_vals, len(bin_means), dim=1)
-
-        #labels_ = torch.where(errors==max_vals, True, False)
         labels_ = onehotEncoder(labels, bin_means)
-        #print(labels_)
-        #print("a shape ", labels_.shape)
         print("Bin means: ", bin_means)
         print("Bin counts: ", torch.sum(labels_, dim=0))
 
 
 
         return labels_.float()
+
+
+    def makeDiscreteDirectionsLabels(self, labels):
+        dir_vectors = getDirVectors()
+        n_vectors = dir_vectors.shape[0]
+        n_datapoints = labels.shape[0]
+
+
+        #print(labels.shape)
+        #print(dir_vectors.shape)
+
+        dirlabels = []
+
+        force_normalized = normalizedVectors(labels)
+
+
+        for i in range(n_vectors):
+            dir_vector = dir_vectors[i,:].repeat(n_datapoints, 1)#.transpose(0,1)   # Select dir vector, repeat for each datapoint
+
+            force_dir_likeness = torch.sum(dir_vector * force_normalized, dim=1)        # Dotproduct from Stackoverflow lol
+            force_dir_likeness = torch.maximum(force_dir_likeness, torch.tensor(0))     # This allows the network to not be punished for pushing from both sides!
+            dirlabels.append(force_dir_likeness)
+
+        dirlabels = torch.stack(dirlabels).transpose(0,1)
+        print("Direction labels shape: ", dirlabels.shape)
+        dirlabels = F.softmax(dirlabels, dim=1)                                         # We need to softmax this, because the NN also softmaxes its output. They must be able to match
+        #exit()
+        return dirlabels
+
+
+
+
+
 
     def assignWeightsToBins(self, onehot_labels):
         #print(onehot_labels.shape)
