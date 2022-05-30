@@ -355,7 +355,7 @@ float Engine::getBoxTemperature() {
 
 																																			// THIS fn requires mallocmanaged!!   // HARD DISABLED HERE
 void Engine::handleBoxtemp() {
-	const float target_temp = 313.f;				// [k]
+	const float target_temp = 310.f;				// [k]
 	float temp = getBoxTemperature();
 	temp = temp == 0.f ? 1 : temp;																			// So we avoid dividing by 0
 	simulation->temperature_buffer[simulation->n_temp_values++] = temp;
@@ -485,7 +485,7 @@ __device__ Float3 calcLJForce(Float3* pos0, Float3* pos1, float* data_ptr, float
 	float dist_sq = (*pos1 - *pos0).lenSquared();
 	float s = sigma * sigma / dist_sq;
 	s = s * s * s;
-	float force = 24.f * epsilon * s / dist_sq * (1.f - 2.f * s);
+	float force = 24.f * epsilon * s / dist_sq * (1.f - 2.f * s);	// Attractive. Negative, when repulsive
 
 	//Float3 v = *pos1 - *pos0;
 	//float dist_sq = v.lenSquared();								// [nm]
@@ -502,11 +502,11 @@ __device__ Float3 calcLJForce(Float3* pos0, Float3* pos1, float* data_ptr, float
 #ifdef LIMA_VERBOSE
 	//if (threadIdx.x == 32 && blockIdx.x == 28 && force < -600000.f && force > -700000) {
 	//if (abs(force) > 20e+8 && type1 == 200 && type2 == 1) {
-	if (abs(force) > 20e+8 || *potE != *potE) {
-		printf("\nDist %f   D2 %f    force %f [MN]     sigma: %f \tepsilon %f  t1 %d t2 %d\n", (float)sqrt(dist_sq), (float) dist_sq, (float)force*1e-6, sigma, epsilon, type1, type2);
-		pos0->print('1');
-		pos1->print('2');
-		printf("Block %d Thread %d\n", blockIdx.x, threadIdx.x);
+	if (abs(force) > 20e+8 || *potE != *potE ) {
+		//printf("\nDist %f   D2 %f    force %f [MN]     sigma: %f \tepsilon %f  t1 %d t2 %d\n", (float)sqrt(dist_sq), (float) dist_sq, (float)force*1e-6, sigma, epsilon, type1, type2);
+		//pos0->print('1');
+		//pos1->print('2');
+		//printf("Block %d Thread %d\n", blockIdx.x, threadIdx.x);
 		//printf("Thread %d Block %d self %f %f %f other %f %f %f\n", threadIdx.x, blockIdx.x, pos0->x, pos0->y, pos0->z, pos1->x, pos1->y, pos1->z);
 		//printf("Force %f %f %f\n", force_unit_vector.x * force, force_unit_vector.y * force, force_unit_vector.z * force);
 	}
@@ -536,10 +536,10 @@ __device__ void calcPairbondForces(Float3* pos_a, Float3* pos_b, PairBond* bondt
 	*potE += 0.5 * bondtype->kb * (error * error);					// [J/mol]
 
 	difference = difference.norm();								// dif_unit_vec, but shares register with dif
-	double force_scalar = -bondtype->kb * error;							// [N/mol] directionless, yes?
+	double force_scalar = -bondtype->kb * error;				//	[J/(mol*nm^2)]*nm =>	kg*nm^2*ns^-2/(mol*nm^2)*nm = kg*nm/(mol*ns^2)				 [N/mol] directionless, yes?
 
-	results[0] = difference * force_scalar;
-	results[1] = difference * force_scalar * -1;
+	results[0] = difference * force_scalar;				// [MN]
+	results[1] = difference * force_scalar * -1;		// [MN]
 
 #ifdef LIMA_VERBOSE
 	if (force_scalar > 2e+7) {
@@ -585,6 +585,10 @@ __device__ void calcDihedralbondForces(Float3* pos_left, Float3* pos_lm, Float3*
 	Float3 normal1 = (*pos_left-*pos_lm).cross((*pos_rm-*pos_lm)).norm();		// Should this not be normalized????
 	Float3 normal2 = (*pos_lm-*pos_rm).cross((*pos_right-*pos_rm)).norm();			// Is inward or outward? Refactor!!!
 	// Both vectors point "left". If pos_left+n1 is closer to pos_right than pos_left-n1, then n1 is pointing inwards, and n2 outwards. Also vice-versa.
+	float torsion = Float3::getAngle(normal1, normal2);
+
+
+
 
 	if (((*pos_left + normal1) - *pos_right).len() < ((*pos_left - normal1) - *pos_right).len())
 		normal2 *= -1;
@@ -595,7 +599,6 @@ __device__ void calcDihedralbondForces(Float3* pos_left, Float3* pos_lm, Float3*
 
 
 
-	float torsion = Float3::getAngle(normal1, normal2);
 
 	//printf("Torsion %f\n", normal1.len());
 	float error = (torsion - dihedral->phi_0);	// *360.f / 2.f * PI;	// Check whether k_phi is in radians or degrees
@@ -817,7 +820,6 @@ __device__ Float3 computeDihedralForces(T* entity, Float3* positions, Float3* ut
 				potE
 			);
 		}
-
 
 		for (int i = 0; i < blockDim.x; i++) {
 			if (threadIdx.x == i && db != nullptr) {
@@ -1042,7 +1044,7 @@ __global__ void compoundKernel(Box* box) {
 	}
 	// ----------------------------------------------------------------------------- //
 
-	if (force.len() > 2e+9) {
+	if (force.len() > 2e+12) {
 		printf("\n\nCritical force %f\n\n\n", force.len());
 		box->critical_error_encountered = true;
 	}

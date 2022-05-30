@@ -7,6 +7,8 @@ void BoxBuilder::buildBox(Simulation* simulation) {
 	simulation->box->compounds = new Compound[MAX_COMPOUNDS];
 	simulation->box->solvents = new Solvent[MAX_SOLVENTS];
 
+
+
 	simulation->box->compound_state_array = new CompoundState[MAX_COMPOUNDS];
 	cudaMalloc(&simulation->box->compound_state_array_next, sizeof(CompoundState) * MAX_COMPOUNDS);
 	cudaMalloc(&simulation->box->solvents_next, sizeof(Solvent) * MAX_SOLVENTS);
@@ -191,7 +193,7 @@ int BoxBuilder::solvateBox(Simulation* simulation)
 
 int BoxBuilder::solvateBox(Simulation* simulation, vector<Float3>* solvent_positions)	// Accepts the position of the center or Oxygen of a solvate molecule. No checks are made wh
 {
-	simulation->box->solvents = new Solvent[MAX_SOLVENTS];
+
 
 
 	for (Float3 sol_pos : *solvent_positions) {

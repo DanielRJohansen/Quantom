@@ -25,7 +25,7 @@ class LIMANET():
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=lr)
         #self.optimizer = torch.optim.SGD(self.model.parameters(), lr=0.001)
 
-        self.loss = self.calcLoss4
+        self.loss = self.calcLoss5
         self.accuracy = self.calcAccuracy2
 
 
@@ -52,7 +52,10 @@ class LIMANET():
         epoch_loss = 0
         for i, data in enumerate(self.trainloader):
             inputs, labels = data
-            labels = labels[:, 3:]                                  # First 3 values are force xyz, next n values are onehot encodings
+
+            #labels = labels[:, 3:]                                  # First 3 values are force xyz, next n values are onehot encodings
+            labels = labels[:,0]                                    # only forward x force
+
             inputs = inputs.to(self.device)
             labels = labels.to(self.device)
 
@@ -78,7 +81,10 @@ class LIMANET():
         acc_total = 0
         for i, data in enumerate(self.valloader):
             inputs, labels = data
-            labels = labels[:,3:]                               # First 3 values are force xyz, next n values are onehot encodings
+
+            #labels = labels[:,3:]                               # First 3 values are force xyz, next n values are onehot encodings
+            labels = labels[:,0]                                # Only forward x force
+
             inputs = inputs.to(self.device)
             labels = labels.to(self.device)
 
@@ -168,6 +174,48 @@ class LIMANET():
         #return torch.sum(variances)
 
         #return torch.sum(torch.square(variances))
+
+
+    def calcLoss5(self, pred, base, labels):
+
+        n_bins = pred.shape[1]
+        batchsize = pred.shape[0]
+
+        ## Loss from distribution overlaps
+        weighted_forces = labels.repeat(n_bins, 1).transpose( 0, 1) * pred      #(batch, bins)
+        weight_sums = torch.sum(pred, dim=0)  # weight sums for each bin        #(bins)
+
+        weightedforces_sums = torch.sum(weighted_forces, dim=0)                 #(bins)
+        weighted_means = weightedforces_sums/weight_sums            # weighted mean for each bin    #(bins)
+
+        weighted_means_repeated = weighted_means.repeat(batchsize, 1)
+        weighted_vars = torch.sum(torch.square(weighted_forces-weighted_means_repeated), dim=0) / weight_sums
+        weighted_stddev = torch.sqrt(weighted_vars)
+
+        loss_contributions = []
+        for i in range(0, n_bins):
+            for j in range(i+1, n_bins):
+                loss_contributions.append(
+                    (
+                        torch.min(weighted_means[i] + weighted_stddev[i], weighted_means[j] + weighted_stddev[j])
+                        -
+                        torch.max(weighted_means[i] - weighted_stddev[i], weighted_means[j] - weighted_stddev[j])
+                    )
+                    *
+                    (1 - torch.abs(weighted_means[i] - weighted_means[j]) / torch.max(weighted_stddev[i], weighted_stddev[j]))
+
+                )
+        loss_contributions = torch.stack(loss_contributions)
+
+
+        # Loss from loss-gaming using few bins
+        samesizebin_measurement = torch.pow(torch.abs(torch.sum(pred, dim=0)-batchsize/n_bins), 1.5)
+
+
+        return torch.sum(loss_contributions) + torch.sum(samesizebin_measurement)
+
+
+
 
 
     def calcAccuracy(self, predictions, base, labels):

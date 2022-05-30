@@ -43,7 +43,7 @@ bar(x,log10(y))
 clear 
 clc
 
-workdir = "C:\\PROJECTS\\Quantom\\Simulation\\Steps_145066";
+workdir = "C:\\PROJECTS\\Quantom\\Simulation\\Steps_350000";
 file = fopen(strcat(workdir, "\\energy.bin"), "rb");
 energy_data = fread(file, 'single');
 fclose(file);
@@ -85,7 +85,7 @@ xlabel("time [fs]")
 %label("Kinetic energy")
 
 %xlim([00 2700])
-ylim([-inf 20000])
+ylim([-inf 10000])
 
 initial_temperature = kinE(1) * 2/(3*8.3145)
 final_temperature = kinE(length(kinE)) * 2/(3*8.3145)
@@ -109,7 +109,7 @@ xlabel("time [fs]")
 clear 
 clc
 
-workdir = "C:\\PROJECTS\\Quantom\\Simulation\\Steps_145066";
+workdir = "C:\\PROJECTS\\Quantom\\Simulation\\Steps_350000";
 file = fopen(strcat(workdir, "\\logdata.bin"), "rb");
 data = fread(file, 'single');
 fclose(file);
@@ -120,7 +120,7 @@ potE = data(3:10:end);
 force = data(4:10:end);
 
 x = 1:length(vel);
-min_x = 000;
+min_x = 340000;
 max_x = length(x);
 
 
@@ -158,7 +158,8 @@ xlim([min_x max_x])
 %% Waterforce
 clear 
 clc
-data = readtable("D:\\Quantom\\log.csv");
+%data = readtable("D:\\Quantom\\log.csv");
+data = readtable("D:\\PROJECTS\\Quantom\\Simulation\\Steps_350000\\log.csv");
 
 %tiledlayout(3,1)
 %nexttile

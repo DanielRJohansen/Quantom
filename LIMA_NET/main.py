@@ -40,7 +40,7 @@ if __name__ == '__main__':
 
     n_bins = 7                          # Must be uneven
     bins = getBins(n_bins)
-    normalize_data = True
+    normalize_data = True               # Should we norm labels aswell?
 
 
 
@@ -53,7 +53,7 @@ if __name__ == '__main__':
     n_neighbors = 32                        # To train with - obviously cannot be > n per row
 
     #dataloader = WaterforceDataloader(data_filepath, neighbors_per_row,batch_size=256, nearest_n_atoms=n_neighbors, prepper_id=2)
-    dataloader = WaterforceDataloader(data_filepath, neighbors_per_row, bin_centers=bins.bin_centers, batch_size=2048, nearest_n_atoms=n_neighbors, prepper_id=4, norm_data=normalize_data)
+    dataloader = WaterforceDataloader(data_filepath, neighbors_per_row, bin_centers=bins.bin_centers, batch_size=4096, nearest_n_atoms=n_neighbors, prepper_id=4, norm_data=normalize_data)
 
 #    model = LIMADNN1(n_neighbors=n_neighbors)
  #   model = LIMADNN2(n_neighbors=n_neighbors)
@@ -64,4 +64,4 @@ if __name__ == '__main__':
 
     trainer = Trainer(net, workdir, n_neighbors=n_neighbors)
 
-    trainer.train(500)
+    trainer.train(15)

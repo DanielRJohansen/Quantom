@@ -30,6 +30,10 @@ constexpr float BOX_LEN_HALF = BOX_LEN / 2.f;
 const int N_SOLVATE_MOLECULES = 2000;	
 
 
+const int NEIGHBORLIST_MAX_COMPOUNDS = 64;
+const int NEIGHBORLIST_MAX_SOLVENTS = 1024;
+const int SOLVENTS_BATCHSIZE = 64;
+
 
 
 
@@ -37,7 +41,7 @@ const int N_SOLVATE_MOLECULES = 2000;
 
 
 const int MAX_SOLVENTS = 0xFFFF;
-constexpr float CUTOFF = 0.6f;	//nm/
+constexpr float CUTOFF = 0.4f;	//nm/
 //const int MAX_ATOM_TYPES = 16;
 
 
@@ -60,7 +64,7 @@ const int STEPS_PER_NLIST_UPDATE = 200;
 
 
 
-const int STEPS_PER_RENDER = 100;
+const int STEPS_PER_RENDER = 2;
 
 
 // THERMOSTAT PARAMETERS

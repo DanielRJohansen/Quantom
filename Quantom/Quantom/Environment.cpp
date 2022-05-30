@@ -27,7 +27,7 @@ Environment::Environment() {
 
 	boxbuilder.buildBox(simulation);
 	boxbuilder.addSingleMolecule(simulation, &mol_6lzm_10);
-	boxbuilder.solvateBox(simulation, &solvent_positions);
+	//boxbuilder.solvateBox(simulation, &solvent_positions);
 	//exit(1);
 
 	//boxbuilder.addScatteredMolecules(simulation, &mol_dpc, N_LIPID_COPIES);
