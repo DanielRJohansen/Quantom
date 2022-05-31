@@ -14,13 +14,14 @@ def makeBlock(inputs, outputs, size):
 def makeBlock1(inputs, outputs, size):
     return nn.Sequential(
         nn.Linear(inputs, size),
-        #nn.BatchNorm1d(size),
-        nn.Linear(size, size//2),
+        nn.BatchNorm1d(size),
+        nn.Linear(size, size),
         nn.ReLU(),
-        nn.Linear(size // 2, size // 4),
+        nn.Linear(size, size),
         nn.ReLU(),
-        nn.Linear(size // 4, outputs),
     )
+
+
 
 
 class LIMADNN4(nn.Module):
@@ -35,16 +36,70 @@ class LIMADNN4(nn.Module):
         #self.block = makeBlock((self.n_neighbors) * 3, self.out_bins, 64)
 
         #self.block = makeBlock1((self.n_neighbors) * 3, self.out_bins, 256)
-        self.block = makeBlock1(inputsize, self.out_bins, 64)
+        #self.block = makeBlock1(inputsize, self.out_bins, 64)
+        self.p0block = makeBlock1(6, 8, 8)
+        self.p0out = nn.Sequential(
+            nn.Linear(32, self.out_bins),
+            nn.ReLU()
+        )
+
+        self.p0simple = nn.Sequential(
+            nn.Linear(1, 4),
+            nn.ReLU(),
+            nn.Linear(4, 8),
+            nn.ReLU()
+        )
 
 
+        self.lstmblock = nn.LSTM(input_size=4, hidden_size=32, num_layers=4, batch_first=True, proj_size=12)
+        self.lstmout_fc = nn.Sequential(
+            nn.Linear(12, 8),
+            nn.ReLU()
+        )
+
+
+        self.mixerblock = nn.Sequential(
+            nn.Linear(8+8, 16),
+            nn.ReLU(),
+            nn.Linear(16, self.out_bins),
+            nn.ReLU()
+        )
+
+
+        #self.mixer_fc = nn.Linear(12+6, 16)
+
+    def calcElementLengths(self, x):
+        squares = torch.square(x)
+        sums = torch.sum(squares, dim=2)
+        lengths = torch.sqrt(sums)
+        return lengths
 
     def forward(self, x):
+        p0data = x[:,:2,:]
+        p0data = p0data.view(-1, 6)
+        base = p0data[:,:3]
+        force_scalar = self.calcElementLengths(base[:, None, :])
 
-        x = x.view(x.shape[0], x.shape[1]*x.shape[2])
-        out = self.block(x)
+        neighbordata = x[:,2:,:]
+        nd_lengths = self.calcElementLengths(neighbordata)
+        neighbordata = torch.cat((neighbordata, nd_lengths[:,:,None]), dim=2) # Trick to add dummy dimension, so we can concat later
+
+
+
+        #x1 = self.p0block(p0data)
+        x1 = self.p0simple(force_scalar)
+
+        _, (x2, _) = self.lstmblock(neighbordata)           # Extract only projection from final element in sequence
+        x2 = x2[-1,:,:]                                     # Extract only proj from final LSTM in block
+        x2 = self.lstmout_fc(x2)
+
+        mixed = torch.cat((x1, x2), dim=1)
+
+        #out = self.p0out(x1)
+        out = self.mixerblock(mixed)
+
         out = F.softmax(out, dim=1)
-        return out, 1           # return 1 because loss expects a "base"
+        return out, base
 
 
 

@@ -37,6 +37,7 @@ class LIMANET():
         #self.BCE = nn.BCELoss(weight=dataloader.bin_weights.to(self.device))
         #self.CELoss = nn.CrossEntropyLoss()
         self.CELoss = F.binary_cross_entropy_with_logits
+        self.dir_vectors = getDirVectors().to(self.device)                                      # Vectors in a set of directions
         #self.BCE = nn.BCELoss()
 
         self.model = self.model.to(self.device)
@@ -109,9 +110,8 @@ class LIMANET():
         errors = predictions.sub(labels)
         # error = predictions.sub(true_dF)
         sq_errors = torch.square(errors)
-        sum_sq_errors = torch.sum(sq_errors, 1)
+        sum_sq_errors = torch.sum(sq_errors, dim=1)
         sum_errors = torch.sqrt(sum_sq_errors)
-
 
         return sum_errors
 
@@ -243,10 +243,29 @@ class LIMANET():
         return mean_acc
 
     def calcAccuracy2(self, pred, base, labels):
-        return torch.tensor(0)
+        force_scalars = vectorLengths(labels[:,:3]).repeat(3,1).transpose(0,1)
+        pred_directions = self.dir_vectors
+        batch_size = pred.shape[0]
 
-        #variances = self.calcVariances(pred, labels)
-        #return torch.mean(variances)
+        summed_dir = torch.zeros((batch_size, 3)).to(self.device)
+        for i in range(6):
+            dir = self.dir_vectors[i]
+            dir = dir.repeat(batch_size, 1)
+            pred_confidence = pred[:,i].repeat(3,1).transpose(0,1)
+            vector_contributions = pred_confidence * dir
+            summed_dir += vector_contributions
+
+
+        dir_vectors = normalizedVectors(summed_dir)
+        label_vectors = normalizedVectors(labels[:,:3])
+
+        euc_err = 1 - self.calcEuclideanError(dir_vectors, label_vectors) * 0.5
+
+        #scaled_predictions = dir_vectors.mul(force_scalars)
+        #euc_err = self.calcEuclideanError(scaled_predictions, labels[:,:3])
+        return torch.mean(euc_err)
+
+
 
 
     def saveModel(self, working_folder):

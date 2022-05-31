@@ -27,10 +27,14 @@ def getDirVectors():
             directions[i + dim*2, dim] = -1 + 2*i   # alternate sign for consecutive vectors: [-1,0,0], [1,0,0], [0,-1..
     return directions
 
-def normalizedVectors(array):
+def vectorLengths(array):    # (n_vectors, n_dims(3))
     sq = torch.square(array)
     sums = torch.sum(sq, dim=1)
-    lengths = torch.sqrt(sums)                  # We do NOT check if any forces are 0, this would prob be an error somewhere elsooo
+    lengths = torch.sqrt(sums)  # We do NOT check if any forces are 0, this would prob be an error somewhere elsooo
+    return lengths
+
+def normalizedVectors(array):
+    lengths = vectorLengths(array)# We do NOT check if any forces are 0, this would prob be an error somewhere elsooo
     #print(array[-20:,:])
     #print(lengths[-20:])
     #print(lengths.shape)
