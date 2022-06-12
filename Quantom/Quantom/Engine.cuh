@@ -32,6 +32,12 @@ public:
 	static float __device__ __host__ calcKineticEnergy(Float3* pos1, Float3* pos2, double mass, double dt) {	// pos1/2 MUST be 2 steps apart!!!!
 		LIMAENG::applyHyperpos(pos1, pos2);
 
+		if ((*pos1 - *pos2).len() > 1) {
+			printf("KinE Dist over 1 nm!\n");
+			pos1->print('1');
+			pos2->print('2');
+		}
+			
 
 		float vel = (*pos1 - *pos2).len() * 0.5f / dt;
 		float kinE = 0.5 * mass * vel * vel;
@@ -155,7 +161,7 @@ private:
 	void offloadPositionData();
 	void offloadTrainData();
 
-	float getBoxTemperature();
+	Float3 getBoxTemperature();
 	void handleBoxtemp();
 
 

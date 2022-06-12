@@ -213,7 +213,7 @@ int BoxBuilder::solvateBox(Simulation* simulation, vector<Float3>* solvent_posit
 
 
 	simulation->total_particles += simulation->box->n_solvents;
-	printf("%d solvents added to box\n", simulation->box->n_solvents);
+	printf("%d of %d solvents added to box\n", simulation->box->n_solvents, solvent_positions->size());
 	return simulation->box->n_solvents;
 }
 
@@ -428,17 +428,39 @@ bool BoxBuilder::spaceAvailable(Box* box, Compound* compound)
 	return true;
 }
 
+float minDist(Compound* compound, Float3 particle_pos) {
+	float mindist = 999999;
+	for (int i = 0; i < compound->n_particles; i++) {
+		float dist = (compound->prev_positions[i] - particle_pos).len();
+		mindist = min(mindist, dist);
+	}
+	return mindist;
+}
+
 bool BoxBuilder::spaceAvailable(Box* box, Float3 particle_center)
 {
 	for (int c_index = 0; c_index < box->n_compounds; c_index++) {
-		BoundingBox bb = calcCompoundBoundingBox(&box->compounds[c_index]);
-		bb.addPadding(MIN_NONBONDED_DIST);
-		if (bb.pointIsInBox(particle_center)) {
+		if (minDist(&box->compounds[c_index], particle_center) < 0.2)
 			return false;
-		}
+
+
+
+		//BoundingBox bb = calcCompoundBoundingBox(&box->compounds[c_index]);
+		//bb.addPadding(MIN_NONBONDED_DIST);
+		//if (bb.pointIsInBox(particle_center)) {
+		//	return false;
+		//}
 	}
+	for (int si = 0; si < box->n_solvents; si++) {
+		float dist = (box->solvents[si].pos - particle_center).len();
+		if (dist < 0.25)
+			return false;		
+	}
+
 	return true;
 }
+
+
 
 bool BoxBuilder::verifyPairwiseParticleMindist(Compound* a, Compound* b)
 {

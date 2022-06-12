@@ -311,13 +311,15 @@ void Engine::offloadTrainData() {
 
 
 
-float Engine::getBoxTemperature() {
+Float3 Engine::getBoxTemperature() {
 	
 	const int step = simulation->getStep() - 1;
 
 	long double temp_sum = 0;				// [k]
 
 	long double kinE_sum = 0;
+	float biggest_contribution = 0;
+
 
 	const int step_offset_a = step * simulation->total_particles_upperbound;
 	const int step_offset_b = (step - 2) * simulation->total_particles_upperbound;
@@ -334,6 +336,8 @@ float Engine::getBoxTemperature() {
 			//float kinE = LIMAENG::calcKineticEnergy(&posa, &posb, forcefield_device.particle_parameters[simulation->box->compounds[c].atom_types[i]].mass, simulation->dt);			// Doesnt work, use forcefield_host!!
 			//printf("kinE %f\n", kinE);
 			//printf("mass %f\n", forcefield_host.particle_parameters[simulation->compounds_host[c].atom_types[i]].mass);
+			biggest_contribution = max(biggest_contribution, kinE);
+				
 			kinE_sum += kinE;
 			//particles_total++;
 		}
@@ -344,19 +348,23 @@ float Engine::getBoxTemperature() {
 		Float3 posa = simulation->traj_buffer[i + solvent_offset + step_offset_a];
 		Float3 posb = simulation->traj_buffer[i + solvent_offset + step_offset_b];
 		float kinE = LIMAENG::calcKineticEnergy(&posa, &posb, SOLVENT_MASS, simulation->dt);
+		biggest_contribution = max(biggest_contribution, kinE);
 		kinE_sum += kinE;
 	}
 	//double avg_kinE = kinE_sum / (long double)particles_total;
 	double avg_kinE = kinE_sum / (long double)simulation->total_particles;
 	float temperature = avg_kinE * 2.f / (3.f * 8.3145);
 	//printf("\nTemp: %f\n", temperature);
-	return temperature;
+	return Float3(temperature, biggest_contribution, avg_kinE);
 }
 
 																																			// THIS fn requires mallocmanaged!!   // HARD DISABLED HERE
 void Engine::handleBoxtemp() {
 	const float target_temp = 310.f;				// [k]
-	float temp = getBoxTemperature();
+	Float3 temp_package = getBoxTemperature();
+	float temp = temp_package.x;
+	float biggest_contribution = temp_package.y;
+
 	temp = temp == 0.f ? 1 : temp;																			// So we avoid dividing by 0
 	simulation->temperature_buffer[simulation->n_temp_values++] = temp;
 
@@ -365,10 +373,10 @@ void Engine::handleBoxtemp() {
 	temp_scalar = min(temp_scalar, 1.1f);
 	temp_scalar = max(temp_scalar, 0.9f);
 
-	if (PRINT_TEMP || temp > 1000.f || temp < 100.f) { printf("\n %d Temperature: %f\n", (simulation->getStep() - 1) / STEPS_PER_THERMOSTAT, temp); }
+	if (PRINT_TEMP || temp > 1000.f || temp < 100.f) { printf("\n %d Temperature: %f Biggest contrib: %f avg kinE %f\n", (simulation->getStep() - 1) / STEPS_PER_THERMOSTAT, temp, biggest_contribution, temp_package.z); }
 		
 	if (temp > target_temp/4.f && temp < target_temp*4.f || true) {
-		if (APPLY_THERMOSTAT && simulation->getStep() > 400) {
+		if (APPLY_THERMOSTAT && simulation->getStep() > 20) {
 			
 			simulation->box->thermostat_scalar = temp_scalar;
 
@@ -468,7 +476,7 @@ __device__ Float3 calcLJForce(Float3* pos0, Float3* pos1, float* data_ptr, float
 	// Calculates LJ force on p0	(attractive to p1. Negative values = repulsion )//
 	// input positions in cartesian coordinates [nm]
 	// sigma [nm]
-	// epsilon [J/mol]
+	// epsilon [J/mol]->[(kg*nm^2)/(ns^2*mol)]
 	//	Returns force in J/mol*M		?????????????!?!?//
 
 	// Before
@@ -483,9 +491,9 @@ __device__ Float3 calcLJForce(Float3* pos0, Float3* pos1, float* data_ptr, float
 
 	// Directly from book
 	float dist_sq = (*pos1 - *pos0).lenSquared();
-	float s = sigma * sigma / dist_sq;
+	float s = sigma * sigma / dist_sq;								// [nm]/[nm] -> unitless
 	s = s * s * s;
-	float force = 24.f * epsilon * s / dist_sq * (1.f - 2.f * s);	// Attractive. Negative, when repulsive
+	float force_scalar = 24.f * epsilon * s / dist_sq * (1.f - 2.f * s);	// Attractive. Negative, when repulsive			[(kg)/(ns^2*mol)]	
 
 	//Float3 v = *pos1 - *pos0;
 	//float dist_sq = v.lenSquared();								// [nm]
@@ -502,8 +510,8 @@ __device__ Float3 calcLJForce(Float3* pos0, Float3* pos1, float* data_ptr, float
 #ifdef LIMA_VERBOSE
 	//if (threadIdx.x == 32 && blockIdx.x == 28 && force < -600000.f && force > -700000) {
 	//if (abs(force) > 20e+8 && type1 == 200 && type2 == 1) {
-	if (abs(force) > 20e+8 || *potE != *potE ) {
-		//printf("\nDist %f   D2 %f    force %f [MN]     sigma: %f \tepsilon %f  t1 %d t2 %d\n", (float)sqrt(dist_sq), (float) dist_sq, (float)force*1e-6, sigma, epsilon, type1, type2);
+	if (abs(force_scalar) > 20e+9 || *potE != *potE ) {
+		//printf("\nDist %f   D2 %f    force %.1f [MN]     sigma: %.3f \tepsilon %.0f  t1 %d t2 %d\n", (float)sqrt(dist_sq), (float) dist_sq, (float)force_scalar *1e-6, sigma, epsilon, type1, type2);
 		//pos0->print('1');
 		//pos1->print('2');
 		//printf("Block %d Thread %d\n", blockIdx.x, threadIdx.x);
@@ -521,7 +529,7 @@ __device__ Float3 calcLJForce(Float3* pos0, Float3* pos1, float* data_ptr, float
 		}*/
 	}
 #endif
-	return (*pos1 - *pos0) * force;										// N/mol
+	return (*pos1 - *pos0) * force_scalar;										// N/mol [(kg*nm)/(ns^2*mol)]
 
 }
 
@@ -842,14 +850,17 @@ __device__ void integratePosition(Float3* pos, Float3* pos_tsub1, Float3* force,
 
 	Float3 temp = *pos;
 	LIMAENG::applyHyperpos(pos, pos_tsub1);
+	//printf("dt %.08f\n", dt);
 	//*pos = *pos * 2 - *pos_tsub1 + *force * (1.f / mass) * dt * dt;	// no *0.5?	// [nm] - [nm] + [kg*m*s^-2]/[kg] * [ns]^2
-	*pos = *pos * 2 - *pos_tsub1 + *force * (1.f / mass) * dt * dt;		// [nm] - [nm] + [kg/mol*m*/s^2]/[kg/mol] * [s]^2 * (1e-9)^2	=> [nm]-[nm]+[]
+	double masstime_scaling = (double)dt / (double)mass * (double) dt;
+	*pos = *pos * 2 - *pos_tsub1 + *force * masstime_scaling;		// [nm] - [nm] + [kg/mol*m*/s^2]/[kg/mol] * [s]^2 * (1e-9)^2	=> [nm]-[nm]+[]
 	*pos_tsub1 = temp;
 
 	Float3 delta_pos = *pos - *pos_tsub1;
 	*pos = *pos_tsub1 + delta_pos * *thermostat_scalar;
 #ifdef LIMA_VERBOSE
-	if (force->len() > 2e+8) {
+	if ((*pos-*pos_tsub1).len() > 0.1) {
+		printf("\nP_index %d Thread %d blockId %d\tForce %f mass  %f \Dist %f\n", p_index, threadIdx.x, blockIdx.x, force->len(), mass, (*pos - *pos_tsub1).len());
 		//printf("\nP_index %d Thread %d blockId %d\tForce %f mass  %f \tFrom %f %f %f\tTo %f %f %f\n", p_index, threadIdx.x, blockIdx.x, force->len(), mass, pos_tsub1->x, pos_tsub1->y, pos_tsub1->z, pos->x, pos->y, pos->z);		
 	}
 #endif

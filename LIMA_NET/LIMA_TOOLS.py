@@ -27,9 +27,9 @@ def getDirVectors():
             directions[i + dim*2, dim] = -1 + 2*i   # alternate sign for consecutive vectors: [-1,0,0], [1,0,0], [0,-1..
     return directions
 
-def vectorLengths(array):    # (n_vectors, n_dims(3))
+def vectorLengths(array, dim=1):    # (n_vectors, n_dims(3))
     sq = torch.square(array)
-    sums = torch.sum(sq, dim=1)
+    sums = torch.sum(sq, dim=dim)
     lengths = torch.sqrt(sums)  # We do NOT check if any forces are 0, this would prob be an error somewhere elsooo
     return lengths
 
@@ -45,3 +45,22 @@ def normalizedVectors(array):
     #exit()
     return normalized_vectors
 
+def normalizeVectors2(array):
+    #print(array.shape)
+    lengths = vectorLengths(array, dim=2)# We do NOT check if any forces are 0, this would prob be an error somewhere elsooo
+
+
+    lengths = lengths.repeat(3, 1, 1).transpose(0, 1).transpose(1,2)
+    normalized_vectors = array/lengths
+
+    return normalized_vectors
+
+
+def sampleNormalizedData(dims, mean, std):
+    mean = torch.ones(dims) * mean
+    std = torch.ones(dims) * std
+    sample = torch.normal(mean, std)
+    return sample
+
+def dotP(v1, v2, dim):                  # Dotproduct from Stackoverflow lol
+    return torch.sum(v1 * v2, dim=dim)

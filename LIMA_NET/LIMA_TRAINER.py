@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from time import time
-
+import torch
 
 class Trainer():
     def __init__(self, net, working_folder, n_neighbors):
@@ -29,24 +29,32 @@ class Trainer():
             val_acc_hist.append(vacc)
 
 
-            if (vacc > self.best_acc):
-                self.net.saveModel(self.working_folder)
+            #if (vacc > self.best_acc):
+            #    self.net.saveModel(self.working_folder)
 
             print("Epoch ", e, " train-loss: ", train_loss_hist[-1], " val-loss: ", val_loss_hist[-1], " mean accuracy: ", val_acc_hist[-1], " time: ", time()-t0)
-        
+
+        val_acc_hist = torch.stack(val_acc_hist)
+        #print(val_acc_hist.shape)
+
+
+
         self.net.visualizePredictions()
-        self.makePlot(train_loss_hist, train_acc_hist, val_loss_hist, val_acc_hist, n_epochs)
+        self.makePlot(train_loss_hist, train_acc_hist, val_loss_hist, val_acc_hist[:,0], val_acc_hist[:,1], n_epochs)
         
         
 
-    def makePlot(self, train_loss, train_acc, val_loss, val_acc, n_epochs):
+    def makePlot(self, train_loss, train_acc, val_loss, val_acc, val_acc_baddata, n_epochs):
         train_loss[0] = train_loss[1]   # Not necessary, just looks better since we dont have data for epoch 0
         t = np.arange(0,n_epochs,1, dtype=np.int16)
 
-        plt.plot(t, train_loss, "b--", t, val_loss, "r--", t, val_acc, "g-")
+
+        print(val_acc)
+
+        plt.plot(t, train_loss, "b-", t, val_loss, "r-", t, val_acc, "g-", t, val_acc_baddata, "g--")
         plt.xlabel("Epoch")
         plt.ylabel("Accuracy/Loss")
-        plt.legend(["train loss", "validation loss", "validation accuracy"])
+        plt.legend(["train loss", "validation loss", "validation accuracy", "validation accuracy (bad data)"])
         plt.title("Training - " + str(self.n_neighbors) + " neighbors - "
                   + str(self.net.total_params) + " parameters")
         plt.grid()
