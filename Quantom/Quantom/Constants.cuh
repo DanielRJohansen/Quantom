@@ -6,7 +6,7 @@
 #define LIMA_DEBUGMODE
 
 //#define LIMA_SAFERUN		// Use this for?
-#define LIMA_VERBOSE
+//#define LIMA_VERBOSE
 
 #define ENABLE_WATER
 
@@ -41,13 +41,13 @@ const int SOLVENTS_BATCHSIZE = 64;
 
 
 const int MAX_SOLVENTS = 0xFFFF;
-constexpr float CUTOFF = 0.4f;	//nm/
+constexpr float CUTOFF = 0.7f;	//nm/
 //const int MAX_ATOM_TYPES = 16;
 
 
 
 // OPTIMIZATION PARAMETERS
-const int MAX_COMPOUND_PARTICLES = 128;
+const int MAX_COMPOUND_PARTICLES = 64;
 
 
 
@@ -64,13 +64,13 @@ const int STEPS_PER_NLIST_UPDATE = 200;
 
 
 
-const int STEPS_PER_RENDER = 20;
+const int STEPS_PER_RENDER = 50;
 
 
 // THERMOSTAT PARAMETERS
-const int STEPS_PER_LOGTRANSFER = 20;
+const int STEPS_PER_LOGTRANSFER = 40;
 //const int STEPS_PER_TRAJTRANSFER = 100;
-const int STEPS_PER_THERMOSTAT = 20;
+const int STEPS_PER_THERMOSTAT = 40;
 const bool ENABLE_BOXTEMP = true;
 const bool APPLY_THERMOSTAT = true;										// Switch to using forcefield_host first
 const bool PRINT_TEMP = false;

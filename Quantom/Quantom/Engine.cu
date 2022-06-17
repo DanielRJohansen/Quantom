@@ -479,14 +479,8 @@ __device__ Float3 calcLJForce(Float3* pos0, Float3* pos1, float* data_ptr, float
 	// epsilon [J/mol]->[(kg*nm^2)/(ns^2*mol)]
 	//	Returns force in J/mol*M		?????????????!?!?//
 
-	// Before
-	//Float3 v = (*pos1 - *pos0);
-	//float dist = v.len();					// [nm]
-	//float fraction = sigma / dist;										// [nm/nm], so unitless
-	//float f6 = fraction * fraction * fraction * fraction * fraction * fraction;
-	//float force = 24.f * 1e-9 * epsilon / dist * f6 * (1.f - 2.f * f6);
 
-
+	//return Float3(sigma);	// Test for forcing LJ calc, but always small force, even with bonded particles!
 
 
 	// Directly from book
@@ -494,18 +488,8 @@ __device__ Float3 calcLJForce(Float3* pos0, Float3* pos1, float* data_ptr, float
 	float s = sigma * sigma / dist_sq;								// [nm]/[nm] -> unitless
 	s = s * s * s;
 	float force_scalar = 24.f * epsilon * s / dist_sq * (1.f - 2.f * s);	// Attractive. Negative, when repulsive			[(kg)/(ns^2*mol)]	
+	//float force_scalar = 1.f;
 
-	//Float3 v = *pos1 - *pos0;
-	//float dist_sq = v.lenSquared();								// [nm]
-	//float f2 = sigma*sigma / dist_sq;										// [nm/nm], so unitless
-	//float f6 = f2 * f2 * f2;
-	//float force = (epsilon * epsilon / (dist_sq)) * f6 * (1.f - 2.f * f6) * 24.f * 1e-9;	//	1e+9 * [kg*m/(mol*s^2)] * 1e-9 => [kg*nm/(mol * ns^2)]										wrong: [J/mol]/[nm] [N/mol] 
-	//*potE = force;
-	//Float3 force_unit_vector = (*pos1 - *pos0).norm();
-
-	//float LJ_pot = 4.f * epsilon * (f6 * f6 - f6);						// [J/mol]
-	//*potE += 2.f * epsilon * (f6 * f6 - f6);												// Log this value for energy monitoring purposes, half here, half on other particle
-	*potE += 2.f * epsilon * (s * s - s);												// Log this value for energy monitoring purposes, half here, half on other particle
 
 #ifdef LIMA_VERBOSE
 	//if (threadIdx.x == 32 && blockIdx.x == 28 && force < -600000.f && force > -700000) {
@@ -672,7 +656,7 @@ __device__ Float3 computerIntermolecularLJForces(Float3* self_pos, uint8_t atomt
 		int neighborparticle_atomtype = neighbor_compound->atom_types[neighborparticle_id];
 
 		
-
+		//continue;	// Tester
 		force += calcLJForce(self_pos, &neighbor_positions[neighborparticle_id], data_ptr, potE_sum,
 			(forcefield_device.particle_parameters[atomtype_self].sigma + forcefield_device.particle_parameters[neighborparticle_atomtype].sigma) * 0.5f,
 			(forcefield_device.particle_parameters[atomtype_self].epsilon + forcefield_device.particle_parameters[neighborparticle_atomtype].epsilon) * 0.5,
@@ -879,9 +863,14 @@ __global__ void compoundKernel(Box* box) {
 	__shared__ Compound compound;
 	__shared__ CompoundState compound_state;
 	__shared__ NeighborList neighborlist;
+
+#ifdef ENABLE_WATER
 	__shared__ Float3 utility_buffer[NEIGHBORLIST_MAX_SOLVENTS];							// waaaaay too biggg
 	__shared__ uint8_t utility_buffer_small[NEIGHBORLIST_MAX_SOLVENTS];
-
+#else
+	__shared__ Float3 utility_buffer[MAX_COMPOUND_PARTICLES];
+	__shared__ uint8_t utility_buffer_small[MAX_COMPOUND_PARTICLES];
+#endif
 
 	if (threadIdx.x == 0) {
 		compound.loadMeta(&box->compounds[blockIdx.x]);
@@ -922,8 +911,8 @@ __global__ void compoundKernel(Box* box) {
 #endif
 
 		for (int i = 0; i < compound.n_particles; i++) {
-
-			if (i != threadIdx.x && !compound.lj_ignore_list[threadIdx.x].ignore((uint8_t) i, (uint8_t) blockIdx.x) && threadIdx.x < compound.n_particles) {
+			if (i != threadIdx.x && !compound.lj_ignore_list[threadIdx.x].ignore((uint8_t) i, (uint8_t) blockIdx.x) && threadIdx.x < compound.n_particles) {	
+			//if (i != threadIdx.x  && threadIdx.x < compound.n_particles) {																											// DANGER
 
 				force += calcLJForce(&compound_state.positions[threadIdx.x], &compound_state.positions[i], data_ptr, &potE_sum,
 					(forcefield_device.particle_parameters[compound.atom_types[threadIdx.x]].sigma + forcefield_device.particle_parameters[compound.atom_types[i]].sigma) * 0.5f,		// Don't know how to handle atoms being this close!!!

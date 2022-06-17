@@ -205,20 +205,12 @@ void markInactiveParticles(Row* row0, Row* row1) {
 
 void alignFrameCenters(Row* row0, Row* row1) {
 	Float3 com0 = calcCenterOfMass(row0);
-	Float3 com1 = calcCenterOfMass(row0);
-
-	Float3 dif = com0 - com1;
-	for (int i = 0; i < row0->n_particles; i++) {
-		if (!row0->particles[i].inactive) {
-			row1->particles[i].pos += dif;
-		}
-	}		
-	// Now both frames share the same com
+	Float3 com1 = calcCenterOfMass(row1);
 
 	for (int i = 0; i < row0->n_particles; i++) {
 		if (!row0->particles[i].inactive) {
-			row0->particles[i].pos += com0 * -1.f;
-			row1->particles[i].pos += com0 * -1.f;
+			row0->particles[i].pos += (com0 * -1.f);
+			row1->particles[i].pos += (com1 * -1.f);
 		}
 	}
 	// Now both frames have a com of (0,0,0)
@@ -339,9 +331,9 @@ void alignTilt(Row* row0, Row* row1) {
 
 void alignFrames(Row* row0, Row* row1) {
 	markInactiveParticles(row0, row1);
-	alignFrameCenters(row0, row1);
-	alignPitch(row0, row1);
-	alignTilt(row0, row1);
+	//alignFrameCenters(row0, row1);
+	//alignPitch(row0, row1);
+	//alignTilt(row0, row1);
 }
 
 template <typename T>
@@ -357,7 +349,7 @@ void printArr(T arr, int n, string arrname) {
 
 int main() {
 
-	const int N_STEPS = 350000;	// Determines file to read
+	const int N_STEPS = 100000;	// Determines file to read
 	string workdir = "C:\\PROJECTS\\Quantom\\Simulation\\Steps_" + to_string(N_STEPS) + "\\";
 	printf("Hello world");
 
@@ -374,7 +366,7 @@ int main() {
 	readDataBIN(rows, path_in, N_STEPS, particles_per_step);
 
 
-	const int steps_per_RMSD = 1000;
+	const int steps_per_RMSD = 5000;
 	const int n_values = N_STEPS / steps_per_RMSD-1;
 	int steps[n_values];
 	float rmsd[n_values];

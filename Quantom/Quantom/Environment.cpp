@@ -28,7 +28,10 @@ Environment::Environment() {
 
 	boxbuilder.buildBox(simulation);
 	boxbuilder.addSingleMolecule(simulation, &mol_6lzm_10);
+
+#ifdef ENABLE_WATER
 	boxbuilder.solvateBox(simulation, &solvent_positions);
+#endif
 	//exit(1);
 
 	//boxbuilder.addScatteredMolecules(simulation, &mol_dpc, N_LIPID_COPIES);
