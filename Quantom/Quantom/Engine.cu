@@ -44,6 +44,7 @@ Engine::Engine(Simulation* simulation, ForceField forcefield_host) {
 void Engine::deviceMaster() {
 	LIMAENG::genericErrorCheck("Error before step!");
 	step();
+	LIMAENG::genericErrorCheck("Error after step!");
 }
 
 void Engine::hostMaster() {						// This is and MUST ALWAYS be called after the deviceMaster, and AFTER intStep()!
@@ -402,7 +403,7 @@ void Engine::step() {
 	cudaDeviceSynchronize();
 
 	if (simulation->box->bridge_bundle->n_bridges > 0) {																		// TODO: Illegal access to device mem!!
-		compoundBridgeKernel << < simulation->box->bridge_bundle->n_bridges, MAX_PARTICLES_IN_BRIDGE >> > (simulation->box);	// Must come before compoundKernel()
+		//compoundBridgeKernel << < simulation->box->bridge_bundle->n_bridges, MAX_PARTICLES_IN_BRIDGE >> > (simulation->box);	// Must come before compoundKernel()
 	}
 		
 	cudaDeviceSynchronize();
@@ -438,7 +439,7 @@ void Engine::step() {
 	
 	//cudaMemcpy(simulation->box->solvents, simulation->box->solvents_next, sizeof(Solvent) * MAX_SOLVENTS, cudaMemcpyDeviceToDevice);
 	cudaDeviceSynchronize();
-	LIMAENG::genericErrorCheck("Error during step or state_transfer\n");		// Temp, we want to do host stuff while waiting for async GPU operations...
+	LIMAENG::genericErrorCheck("Error during step or state_transfer\n");		// Temp, we want to do host stuff while waiting for async GPU operations...	// SLOW
 	auto t2 = std::chrono::high_resolution_clock::now();
 
 
@@ -490,6 +491,23 @@ __device__ Float3 calcLJForce(Float3* pos0, Float3* pos1, float* data_ptr, float
 	float force_scalar = 24.f * epsilon * s / dist_sq * (1.f - 2.f * s);	// Attractive. Negative, when repulsive			[(kg)/(ns^2*mol)]	
 	//float force_scalar = 1.f;
 
+	if ((type1 == 35 || type2 == 35) && blockIdx.x == 6 && ((*pos1 - *pos0) * force_scalar).len() > 10000000) {
+	//if (threadIdx.x == 35 && blockIdx.x == 6 && ((*pos1 - *pos0) * force_scalar).len() > 0) {
+		//((*pos1 - *pos0) * force_scalar).print('L');
+		//printf("Type %d\n", type2);
+		//pos0->print('L');
+		printf("t1 %d t2 %d x %f\n", type1, type2, ((*pos1 - *pos0) * force_scalar).x);
+	}
+	
+	if (abs(((*pos1 - *pos0) * force_scalar).x) > 120000000) {
+		//printf("Thread %d block %d\n", threadIdx.x, blockIdx.x);
+		//((*pos1 - *pos0)* force_scalar).print('l');
+	}
+	
+
+		//printf("LJ: %f\n", ((*pos1 - *pos0) * force_scalar).len());
+
+
 
 #ifdef LIMA_VERBOSE
 	//if (threadIdx.x == 32 && blockIdx.x == 28 && force < -600000.f && force > -700000) {
@@ -528,7 +546,7 @@ __device__ void calcPairbondForces(Float3* pos_a, Float3* pos_b, PairBond* bondt
 	*potE += 0.5 * bondtype->kb * (error * error);					// [J/mol]
 
 	difference = difference.norm();								// dif_unit_vec, but shares register with dif
-	double force_scalar = -bondtype->kb * error;				//	[J/(mol*nm^2)]*nm =>	kg*nm^2*ns^-2/(mol*nm^2)*nm = kg*nm/(mol*ns^2)				 [N/mol] directionless, yes?
+	double force_scalar = -bondtype->kb * error * 0.f;	//DANGER				//	[J/(mol*nm^2)]*nm =>	kg*nm^2*ns^-2/(mol*nm^2)*nm = kg*nm/(mol*ns^2)				 [N/mol] directionless, yes?
 
 	results[0] = difference * force_scalar;				// [MN]
 	results[1] = difference * force_scalar * -1;		// [MN]
@@ -562,7 +580,7 @@ __device__ void calcAnglebondForces(Float3* pos_left, Float3* pos_middle, Float3
 	//*potE += 0.5 * ktheta * error * error * 0.5;
 	//double force_scalar = ktheta * (error);
 	*potE += 0.5 * angletype->k_theta * error * error * 0.5;
-	double force_scalar = angletype->k_theta * (error);
+	double force_scalar = angletype->k_theta * (error) * 0.f;	// DANGER
 
 	results[0] = inward_force_direction1 * force_scalar;
 	results[2] = inward_force_direction2 * force_scalar;
@@ -579,18 +597,11 @@ __device__ void calcDihedralbondForces(Float3* pos_left, Float3* pos_lm, Float3*
 	// Both vectors point "left". If pos_left+n1 is closer to pos_right than pos_left-n1, then n1 is pointing inwards, and n2 outwards. Also vice-versa.
 	float torsion = Float3::getAngle(normal1, normal2);
 
-
-
-
 	if (((*pos_left + normal1) - *pos_right).len() < ((*pos_left - normal1) - *pos_right).len())
 		normal2 *= -1;
 	else
 		normal1 *= -1;
-
 	// Now both normals are pointing inwards
-
-
-
 
 	//printf("Torsion %f\n", normal1.len());
 	float error = (torsion - dihedral->phi_0);	// *360.f / 2.f * PI;	// Check whether k_phi is in radians or degrees
@@ -598,13 +609,12 @@ __device__ void calcDihedralbondForces(Float3* pos_left, Float3* pos_lm, Float3*
 	//error = (error / (2.f * PI)) * 360.f;
 
 	
-
 	//*potE += 0.5 * dihedral->k_phi * error * error * 0.5;
 	//double force_scalar = dihedral->k_phi * (error);
 
 	//double force_scalar = sinf(torsion - dihedral->phi_0);		// Should be -sinf? (cos)' = -sin??!?!
 
-	float force_scalar = dihedral->k_phi * sinf(dihedral->n * torsion - dihedral->phi_0);
+	float force_scalar = dihedral->k_phi * sinf(dihedral->n * torsion - dihedral->phi_0) * 0,f;		// DANGER
 	*potE = dihedral->k_phi * (1 - cosf(dihedral->n * torsion - dihedral->phi_0));
 
 	//printf("Torsion %f ref %f force_scalar %f\n", torsion, dihedral->phi_0, force_scalar);
@@ -650,8 +660,10 @@ __device__ Float3 computerIntermolecularLJForces(Float3* self_pos, uint8_t atomt
 	
 	Float3 force(0.f);
 	for (int neighborparticle_id = 0; neighborparticle_id < neighbor_compound->n_particles; neighborparticle_id++) {
-		if (lj_ignore_list->ignore((uint8_t)neighborparticle_id, (uint8_t)neighborcompound_id))	// Check if particle_self is bonded to particle_i in neighbor compound
-			continue;
+		
+		
+		//if (lj_ignore_list->ignore((uint8_t)neighborparticle_id, (uint8_t)neighborcompound_id))	// Check if particle_self is bonded to particle_i in neighbor compound
+			//continue;
 
 		int neighborparticle_atomtype = neighbor_compound->atom_types[neighborparticle_id];
 
@@ -666,6 +678,8 @@ __device__ Float3 computerIntermolecularLJForces(Float3* self_pos, uint8_t atomt
 	}
 	return force;// *24.f * 1e-9;
 }
+
+
 /*
 
 	Float3 force(0.f);
@@ -741,6 +755,12 @@ __device__ Float3 computePairbondForces(T* entity, Float3* positions, Float3* ut
 				pb,
 				forces, potE
 			);
+
+			float temp = 0.f;
+			float sigma = (forcefield_device.particle_parameters[entity->atom_types[pb->atom_indexes[0]]].sigma + forcefield_device.particle_parameters[entity->atom_types[pb->atom_indexes[1]]].sigma) * 0.5;
+			float epsilon = sqrtf(forcefield_device.particle_parameters[entity->atom_types[pb->atom_indexes[0]]].epsilon * forcefield_device.particle_parameters[entity->atom_types[pb->atom_indexes[1]]].epsilon);
+			Float3 anti_lj_force = calcLJForce(&positions[pb->atom_indexes[0]], &positions[pb->atom_indexes[1]], &temp, potE, sigma, epsilon, -1, -1);
+			forces[0] -= anti_lj_force; forces[1] += anti_lj_force;
 		}
 
 
@@ -775,6 +795,12 @@ __device__ Float3 computeAnglebondForces(T* entity, Float3* positions, Float3* u
 				ab,
 				forces, potE
 			);
+
+			float temp = 0.f;
+			float sigma = (forcefield_device.particle_parameters[entity->atom_types[ab->atom_indexes[0]]].sigma + forcefield_device.particle_parameters[entity->atom_types[ab->atom_indexes[2]]].sigma) * 0.5;
+			float epsilon = sqrtf(forcefield_device.particle_parameters[entity->atom_types[ab->atom_indexes[0]]].epsilon * forcefield_device.particle_parameters[entity->atom_types[ab->atom_indexes[2]]].epsilon);
+			Float3 anti_lj_force = calcLJForce(&positions[ab->atom_indexes[0]], &positions[ab->atom_indexes[2]], &temp, potE, sigma, epsilon, -1, -1);
+			forces[0] -= anti_lj_force; forces[2] += anti_lj_force;			
 		}
 
 
@@ -811,6 +837,25 @@ __device__ Float3 computeDihedralForces(T* entity, Float3* positions, Float3* ut
 				forces, 
 				potE
 			);
+
+
+			float temp = 0.f;
+			float sigma = (forcefield_device.particle_parameters[entity->atom_types[db->atom_indexes[0]]].sigma + forcefield_device.particle_parameters[entity->atom_types[db->atom_indexes[3]]].sigma) * 0.5;
+			float epsilon = sqrtf(forcefield_device.particle_parameters[entity->atom_types[db->atom_indexes[0]]].epsilon * forcefield_device.particle_parameters[entity->atom_types[db->atom_indexes[3]]].epsilon);
+			Float3 anti_lj_force = calcLJForce(&positions[db->atom_indexes[0]], &positions[db->atom_indexes[3]], &temp, potE, sigma, epsilon, db->atom_indexes[0], db->atom_indexes[3]);
+			//forces[0] = Float3(0.f);
+			forces[0] -= anti_lj_force; forces[3] += anti_lj_force;
+			
+			if (abs(anti_lj_force.x) > 17000000 && blockIdx.x == 6) {
+			//	anti_lj_force.print('Q');
+			}
+			if ((db->atom_indexes[0] == 35 || db->atom_indexes[3] == 35) && blockIdx.x == 6) {
+				//forces[0] = Float3(-1, 1, -1);
+				printf("A: 0 %d 3 %d\n", db->atom_indexes[0], db->atom_indexes[3]);
+				//anti_lj_force.print('A');
+				//positions[35].print('A');
+				//printf("ANTI: %f\n", anti_lj_force.len());
+			}
 		}
 
 		for (int i = 0; i < blockDim.x; i++) {
@@ -897,7 +942,8 @@ __global__ void compoundKernel(Box* box) {
 	data_ptr[3] = box->step + 1;
 	
 	//Float3 force(0.f);
-	Float3 force = compound.forces[threadIdx.x];
+	//Float3 force = compound.forces[threadIdx.x];
+	Float3 force = Float3(0.f);
 	Float3 force_LJ_sol(-1.f);
 	// ------------------------------------------------------------ Intramolecular Operations ------------------------------------------------------------ //
 	{
@@ -911,19 +957,24 @@ __global__ void compoundKernel(Box* box) {
 #endif
 
 		for (int i = 0; i < compound.n_particles; i++) {
+			//continue;
+			if (blockIdx.x == 6 && threadIdx.x == 35) {
+				//printf("GLOBAL IDS: %d %d\n", compound.particle_global_ids[35], compound.particle_global_ids[37]);
+			}
+				
 			if (i != threadIdx.x && !compound.lj_ignore_list[threadIdx.x].ignore((uint8_t) i, (uint8_t) blockIdx.x) && threadIdx.x < compound.n_particles) {	
 			//if (i != threadIdx.x  && threadIdx.x < compound.n_particles) {																											// DANGER
-
+				
 				force += calcLJForce(&compound_state.positions[threadIdx.x], &compound_state.positions[i], data_ptr, &potE_sum,
 					(forcefield_device.particle_parameters[compound.atom_types[threadIdx.x]].sigma + forcefield_device.particle_parameters[compound.atom_types[i]].sigma) * 0.5f,		// Don't know how to handle atoms being this close!!!
 					sqrtf(forcefield_device.particle_parameters[compound.atom_types[threadIdx.x]].epsilon * forcefield_device.particle_parameters[compound.atom_types[i]].epsilon),
 					//compound.atom_types[threadIdx.x], compound.atom_types[i]
 					//compound.particle_global_ids[threadIdx.x], blockIdx.x
-					//threadIdx.x, i
-					compound.particle_global_ids[threadIdx.x], compound.particle_global_ids[i]
+					threadIdx.x, i
+					//compound.particle_global_ids[threadIdx.x], compound.particle_global_ids[i]
+
 				);// *24.f * 1e-9;
-
-
+				
 			}
 		}
 	}
@@ -947,6 +998,8 @@ __global__ void compoundKernel(Box* box) {
 		}
 		__syncthreads();				// CRITICAL
 		//continue;
+
+		continue;									// DANGER
 		if (threadIdx.x < compound.n_particles) {
 			force += computerIntermolecularLJForces(&compound_state.positions[threadIdx.x], compound.atom_types[threadIdx.x], &compound.lj_ignore_list[threadIdx.x], &potE_sum, compound.particle_global_ids[threadIdx.x], data_ptr,
 				&box->compounds[neighborcompound_id], utility_buffer, neighborcompound_id);
@@ -1043,9 +1096,12 @@ __global__ void compoundKernel(Box* box) {
 //		box->data_GAN[3 + threadIdx.x * 6 + step_offset] = force_LJ_sol;
 	}
 	// ----------------------------------------------------------------------------- //
-
+	if (threadIdx.x == 35 && blockIdx.x == 6) {
+		force.print('F');
+	}
+		
 	if (force.len() > 2e+12) {
-		printf("\n\nCritical force %f\n\n\n", force.len());
+		printf("\n\nCritical force %f - thread: %d, block = %d\n\n\n", force.len(), threadIdx.x, blockIdx.x);
 		box->critical_error_encountered = true;
 	}
 		

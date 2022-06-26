@@ -50,7 +50,7 @@ private:
 	ParticleRef* particle_id_maps;
 	CompoundBridgeBundle* compound_bridge_bundle;
 
-
+	uint16_t unique_doublyconnected_id = 1;
 
 
 
