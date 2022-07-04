@@ -8,11 +8,21 @@
 //#define LIMA_SAFERUN		// Use this for?
 //#define LIMA_VERBOSE
 
-#define ENABLE_WATER
 
+// --- These can be toggled to test the capabilities of LIMA without the two improperly implemented features --- //
+//#define ENABLE_SOLVENTS				// Enables Explicit Solvents
+//#define ENABLE_BLJV				// Ensures no LJ between bonded particles
+#define IGNORE_NEIGHBOR_OVERFLOW	// LJ list doesnt include neighbors when limit is reached.
+// -------------------------------------------------------------------------------------------------------------- //
 
 #define ENABLE_DIHEDRALS
 
+
+
+
+#ifndef __linux__
+//#define ENABLE_DISPLAY
+#endif
 
 
 
@@ -64,7 +74,8 @@ const int STEPS_PER_NLIST_UPDATE = 200;
 
 
 
-const int STEPS_PER_RENDER = 50;
+const int STEPS_PER_RENDER = 500;
+
 
 
 // THERMOSTAT PARAMETERS

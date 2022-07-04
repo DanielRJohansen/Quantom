@@ -220,15 +220,23 @@ public:
 				neighborcompound_ids[n_compound_neighbors++] = new_id;
 				return true;
 			}
+#ifdef IGNORE_NEIGHBOR_OVERFLOW
+			return true;
+#else
 			printf("\nFailed to insert compound neighbor id %d!\n", new_id);
 			break;
+#endif
 		case NeighborList::SOLVENT:
 			if (n_solvent_neighbors < NEIGHBORLIST_MAX_SOLVENTS) {
 				neighborsolvent_ids[n_solvent_neighbors++] = new_id;
 				return true;
 			}
+#ifdef IGNORE_NEIGHBOR_OVERFLOW
+			return true;
+#else
 			printf("\nFailed to insert solvent neighbor id %d!\n", new_id);
 			break;
+#endif
 		default:
 			break;
 		}

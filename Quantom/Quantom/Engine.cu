@@ -411,7 +411,7 @@ void Engine::step() {
 	}
 	cudaDeviceSynchronize();
 
-#ifdef ENABLE_WATER
+#ifdef ENABLE_SOLVENTS
 	if (simulation->n_solvents > 0) { 
 		solventForceKernel << < simulation->blocks_per_solventkernel, THREADS_PER_SOLVENTBLOCK >> > (simulation->box); 
 	}
@@ -490,6 +490,10 @@ __device__ Float3 calcLJForce(Float3* pos0, Float3* pos1, float* data_ptr, float
 	float force_scalar = 24.f * epsilon * s / dist_sq * (1.f - 2.f * s);	// Attractive. Negative, when repulsive			[(kg)/(ns^2*mol)]	
 	//float force_scalar = 1.f;
 
+
+#ifndef ENABLE_BLJV
+	return (*pos1 - *pos0) * sigma * epsilon;				// This line forces the CUDA compile to include all calculations, but can never produce a large force.
+#endif
 
 #ifdef LIMA_VERBOSE
 	//if (threadIdx.x == 32 && blockIdx.x == 28 && force < -600000.f && force > -700000) {
@@ -582,7 +586,7 @@ __device__ void calcDihedralbondForces(Float3* pos_left, Float3* pos_lm, Float3*
 
 
 
-	if (((*pos_left + normal1) - *pos_right).len() < ((*pos_left - normal1) - *pos_right).len())
+	if (((*pos_left + normal1) - *pos_right).len() < ((*pos_left - normal1) - *pos_right).len())	// Wait, can't i just check if torsion > pi | torsion < 0`???????????????????????
 		normal2 *= -1;
 	else
 		normal1 *= -1;
@@ -593,7 +597,7 @@ __device__ void calcDihedralbondForces(Float3* pos_left, Float3* pos_lm, Float3*
 
 
 	//printf("Torsion %f\n", normal1.len());
-	float error = (torsion - dihedral->phi_0);	// *360.f / 2.f * PI;	// Check whether k_phi is in radians or degrees
+	//float error = (torsion - dihedral->phi_0);	// *360.f / 2.f * PI;	// Check whether k_phi is in radians or degrees
 
 	//error = (error / (2.f * PI)) * 360.f;
 
@@ -614,7 +618,8 @@ __device__ void calcDihedralbondForces(Float3* pos_left, Float3* pos_lm, Float3*
 		pos_lm->print('l');
 		pos_rm->print('r');
 		pos_right->print('R');
-		printf("torsion %f      ref %f     error %f     force: %f\n", torsion, dihedral->phi_0, error, force_scalar);
+		//printf("torsion %f      ref %f     error %f     force: %f\n", torsion, dihedral->phi_0, error, force_scalar);
+		printf("torsion %f      ref %f     error %f     force: %f\n", torsion, dihedral->phi_0, 0.f, force_scalar);
 	}
 		
 
@@ -650,8 +655,11 @@ __device__ Float3 computerIntermolecularLJForces(Float3* self_pos, uint8_t atomt
 	
 	Float3 force(0.f);
 	for (int neighborparticle_id = 0; neighborparticle_id < neighbor_compound->n_particles; neighborparticle_id++) {
+
+#ifdef ENABLE_BLJV
 		if (lj_ignore_list->ignore((uint8_t)neighborparticle_id, (uint8_t)neighborcompound_id))	// Check if particle_self is bonded to particle_i in neighbor compound
 			continue;
+#endif
 
 		int neighborparticle_atomtype = neighbor_compound->atom_types[neighborparticle_id];
 
@@ -666,23 +674,33 @@ __device__ Float3 computerIntermolecularLJForces(Float3* self_pos, uint8_t atomt
 	}
 	return force;// *24.f * 1e-9;
 }
-/*
+
+__device__ Float3 computeIntramolecularLJForces(Compound* compound, CompoundState* compound_state, float* potE_sum, float* data_ptr) {
 
 	Float3 force(0.f);
-	for (int i = 0; i < n_particles; i++) {
-		if (lj_ignore_list[threadIdx.x].ignore((uint8_t)i, (uint8_t)blockIdx.x))	// Check if particle_self is bonded to particle_i in neighbor compound
-			continue;
+	for (int i = 0; i < compound->n_particles; i++) {
+#ifdef ENABLE_BLJV
+		if (i != threadIdx.x && !compound->lj_ignore_list[threadIdx.x].ignore((uint8_t)i, (uint8_t)blockIdx.x) && threadIdx.x < compound->n_particles) {
+#else
+		if (i != threadIdx.x && threadIdx.x < compound->n_particles) {
+#endif
+			//if (i != threadIdx.x  && threadIdx.x < compound.n_particles) {																											// DANGER
 
-
-		force += calcLJForce(self_pos, &positions[i], data_ptr, potE_sum,
-			(forcefield_device.particle_parameters[atomtype_self].sigma + forcefield_device.particle_parameters[atomtypes_others[i]].sigma) * 0.5f,
-			(forcefield_device.particle_parameters[atomtype_self].epsilon + forcefield_device.particle_parameters[atomtypes_others[i]].epsilon) * 0.5,
-			//atomtype_self, atomtypes_others[i]
-			global_ids[threadIdx.x], global_ids[i]
-		);
+			force += calcLJForce(&compound_state->positions[threadIdx.x], &compound_state->positions[i], data_ptr, potE_sum,
+				(forcefield_device.particle_parameters[compound->atom_types[threadIdx.x]].sigma + forcefield_device.particle_parameters[compound->atom_types[i]].sigma) * 0.5f,		// Don't know how to handle atoms being this close!!!
+				sqrtf(forcefield_device.particle_parameters[compound->atom_types[threadIdx.x]].epsilon * forcefield_device.particle_parameters[compound->atom_types[i]].epsilon),
+				//compound.atom_types[threadIdx.x], compound.atom_types[i]
+				//compound.particle_global_ids[threadIdx.x], blockIdx.x
+				//threadIdx.x, i
+				compound->particle_global_ids[threadIdx.x], compound->particle_global_ids[i]
+			);// *24.f * 1e-9;
+		}
 	}
-	return force;// *24.f * 1e-9;
-*/
+	return force;
+}
+
+
+
 
 
 __device__ Float3 computeSolventToSolventLJForces(Float3* self_pos, NeighborList* nlist, Solvent* solvents, float* data_ptr, float* potE_sum) {	// Specific to solvent kernel
@@ -864,7 +882,7 @@ __global__ void compoundKernel(Box* box) {
 	__shared__ CompoundState compound_state;
 	__shared__ NeighborList neighborlist;
 
-#ifdef ENABLE_WATER
+#ifdef ENABLE_SOLVENTS
 	__shared__ Float3 utility_buffer[NEIGHBORLIST_MAX_SOLVENTS];							// waaaaay too biggg
 	__shared__ uint8_t utility_buffer_small[NEIGHBORLIST_MAX_SOLVENTS];
 #else
@@ -910,22 +928,7 @@ __global__ void compoundKernel(Box* box) {
 		force += computeDihedralForces(&compound, compound_state.positions, utility_buffer, &potE_sum);
 #endif
 
-		for (int i = 0; i < compound.n_particles; i++) {
-			if (i != threadIdx.x && !compound.lj_ignore_list[threadIdx.x].ignore((uint8_t) i, (uint8_t) blockIdx.x) && threadIdx.x < compound.n_particles) {	
-			//if (i != threadIdx.x  && threadIdx.x < compound.n_particles) {																											// DANGER
-
-				force += calcLJForce(&compound_state.positions[threadIdx.x], &compound_state.positions[i], data_ptr, &potE_sum,
-					(forcefield_device.particle_parameters[compound.atom_types[threadIdx.x]].sigma + forcefield_device.particle_parameters[compound.atom_types[i]].sigma) * 0.5f,		// Don't know how to handle atoms being this close!!!
-					sqrtf(forcefield_device.particle_parameters[compound.atom_types[threadIdx.x]].epsilon * forcefield_device.particle_parameters[compound.atom_types[i]].epsilon),
-					//compound.atom_types[threadIdx.x], compound.atom_types[i]
-					//compound.particle_global_ids[threadIdx.x], blockIdx.x
-					//threadIdx.x, i
-					compound.particle_global_ids[threadIdx.x], compound.particle_global_ids[i]
-				);// *24.f * 1e-9;
-
-
-			}
-		}
+		force += computeIntramolecularLJForces(&compound, &compound_state, &potE_sum, data_ptr);
 	}
 	// ----------------------------------------------------------------------------------------------------------------------------------------------- //
 
@@ -958,7 +961,7 @@ __global__ void compoundKernel(Box* box) {
 
 
 	// --------------------------------------------------------------- Solvation forces --------------------------------------------------------------- //
-#ifdef ENABLE_WATER
+#ifdef ENABLE_SOLVENTS
 	for (int i = threadIdx.x; i < neighborlist.n_solvent_neighbors; i += blockDim.x) {
 		utility_buffer[i] = box->solvents[neighborlist.neighborsolvent_ids[i]].pos;
 		LIMAENG::applyHyperpos(&compound_state.positions[0], &utility_buffer[i]);
