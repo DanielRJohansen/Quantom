@@ -74,7 +74,7 @@ const int STEPS_PER_NLIST_UPDATE = 200;
 
 
 
-const int STEPS_PER_RENDER = 500;
+const int STEPS_PER_RENDER = 200;
 
 
 
