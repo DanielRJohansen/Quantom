@@ -13,6 +13,7 @@
   <PropertyGroup Label="Globals">
     <ProjectGuid>{C99AA1C8-FBF6-4D0B-93FA-A135656EAA26}</ProjectGuid>
     <RootNamespace>Quantom</RootNamespace>
+    <ProjectName>LIMA_MD</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">

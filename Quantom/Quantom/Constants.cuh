@@ -10,9 +10,9 @@
 
 
 // --- These can be toggled to test the capabilities of LIMA without the two improperly implemented features --- //
-//#define ENABLE_SOLVENTS				// Enables Explicit Solvents
-//#define ENABLE_BLJV				// Ensures no LJ between bonded particles
-#define IGNORE_NEIGHBOR_OVERFLOW	// LJ list doesnt include neighbors when limit is reached.
+#define ENABLE_SOLVENTS				// Enables Explicit Solvents
+#define ENABLE_BLJV				// Ensures no LJ between bonded particles
+//#define IGNORE_NEIGHBOR_OVERFLOW	// LJ list doesnt include neighbors when limit is reached.
 // -------------------------------------------------------------------------------------------------------------- //
 
 #define ENABLE_DIHEDRALS
@@ -21,7 +21,7 @@
 
 
 #ifndef __linux__
-//#define ENABLE_DISPLAY
+#define ENABLE_DISPLAY
 #endif
 
 
