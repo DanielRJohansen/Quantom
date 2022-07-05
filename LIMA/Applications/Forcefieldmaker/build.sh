@@ -12,4 +12,4 @@ cd build/
 cmake ../
 make
 
-mv ./ffm ../
+mv ./ffmrun ../

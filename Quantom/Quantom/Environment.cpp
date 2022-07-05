@@ -123,7 +123,7 @@ void Environment::run() {
 
 void Environment::postRunEvents() {
 	simulation->out_dir += "\\Steps_" + to_string(simulation->getStep()) + "\\";
-	int check = _mkdir(&(simulation->out_dir[0]));
+//	int check = _mkdir(&(simulation->out_dir[0]));		// Not recognized on linux
 
 	
 

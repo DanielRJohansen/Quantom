@@ -4,8 +4,8 @@
 
 
 #ifdef __linux__
-
-	string sim_path = "/home/lima/Desktop/LIMA/Simulation";
+	string sim_path = "../../Simulation";
+	//string sim_path = "/home/lima/Desktop/LIMA/Simulation";
 #else
 	string sim_path = "C:\\PROJECTS\\QUANTOM\\Simulation";
 #endif
@@ -120,10 +120,15 @@ void mergeForcefieldFiles() {
 
 	//files.push_back("C:\\PROJECTS\\Quantom\\charmm36-mar2019.ff\\toppar_c36_jul18\\par_all35_ethers.prm");
 	//files.push_back("C:\\PROJECTS\\Quantom\\charmm36-mar2019.ff\\toppar_c36_jul18\\par_all36_carb.prm");
+#ifdef __linux__
+	files.push_back(FileHelpers::pathJoin(forcefield_path, "par_all36_lipid.prm"));
+	files.push_back(FileHelpers::pathJoin(forcefield_path, "par_all36_na.prm"));
+	files.push_back(FileHelpers::pathJoin(forcefield_path, "par_all36m_prot.prm"));
+#else
 	files.push_back("C:\\PROJECTS\\Quantom\\charmm36-mar2019.ff\\toppar_c36_jul18\\par_all36_lipid.prm");
 	files.push_back("C:\\PROJECTS\\Quantom\\charmm36-mar2019.ff\\toppar_c36_jul18\\par_all36_na.prm");
 	files.push_back("C:\\PROJECTS\\Quantom\\charmm36-mar2019.ff\\toppar_c36_jul18\\par_all36m_prot.prm");
-
+#endif
 
 
 	//files.push_back("C:\\PROJECTS\\Quantom\\charmm36-mar2019.ff\\toppar_c36_jul18\\par_all36_cgenff.prm");	// CHARMM wants this to be read last for some reason??
@@ -144,7 +149,7 @@ int main(int argc, char* argv[]) {
 
 	prepareForcefieldForSimulation();
 
-
+	printf("\nForcefieldMaker finished\n\n\n\n\n\n\n\n");
 	
 	return 0;
 }

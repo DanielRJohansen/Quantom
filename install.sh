@@ -26,12 +26,19 @@ cp ./Quantom/Quantom/*.cpp "$Q_dir"/src/
 
 cp ./LIMA/Applications/Quantom/* "$Q_dir"/
 
+
+
 # Handle GLFW for Quantom. This is a quite bad way...
+GLFW_CMAKER=~/Downloads/glfw-3.3.6/CMakeLists.txt
+if [ ! -f "$GLFW_CMAKER" ]; then
+	echo "glfw-3.3.6 not present in Downloads folder. Terminating install."
+	exit 1
+fi
 mkdir -p "$default_dir"/Dependencies/GLFW/
 cp -r ~/Downloads/glfw-3.3.6/* "$default_dir"/Dependencies/GLFW/
 
 
-
+#exit 0
 
 ######### Now make FFM
 FFM_dir="$default_dir"/Applications/Forcefieldmaker
@@ -58,17 +65,42 @@ cp ./LIMA_services/LIMA_services/*.cpp "$SPP_dir"/src/
 s_dir="$default_dir"/Simulation
 mkdir -p "$s_dir/"Molecule
 mkdir "$s_dir"/Forcefield
-cp ~/Downloads/QnD/* "$s_dir"/Forcefield/	# nb and b ff
-cp ~/Downloads/QnD/*/* "$s_dir"/Molecule/	# conf and topol
+#cp ~/Downloads/QnD/* "$s_dir"/Forcefield/	# nb and b ff
+#cp ~/Downloads/QnD/*/* "$s_dir"/Molecule/	# conf and topol
+cp ./Demo/6lzm/* "$s_dir"/Molecule/		# conf and topol"
+cp ./Demo/CHARMM_FF/* "$s_dir"/Forcefield/	# nb and b ff
+
 
 
 ## Compile all applications
 cd "$FFM_dir"
 chmod +x build.sh
 ./build.sh
+#./ffmrun
+
+
+
 
 cd "$Q_dir"
 chmod +x build.sh
 chmod +x mdrun.sh
 ./build.sh
+
+printf "\n\n\n\n\n\n\n\n\n\n"
+printf "All LIMA applications have been installed\n"
+
+
+
+## Run DEMO
+
+read -p "Press y to start demo simulation    " confirm && [[ $confirm == [yY] ]] || exit 1
+
+cd "$FFM_dir"
+./ffmrun
+
+
+cd "$Q_dir"
 ./mdrun.sh
+
+
+
