@@ -93,7 +93,7 @@ printf "All LIMA applications have been installed\n"
 
 ## Run DEMO
 
-read -p "Press y to start demo simulation    " confirm && [[ $confirm == [yY] ]] || exit 1
+#read -p "Press y to start demo simulation    " confirm && [[ $confirm == [yY] ]] || exit 1
 
 cd "$FFM_dir"
 ./ffmrun

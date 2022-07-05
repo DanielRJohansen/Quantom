@@ -15,16 +15,14 @@
 //#define IGNORE_NEIGHBOR_OVERFLOW	// LJ list doesnt include neighbors when limit is reached.
 // -------------------------------------------------------------------------------------------------------------- //
 
-#define ENABLE_DIHEDRALS
 
 
 
-
-#ifndef __linux__
+// Disable this for faster simulations. 
 #define ENABLE_DISPLAY
-#endif
 
 
+#define ENABLE_DIHEDRALS
 
 
 // Debugging
