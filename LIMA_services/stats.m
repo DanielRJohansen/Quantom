@@ -258,6 +258,27 @@ xlim([-inf, inf])
 ylabel("Energy [J]")
 xlabel("Distance [nm]")
 grid
+hold on
+
+plot([0.365 0.9], [0 0], 'Color', '#000000')
+
+x = [0.45 0.45];
+y = [0 -460];
+%\bullet
+plot(x,y, '-', 'LineWidth', 2)
+txt = '\fontsize{20} \epsilon';
+text(0.45,-250, txt)
+
+x = [0.365 0.4];
+y = [0 0];
+%\bullet
+plot(x,y, '-', 'LineWidth', 2)
+txt = '\fontsize{20} \sigma';
+text(0.36,-50, txt)
+
+%
+%quiver( x(1),y(1),x(2)-x(1),y(2)-y(1),1 )
+hold off
 
 %% 
 
@@ -278,7 +299,20 @@ plot(x,-y, LineWidth=1.5)
 hold off
 
 
+%% BENCHMARKS
+clear
+clc
+x = categorical({'GROMACS x64 XEON', 'LIMA 2080 TI', 'GROMACS 2080 TI'});
+X = reordercats(x, {'GROMACS x64 XEON', 'LIMA 2080 TI', 'GROMACS 2080 TI'})
+y = [1.00 3.34 0.27]
+b = bar(X,y, 'FaceColor', '#70AD47', 'EdgeColor','flat', 'BarWidth', 0.5)
+%)
 
+%
+xtips1 = b(1).XEndPoints;
+ytips1 = b(1).YEndPoints;
+labels1 = string(b(1).YData);
+text(xtips1,ytips1,labels1,'HorizontalAlignment','center','VerticalAlignment','bottom')
 
 %%
 nexttile

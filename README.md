@@ -15,8 +15,8 @@ LIMA is a collection of programs, centered around LIMA_MD which is a GPU-based M
 LIMA was developed in 1 year, as part of the Masters Thesis of Computer  Science at University of Southern Denmark (SDU).
 The long-term goal of LIMA is to become a MD cloud-provider for MD users.
 
-If you want to read about LIMA_MD, or how to make an efficient MD simulator, I will upload my Thesis here in august 2022.
-LIMA_MD takes 4.1 ms/step compared to GROMACS 0.2 with the same setup. Disabling 2 temporary and poorly implemented features (Explicit Solvation and Bonded Lennard-Jones Verification), LIMA_MD reaches just 0.86 ms/step!
+If you want to read about LIMA_MD, or how to make an efficient MD simulator, I will upload my Thesis here August 2022.
+LIMA_MD takes 3.34 ms/step compared to GROMACS 0.27 with the same setup. Disabling 2 temporary and poorly implemented features (Explicit Solvation and Bonded Lennard-Jones Verification), LIMA_MD reaches an impressive 0.17 ms/step!
 
 
 
