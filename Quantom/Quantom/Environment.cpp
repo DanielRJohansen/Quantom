@@ -44,7 +44,7 @@ Environment::Environment() {
 	verifyBox();
 
 
-
+ 
 
 	if (print_compound_positions) {	
 		for (int c = 0; c < simulation->n_compounds; c++) {

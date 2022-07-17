@@ -3,7 +3,7 @@
 #include "Simulation.cuh"
 #ifndef __linux__
 #include <glfw3.h>
-//#define ENABLE_DISPLAY 
+#define ENABLE_DISPLAY 
 #else
 #include <GLFW/glfw3.h>
 #endif // !__linux__

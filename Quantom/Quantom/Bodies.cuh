@@ -170,9 +170,18 @@ struct LJ_Ignores {	// Each particle is associated with 1 of these.
 	static const int max_ids = 32;
 	uint8_t local_ids[max_ids];
 	uint8_t compound_ids[max_ids];
+
+	int global_ids[max_ids];
 	uint8_t n_ignores = 0;
 
+
+	uint16_t doublyconnected_id = 0;
 	
+	__host__ void addIgnoreTarget(int target_global_id) {
+		global_ids[n_ignores] = target_global_id;
+		n_ignores++;
+	}
+
 	__host__ void addIgnoreTarget(uint8_t target_id, uint8_t compound_id) {
 		if (n_ignores == max_ids) {
 			printf("Failed to add ignore target!\n");
@@ -194,6 +203,22 @@ struct LJ_Ignores {	// Each particle is associated with 1 of these.
 				return true;
 		}
 		return false;
+	}
+
+	__host__ bool checkAlreadyConnected(uint16_t global_id) {
+		for (int i = 0; i < n_ignores; i++) {
+			if (global_ids[i] == global_id)
+				return true;
+		}
+		return false;
+	}
+
+	__host__ void assignDoublyConnectedID(uint16_t id) {
+		doublyconnected_id = id;
+	}
+
+	__device__ bool doublyConnected(uint16_t dc_id) {
+		return (dc_id == doublyconnected_id && doublyconnected_id != 0);
 	}
 };
 

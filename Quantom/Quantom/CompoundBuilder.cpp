@@ -230,7 +230,7 @@ void CompoundBuilder::addBond(Molecule* molecule, ParticleRef* maps, vector<stri
 
 	PairBond* bondtype = FFM->getBondType(maps[0].global_id, maps[1].global_id);
 
-	distributeLJIgnores(molecule, maps, 2);
+	distributeLJIgnores(molecule, maps, 2);				// DANGER
 
 	if (!g_bond.spansTwoCompounds()) {
 		Compound* compound = &molecule->compounds[maps[0].compound_id];
@@ -305,6 +305,30 @@ void CompoundBuilder::addDihedral(Molecule* molecule, ParticleRef* maps, vector<
 }
 
 void CompoundBuilder::distributeLJIgnores(Molecule* molecule, ParticleRef* particle_refs, int n) {	// Works whether particle spans multiple compounds or not.
+	// This way only connects the edges of each bond, angle or dihedral
+	// ALWAYS do angles first, or this breaks!
+
+	if (n == 4)  {	// First check if connection is already made. I guess i could do this irrelevant of n
+		Compound* compound = &molecule->compounds[particle_refs[0].compound_id];
+		if (compound->lj_ignore_list[particle_refs[0].local_id_compound].checkAlreadyConnected(particle_refs[n-1].global_id)) {
+			compound->lj_ignore_list[particle_refs[0].local_id_compound].assignDoublyConnectedID(unique_doublyconnected_id);
+
+			compound = &molecule->compounds[particle_refs[n-1].compound_id];
+			compound->lj_ignore_list[particle_refs[n-1].local_id_compound].assignDoublyConnectedID(unique_doublyconnected_id);
+			printf("Assigning ID %d - %d %d\n", unique_doublyconnected_id, particle_refs[0].global_id, particle_refs[n-1].global_id);
+			unique_doublyconnected_id++;
+		}
+	}
+	// Then make connection
+	Compound* compound = &molecule->compounds[particle_refs[0].compound_id];
+	compound->lj_ignore_list[particle_refs[0].local_id_compound].addIgnoreTarget(particle_refs[n - 1].global_id);
+
+	compound = &molecule->compounds[particle_refs[n - 1].compound_id];
+	compound->lj_ignore_list[particle_refs[n - 1].local_id_compound].addIgnoreTarget(particle_refs[0].global_id);
+
+
+	// This approach connects all elements of the bond, angle or dihedral
+	/*	// OLD system
 	for (int id_self = 0; id_self < n; id_self++) {
 		for (int id_other = 0; id_other < n; id_other++) {
 
@@ -314,7 +338,7 @@ void CompoundBuilder::distributeLJIgnores(Molecule* molecule, ParticleRef* parti
 			Compound* compound_self = &molecule->compounds[particle_refs[id_self].compound_id];
 			compound_self->lj_ignore_list[particle_refs[id_self].local_id_compound].addIgnoreTarget(particle_refs[id_other].local_id_compound, particle_refs[id_other].compound_id);
 		}
-	}
+	}*/
 }
 
 
