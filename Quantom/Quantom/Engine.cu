@@ -24,7 +24,7 @@ Engine::Engine(Simulation* simulation, ForceField forcefield_host) {
 	//ForceField forcefield_host = FFM.getForcefield();
 	//ForceField forcefield_host = FFM.getNBForcefield();
 	this->forcefield_host = forcefield_host;
-	cudaMemcpyToSymbol(forcefield_device, &forcefield_host, sizeof(ForceField), 0, cudaMemcpyHostToDevice);
+	cudaMemcpyToSymbol(&forcefield_device, &forcefield_host, sizeof(ForceField), 0, cudaMemcpyHostToDevice);
 
 	//ForceField forcefield_nb_host = FFM.getNBForcefield();
 	//cudaMemcpyToSymbol(forcefield_nb_device, &forcefield_nb_host, sizeof(ForceField), 0, cudaMemcpyHostToDevice);
