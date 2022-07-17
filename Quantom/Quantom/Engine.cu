@@ -19,16 +19,21 @@ Engine::Engine(Simulation* simulation, ForceField forcefield_host) {
 	printf("Compoundkernel shared mem. size: %d B\n", Ckernel_shared_mem);
 	printf("Solventkernel shared mem. size: %d B\n", Skernel_shared_mem);
 
+	LIMAENG::genericErrorCheck("Error before moving forcefield to device\n");
 
+
+	printf("pp 5 mass %f", forcefield_host.particle_parameters[5].mass);
 
 	//ForceField forcefield_host = FFM.getForcefield();
 	//ForceField forcefield_host = FFM.getNBForcefield();
 	this->forcefield_host = forcefield_host;
-	cudaMemcpyToSymbol(&forcefield_device, &forcefield_host, sizeof(ForceField), 0, cudaMemcpyHostToDevice);
+	cudaMemcpyToSymbol(forcefield_device, &forcefield_host, sizeof(ForceField), 0, cudaMemcpyHostToDevice);	// So there should not be a & before the device __constant__
+
+	printf("Forcefield size: %d bytes\n", sizeof(ForceField));
 
 	//ForceField forcefield_nb_host = FFM.getNBForcefield();
 	//cudaMemcpyToSymbol(forcefield_nb_device, &forcefield_nb_host, sizeof(ForceField), 0, cudaMemcpyHostToDevice);
-	cudaDeviceSynchronize();
+	//cudaDeviceSynchronize();
 	LIMAENG::genericErrorCheck("Error while moving forcefield to device\n");
 
 
