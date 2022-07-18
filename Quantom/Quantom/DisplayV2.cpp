@@ -61,7 +61,7 @@ void DisplayV2::render(Simulation* simulation) {
 
     auto stop = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
-    printf("\tRender time: %4d ys  ", duration.count());
+    printf("\tRender time: %4d ys  ", (int) duration.count());
 #endif
 }
 
@@ -92,7 +92,7 @@ bool DisplayV2::initGLFW() {
     if (!window)
     {
         glfwTerminate();
-        return -1;
+        return 0;
     }
 
     /* Make the window's context current */

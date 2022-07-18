@@ -48,7 +48,7 @@ private:
 	GLFWwindow* window;
 
 	const int triangleAmount = 20; //# of triangles used to draw circle
-	const float PI = 3.14;
+	const float PI = 3.14f;
 	const GLfloat twicePi = 2.0f * PI;
 };
 

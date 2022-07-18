@@ -79,9 +79,11 @@ struct PairBond {	// IDS and indexes are used interchangeably here!
 	
 	//uint32_t bond_index;	
 	//double reference_dist;
-	float b0, kb;
+	float b0 = 0.f;
+	float kb = 0.f;
 	uint32_t atom_indexes[2];	// Relative to the compund - NOT ABSOLUTE INDEX. Used in global table with compunds start-index
 	const static int n_atoms = 2;
+	bool invertLJ = false;		// When sharing multiple bonded connections
 };
 
 struct AngleBond {
@@ -92,9 +94,11 @@ struct AngleBond {
 		atom_indexes[2] = id3;
 	}
 
-	float theta_0, k_theta;
+	float theta_0 = 0.f;
+	float k_theta = 0.f;
 	uint32_t atom_indexes[3]; // i,j,k angle between i and k
 	const static int n_atoms = 3;
+	bool invertLJ = false;		// When sharing multiple bonded connections
 };
 
 struct DihedralBond {
@@ -106,10 +110,12 @@ struct DihedralBond {
 		atom_indexes[2] = id3;
 		atom_indexes[3] = id4;
 	}
-	float phi_0, k_phi;
-	uint8_t n;
+	float phi_0 = 0.f;
+	float k_phi = 0.f;
+	uint8_t n = 0;
 	uint32_t atom_indexes[4];
 	const static int n_atoms = 4;
+	bool invertLJ = false;		// When sharing multiple bonded connections
 };
 
 struct GenericBond {					// ONLY used during creation, never on device!
@@ -341,7 +347,7 @@ struct CompoundState {							// Maybe delete this soon?
 
 
 struct Compound {
-	__host__ Compound() {}	// {}
+	__host__ __device__  Compound() {}	// {}
 
 
 	uint8_t n_particles = 0;					// MAX 256 particles!!!!0
@@ -432,8 +438,10 @@ struct Compound {
 	__host__ void calcParticleSphere() {
 		Float3 com = calcCOM();// calcCOM(compound);
 
-		float furthest = LONG_MIN;
-		float closest = LONG_MAX;
+		//float furthest = LONG_MIN;
+		float furthest = FLT_MIN;
+		//float closest = LONG_MAX;
+		float closest = FLT_MAX;
 		int closest_index = 0;
 
 		for (int i = 0; i < n_particles; i++) {
@@ -701,7 +709,7 @@ struct CompoundBridgeCompact {
 	
 	ParticleRefCompact particle_refs[MAX_PARTICLES_IN_BRIDGE];
 	uint8_t atom_types[MAX_PARTICLES_IN_BRIDGE];
-	int n_particles = 0;					
+	uint8_t n_particles = 0;					
 
 	uint16_t n_singlebonds = 0;
 	PairBond singlebonds[MAX_SINGLEBONDS_IN_BRIDGE];

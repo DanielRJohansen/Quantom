@@ -91,9 +91,9 @@ private:
 	// ---------------------------------------------------- Helper functions ---------------------------------------------------- //
 	Float3 get3Random() {	// Returns 3 numbers between 0-1
 		return Float3(
-			rand() % RAND_MAX / (double) RAND_MAX,
-			rand() % RAND_MAX / (double)RAND_MAX,
-			rand() % RAND_MAX / (double)RAND_MAX
+			(float) (rand() % RAND_MAX / (double) RAND_MAX),
+			(float) (rand() % RAND_MAX / (double) RAND_MAX),
+			(float) (rand() % RAND_MAX / (double) RAND_MAX)
 		);
 	}
 

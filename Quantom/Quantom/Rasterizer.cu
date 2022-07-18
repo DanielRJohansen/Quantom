@@ -11,7 +11,7 @@ void mergeSortAPI(RenderBall* balls, int n_balls);
 
 RenderBall* Rasterizer::render(Simulation* simulation) {    
     solvent_offset = simulation->n_compounds * MAX_COMPOUND_PARTICLES;
-    n_threadblocks = ceil((float)simulation->total_particles_upperbound / (float)RAS_THREADS_PER_BLOCK);
+    n_threadblocks = (int) ceil((float)simulation->total_particles_upperbound / (float)RAS_THREADS_PER_BLOCK);
 
 
 	RenderAtom* atoms = getAllAtoms(simulation);
@@ -44,7 +44,7 @@ RenderAtom* Rasterizer::getAllAtoms(Simulation* simulation) {
 	RenderAtom* atoms;
 	cudaMalloc(&atoms, sizeof(RenderAtom) * simulation->total_particles_upperbound);
 
-    int solvent_blocks = ceil((float)simulation->n_solvents / (float)THREADS_PER_LOADSOLVENTSATOMSKERNEL);
+    int solvent_blocks = (int) ceil((float)simulation->n_solvents / (float)THREADS_PER_LOADSOLVENTSATOMSKERNEL);
 
 
 	Box* box = simulation->box;

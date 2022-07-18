@@ -29,7 +29,7 @@ public:
 		}	
 	}
 
-	static float __device__ __host__ calcKineticEnergy(Float3* pos1, Float3* pos2, double mass, double dt) {	// pos1/2 MUST be 2 steps apart!!!!
+	static float __device__ __host__ calcKineticEnergy(Float3* pos1, Float3* pos2, float mass, double dt) {	// pos1/2 MUST be 2 steps apart!!!!
 		LIMAENG::applyHyperpos(pos1, pos2);
 
 		if ((*pos1 - *pos2).len() > 1) {
@@ -39,8 +39,8 @@ public:
 		}
 			
 
-		float vel = (*pos1 - *pos2).len() * 0.5f / dt;
-		float kinE = 0.5 * mass * vel * vel;
+		float vel = (*pos1 - *pos2).len() * (float) (0.5f / dt);
+		float kinE = 0.5f * mass * vel * vel;
 		return kinE;
 	}
 

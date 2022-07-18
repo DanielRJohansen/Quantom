@@ -55,7 +55,7 @@ constexpr float CUTOFF = 0.7f;	//nm/
 
 
 // OPTIMIZATION PARAMETERS
-const int MAX_COMPOUND_PARTICLES = 64;
+const int MAX_COMPOUND_PARTICLES = 48;
 
 
 
@@ -63,7 +63,7 @@ const int THREADS_PER_SOLVENTBLOCK = 128;
 const int THREADS_PER_COMPOUNDBLOCK = MAX_COMPOUND_PARTICLES; // Must be >= max comp particles
 
 
-const int SIMULATION_STEPS = 1;
+const int SIMULATION_STEPS = 20000;
 
 
 

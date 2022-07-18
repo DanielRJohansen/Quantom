@@ -22,7 +22,6 @@ Engine::Engine(Simulation* simulation, ForceField forcefield_host) {
 	LIMAENG::genericErrorCheck("Error before moving forcefield to device\n");
 
 
-	printf("pp 5 mass %f", forcefield_host.particle_parameters[5].mass);
 
 	//ForceField forcefield_host = FFM.getForcefield();
 	//ForceField forcefield_host = FFM.getNBForcefield();
@@ -386,7 +385,7 @@ void Engine::handleBoxtemp() {
 			
 			simulation->box->thermostat_scalar = temp_scalar;
 
-			if (temp_scalar != temp_scalar || abs(temp_scalar) == 'inf') {
+			if (temp_scalar != temp_scalar ){//} || abs(temp_scalar) == "inf") {
 				printf("Scalar: %f\n", simulation->box->thermostat_scalar);
 				exit(0);
 			}			
@@ -408,7 +407,7 @@ void Engine::step() {
 	cudaDeviceSynchronize();
 
 	if (simulation->box->bridge_bundle->n_bridges > 0) {																		// TODO: Illegal access to device mem!!
-		compoundBridgeKernel << < simulation->box->bridge_bundle->n_bridges, MAX_PARTICLES_IN_BRIDGE >> > (simulation->box);	// Must come before compoundKernel()
+		//compoundBridgeKernel << < simulation->box->bridge_bundle->n_bridges, MAX_PARTICLES_IN_BRIDGE >> > (simulation->box);	// Must come before compoundKernel()		// DANGER
 	}
 		
 	cudaDeviceSynchronize();
@@ -554,7 +553,7 @@ __device__ void calcPairbondForces(Float3* pos_a, Float3* pos_b, PairBond* bondt
 }
 
 
-constexpr double ktheta = 65 * 1e+3;	// J/mol
+//constexpr double ktheta = 65 * 1e+3;	// J/mol
 __device__ void calcAnglebondForces(Float3* pos_left, Float3* pos_middle, Float3* pos_right, AngleBond* angletype, Float3* results, float* potE) {
 	Float3 v1 = *pos_left - *pos_middle;
 	Float3 v2 = *pos_right - *pos_middle;
@@ -761,11 +760,11 @@ __device__ Float3 computePairbondForces(T* entity, Float3* positions, Float3* ut
 				forces, potE
 			);
 
-			float temp = 0.f;
-			float sigma = (forcefield_device.particle_parameters[entity->atom_types[pb->atom_indexes[0]]].sigma + forcefield_device.particle_parameters[entity->atom_types[pb->atom_indexes[1]]].sigma) * 0.5;
-			float epsilon = sqrtf(forcefield_device.particle_parameters[entity->atom_types[pb->atom_indexes[0]]].epsilon * forcefield_device.particle_parameters[entity->atom_types[pb->atom_indexes[1]]].epsilon);
-			Float3 anti_lj_force = calcLJForce(&positions[pb->atom_indexes[0]], &positions[pb->atom_indexes[1]], &temp, potE, sigma, epsilon, -1, -1);
-			forces[0] -= anti_lj_force; forces[1] += anti_lj_force;
+			//float temp = 0.f;
+			//float sigma = (forcefield_device.particle_parameters[entity->atom_types[pb->atom_indexes[0]]].sigma + forcefield_device.particle_parameters[entity->atom_types[pb->atom_indexes[1]]].sigma) * 0.5;
+			//float epsilon = sqrtf(forcefield_device.particle_parameters[entity->atom_types[pb->atom_indexes[0]]].epsilon * forcefield_device.particle_parameters[entity->atom_types[pb->atom_indexes[1]]].epsilon);
+			//Float3 anti_lj_force = calcLJForce(&positions[pb->atom_indexes[0]], &positions[pb->atom_indexes[1]], &temp, potE, sigma, epsilon, -1, -1);
+			//forces[0] -= anti_lj_force; forces[1] += anti_lj_force;
 		}
 
 
@@ -918,9 +917,11 @@ __global__ void compoundKernel(Box* box) {
 	__shared__ Float3 utility_buffer[NEIGHBORLIST_MAX_SOLVENTS];							// waaaaay too biggg
 	__shared__ uint8_t utility_buffer_small[NEIGHBORLIST_MAX_SOLVENTS];
 #else
-	__shared__ Float3 utility_buffer[MAX_COMPOUND_PARTICLES];
-	__shared__ uint8_t utility_buffer_small[MAX_COMPOUND_PARTICLES];
+	//__shared__ Float3 utility_buffer[MAX_COMPOUND_PARTICLES];
+	//__shared__ uint8_t utility_buffer_small[MAX_COMPOUND_PARTICLES];
 #endif
+
+
 
 	if (threadIdx.x == 0) {
 		compound.loadMeta(&box->compounds[blockIdx.x]);
@@ -955,9 +956,9 @@ __global__ void compoundKernel(Box* box) {
 		LIMAENG::applyHyperpos(&compound_state.positions[0], &compound_state.positions[threadIdx.x]);
 		__syncthreads();
 		force += computePairbondForces(&compound, compound_state.positions, utility_buffer, &potE_sum);
-		force += computeAnglebondForces(&compound, compound_state.positions, utility_buffer, &potE_sum);
+		//force += computeAnglebondForces(&compound, compound_state.positions, utility_buffer, &potE_sum);
 #ifdef ENABLE_DIHEDRALS
-		force += computeDihedralForces(&compound, compound_state.positions, utility_buffer, &potE_sum);
+		//force += computeDihedralForces(&compound, compound_state.positions, utility_buffer, &potE_sum);
 #endif
 
 		force += computeIntramolecularLJForces(&compound, &compound_state, &potE_sum, data_ptr);
@@ -1088,7 +1089,12 @@ __global__ void compoundKernel(Box* box) {
 		
 	
 	box->compound_state_array_next[blockIdx.x].loadData(&compound_state);
+
 }
+
+
+
+
 
 
 
@@ -1190,6 +1196,8 @@ __global__ void solventForceKernel(Box* box) {
 	}
 
 
+
+
 #undef solvent_index
 #undef thread_active
 }
@@ -1232,13 +1240,13 @@ __global__ void compoundBridgeKernel(Box* box) {
 		LIMAENG::applyHyperpos(&positions[0], &positions[particle_id_bridge]);
 		__syncthreads();	
 		force += computePairbondForces(&bridge, positions, utility_buffer, &potE_sum);
-		force += computeAnglebondForces(&bridge, positions, utility_buffer, &potE_sum);
+		//force += computeAnglebondForces(&bridge, positions, utility_buffer, &potE_sum);
 #ifdef ENABLE_DIHEDRALS
-		force += computeDihedralForces(&bridge, positions, utility_buffer, &potE_sum);
+		//force += computeDihedralForces(&bridge, positions, utility_buffer, &potE_sum);
 #endif
 	}
 	__syncthreads();
-
+	// --------------------------------------------------------------------------------------------------------------------------------------------------- //
 
 	if (particle_id_bridge < bridge.n_particles) {
 		ParticleRefCompact* p_ref = &bridge.particle_refs[particle_id_bridge];

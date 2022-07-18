@@ -115,7 +115,7 @@ public:
 
 
 		n_solvents = box->n_solvents;
-		blocks_per_solventkernel = ceil((float)n_solvents / (float)THREADS_PER_SOLVENTBLOCK);
+		blocks_per_solventkernel = (int) ceil((float)n_solvents / (float)THREADS_PER_SOLVENTBLOCK);
 
 
 		compounds_host = new Compound[n_compounds];

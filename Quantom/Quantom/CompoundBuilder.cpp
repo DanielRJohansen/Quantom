@@ -192,14 +192,14 @@ void CompoundBuilder::loadMaps(ParticleRef* maps, vector<string>* record, int n)
 }
 
 void CompoundBuilder::addGeneric(Molecule* molecule, vector<string>* record, TopologyMode mode) {
-	GenericBond g_bond;
-	PairBond s_bond;
-	AngleBond a_bond;
+	//GenericBond g_bond;
+	//PairBond s_bond;
+	//AngleBond a_bond;
 	ParticleRef maps[4];
 
-	PairBond* bondtype;
-	AngleBond* angletype;
-	DihedralBond* dihedraltype;
+	//PairBond* bondtype;
+	//AngleBond* angletype;
+	//DihedralBond* dihedraltype;
 
 
 	switch (mode)
@@ -429,7 +429,7 @@ vector<CompoundBuilder::Record_ATOM> CompoundBuilder::parsePDB(string path)
 			data_buffer[5][0],		// chain id
 			stoi(data_buffer[6]),
 			data_buffer[7][0],
-			Float3(stod(data_buffer[8]), stod(data_buffer[9]), stod(data_buffer[10])) * 0.1	// Convert A to nm right off the bat!
+			Float3(stof(data_buffer[8]), stof(data_buffer[9]), stof(data_buffer[10])) * 0.1	// Convert A to nm right off the bat!
 		));
 		
 	}
@@ -475,7 +475,7 @@ vector<CompoundBuilder::Record_ATOM> CompoundBuilder::parseGRO(string path)
 			' ',
 			res.id,
 			' ',
-			Float3(stod(words.at(3)), stod(words.at(4)), stod(words.at(5)))
+			Float3(stof(words.at(3)), stof(words.at(4)), stof(words.at(5)))
 		);
 		records.push_back(record);
 	}

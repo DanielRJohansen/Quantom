@@ -24,7 +24,7 @@ struct Int3 {
 	__host__ __device__ inline Int3 operator + (const Int3 a) const { return Int3(x + a.x, y + a.y, z + a.z); }
 	__host__ __device__ inline Int3 operator - (const Int3 a) const { return Int3(x - a.x, y - a.y, z - a.z); }
 	__host__ __device__ inline Int3 operator * (const int a) const { return Int3(x * a, y * a, z * a); }
-	__host__ __device__ inline Int3 operator * (const float a) const { return Int3(floor((float)x * a), floor((float)y * a), floor((float)z * a)); }
+	__host__ __device__ inline Int3 operator * (const float a) const { return Int3((int) floor((float)x * a), (int) floor((float)y * a), (int) floor((float)z * a)); }
 
 
 	int x=0, y=0, z = 0;
@@ -36,7 +36,8 @@ struct Float3 {
 	__host__ __device__ Float3(float x, float y, float z) : x(x), y(y), z(z) {}
 	__host__ __device__ Float3(float* a) { x = a[0]; y = a[1]; z = a[2]; }
 
-	__host__ __device__ inline Float3 operator * (const double a) const { return Float3(x * a, y * a, z * a); }
+	__host__ __device__ inline Float3 operator * (const float a) const { return Float3(x * a, y * a, z * a); }
+	//__host__ __device__ inline Float3 operator * (const double a) const { return Float3((float) (x * a), (float) (y * a), (float) (z * a)); }
 	__host__ __device__ inline Float3 operator * (const Float3 a) const { return Float3(x * a.x, y * a.y, z * a.z); }
 	__host__ __device__ inline Float3 operator + (const Float3 a) const { return Float3(x + a.x, y + a.y, z + a.z); }
 	__host__ __device__ inline Float3 operator - (const Float3 a) const { return Float3(x - a.x, y - a.y, z - a.z); }
@@ -125,7 +126,7 @@ struct Float3 {
 		v = rodriguesRotatation(v, k, pitch_yaw_roll.z);
 		return v;
 	}
-	__host__ __device__ static Float3 rodriguesRotatation(Float3 v, Float3 k, double theta) {
+	__host__ __device__ static Float3 rodriguesRotatation(Float3 v, Float3 k, float theta) {
 		return v * cos(theta) + k.cross(v) * sin(theta) + k * (k.dot(v)) * (1 - cos(theta));
 	}
 
@@ -184,7 +185,7 @@ struct BoundingBox {
 	bool pointIsInBox(Float3 point) {
 		return (min < point) && (point < max);
 	}
-	void addPadding(double margin) {
+	void addPadding(float margin) {
 		min += Float3(-margin);
 		max += Float3(margin);
 	}
@@ -262,7 +263,7 @@ struct Trajectory {
 
 			int dim = 0;
 			while (getline(line, record, ';')) {
-				buffer[dim++] = stod(record);
+				buffer[dim++] = stof(record);
 
 				if (dim == 3) {
 					positions[counter++] = Float3(buffer);
