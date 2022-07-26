@@ -43,13 +43,14 @@ class Environment
 {
 public:
 	Environment();
+	Environment(string conf_filename, string topol_filename);
 
 	void run();
 	void postRunEvents();
 	void handleStatus(Simulation* simulation);
 	void handleDisplay(Simulation* simulation);
 	bool handleTermination(Simulation* simulation);
-
+	static void prepFF(string conf_path, string topol_path);
 
 	void renderTrajectory(string trj_path);
 	void makeVirtualTrajectory(string trj_path, string waterforce_path);

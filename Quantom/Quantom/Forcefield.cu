@@ -35,7 +35,7 @@ void ForceFieldMaker::buildForcefield() {
 
 	printf("Nonbonded parameters size: %d bytes\n", sizeof(ForceField));
 
-	printf("############################# FINISHED BUILDING FORCEFIELD #############################\n\n\n");
+	printf("\n\n############################# FINISHED BUILDING FORCEFIELD #############################\n\n\n");
 
 	//exit(0);
 }
@@ -168,7 +168,7 @@ AngleBond* ForceFieldMaker::parseAngles(vector<vector<string>> forcefield_rows) 
 		}
 
 		if (current_state == ANGLES) {
-			angles[ptr++] = AngleBond(stoi(row[0]), stoi(row[1]), stoi(row[2]), stof(row[6]) , stof(row[7]));		// Assumes radians here
+			angles[ptr++] = AngleBond(stoi(row[0]), stoi(row[1]), stoi(row[2]), stof(row[6]) , stof(row[7]), 0);		// Assumes radians here
 		}
 
 	}
@@ -194,7 +194,7 @@ DihedralBond* ForceFieldMaker::parseDihedrals(vector<vector<string>> forcefield_
 		}
 
 		if (current_state == DIHEDRALS) {
-			dihedrals[ptr++] = DihedralBond(stoi(row[0]), stoi(row[1]), stoi(row[2]), stoi(row[3]), stof(row[8]), abs(stof(row[9])), stoi(row[10]));			// MIGHT HAVE TO DO AN ABS() ON K_PHI, SINCE IT IS NEGATIVE SOMETIMES??? WHAT THE FUCKKKKKKKKKK CHEMISTS?????!?!?!
+			dihedrals[ptr++] = DihedralBond(stoi(row[0]), stoi(row[1]), stoi(row[2]), stoi(row[3]), stof(row[8]), abs(stof(row[9])), stoi(row[10]), 0);			// MIGHT HAVE TO DO AN ABS() ON K_PHI, SINCE IT IS NEGATIVE SOMETIMES??? WHAT THE FUCKKKKKKKKKK CHEMISTS?????!?!?!
 			//has_been_enabled = true;
 		}
 	}

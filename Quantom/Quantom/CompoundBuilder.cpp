@@ -7,8 +7,14 @@
 Molecule CompoundBuilder::buildMolecule(string gro_path, string itp_path, int max_residue_id, int min_residue_id, bool ignore_hydrogens) {
 	//vector<vector<string>> pdb_data = readFile(pdb_path);
 	//vector<Record_ATOM> atom_data = parsePDB(pdb_path);
+	printf("\n\n############################# BUILDING MOLECULE #############################\n\n\n");
+
 	compound_bridge_bundle = new CompoundBridgeBundle;
 	particle_id_maps = new ParticleRef[MAX_ATOMS];
+
+
+	
+
 
 	vector<Record_ATOM> atom_data = parseGRO(gro_path);
 	vector<vector<string>> top_data = parseTOP(itp_path);
@@ -23,6 +29,10 @@ Molecule CompoundBuilder::buildMolecule(string gro_path, string itp_path, int ma
 
 	//loadParticles(&compound, &atom_data, max_residue_id, true);
 	loadParticles(&molecule, &atom_data, max_residue_id, min_residue_id, ignore_hydrogens);
+	bonded_interactions_list = new LJ_Ignores[molecule.n_atoms_total * 10];		// DANGER - could get big. We need to ref the lists with particles global id, which comes directly from gro files, thus includes hydrogens and is 1-indexed!
+
+
+
 	//printf("%d particles added\n", compound.n_particles);
 	loadTopology(&molecule, &top_data);
 
@@ -37,12 +47,22 @@ Molecule CompoundBuilder::buildMolecule(string gro_path, string itp_path, int ma
 		molecule.compounds[i].calcParticleSphere();
 	}
 
+	
+	if (0) {
+		for (int i = 1; i < MAX_ATOMS; i++) {
+			if (particle_id_maps[i].global_id == -1)
+				continue;
+			printf("compound %d    local %d    global %d\n", particle_id_maps[i].compound_id, particle_id_maps[i].local_id_compound, particle_id_maps[i].global_id);
+		}	
+	}
+	
+
 
 	delete[] particle_id_maps;
 	delete compound_bridge_bundle;
+	delete[] bonded_interactions_list;
 
-
-
+	printf("\n\n############################# FINISHED BUILDING MOLECULE #############################\n\n\n");
 
 	return molecule;
 }
@@ -81,8 +101,6 @@ vector<Float3> CompoundBuilder::getSolventPositions(string gro_path) {
 
 
 void CompoundBuilder::loadParticles(Molecule* molecule, vector<CompoundBuilder::Record_ATOM>* pdb_data, int max_residue_id, int min_residue_id, bool ignore_protons) {
-
-
 	int current_res_id = -1;
 	int current_compound_id = -1;
 	Compound* current_compound = nullptr;
@@ -134,6 +152,11 @@ void CompoundBuilder::loadParticles(Molecule* molecule, vector<CompoundBuilder::
 
 
 		//particle_id_maps[record.atom_serial_number] = IDMap(record.atom_serial_number, current_compound_id, molecule->compounds[current_compound_id].n_particles);
+		if (particle_id_maps[record.atom_serial_number].compound_id != -1) {
+			printf("WARNING: Added particle is NOT unique");
+			exit(1);
+		}
+			
 		particle_id_maps[record.atom_serial_number] = ParticleRef(record.atom_serial_number, current_compound_id, molecule->compounds[current_compound_id].n_particles);
 		//current_compound->addParticle(FFM.atomTypeToIndex(record.atom_name[0]), CompactParticle(record.coordinate));
 
@@ -145,12 +168,23 @@ void CompoundBuilder::loadParticles(Molecule* molecule, vector<CompoundBuilder::
 		//current_compound->addParticle(FFM->atomTypeToIndex(record.atom_name[0]), record.coordinate);
 		//current_compound->addParticle(FFM->getAtomtypeID(record.atom_serial_number), record.coordinate);
 		current_compound->addParticle(FFM->getAtomtypeID(record.atom_serial_number), record.coordinate, FFM->atomTypeToIndex(record.atom_name[0]), record.atom_serial_number);
+		//record.coordinate.print('p');
 		molecule->n_atoms_total++;
 	}
 }
 
 void CompoundBuilder::loadTopology(Molecule* molecule, vector<vector<string>>* top_data)
-{
+{	
+	/*bonded_interactions_list = new uint32_t * [molecule->n_atoms_total];			// Just delete this section now
+	for (uint32_t i = 0; i < molecule->n_atoms_total; i++) {
+		bonded_interactions_list[i] = new uint32_t[MAX_BONDED_INTERACTIONS];
+		for (uint32_t ii = 0; ii < MAX_BONDED_INTERACTIONS; ii++) {
+			bonded_interactions_list[i][ii] = UINT32_MAX;
+		}
+	}*/
+
+
+
 	int dihedral_cnt = 0;
 	TopologyMode mode = INACTIVE;
 	for (vector<string> record : *top_data) {
@@ -158,7 +192,7 @@ void CompoundBuilder::loadTopology(Molecule* molecule, vector<vector<string>>* t
 			mode = INACTIVE;
 			continue;
 		}
-		
+
 		if (mode == INACTIVE) {
 			mode = setMode(record[0]);
 
@@ -169,9 +203,9 @@ void CompoundBuilder::loadTopology(Molecule* molecule, vector<vector<string>>* t
 		}
 		if (mode == DIHEDRAL && dihedral_cnt > 1)
 			continue;
+
 		addGeneric(molecule, &record, mode);
 	}
-
 }
 
 
@@ -187,8 +221,10 @@ CompoundBuilder::TopologyMode CompoundBuilder::setMode(string entry)
 }
 
 void CompoundBuilder::loadMaps(ParticleRef* maps, vector<string>* record, int n) {
-	for (int i = 0; i < n; i++)
+	for (int i = 0; i < n; i++) {
 		maps[i] = particle_id_maps[stoi((*record)[i])];
+	}
+		
 }
 
 void CompoundBuilder::addGeneric(Molecule* molecule, vector<string>* record, TopologyMode mode) {
@@ -218,6 +254,7 @@ void CompoundBuilder::addGeneric(Molecule* molecule, vector<string>* record, Top
 
 		break;
 	default:
+		printf("Default case???!!?\n");
 		return;
 	}
 }
@@ -225,12 +262,15 @@ void CompoundBuilder::addGeneric(Molecule* molecule, vector<string>* record, Top
 void CompoundBuilder::addBond(Molecule* molecule, ParticleRef* maps, vector<string>*record) {
 	loadMaps(maps, record, 2);
 	GenericBond g_bond = GenericBond(maps, 2);
-	if (!g_bond.allParticlesExist())
+	if (!g_bond.allParticlesExist()) {
 		return;
+	}
+		
 
 	PairBond* bondtype = FFM->getBondType(maps[0].global_id, maps[1].global_id);
 
 	distributeLJIgnores(molecule, maps, 2);				// DANGER
+	bool apply_BLJI = checkIfFirstBondedInteraction(molecule, maps, 2);
 
 	if (!g_bond.spansTwoCompounds()) {
 		Compound* compound = &molecule->compounds[maps[0].compound_id];
@@ -239,15 +279,16 @@ void CompoundBuilder::addBond(Molecule* molecule, ParticleRef* maps, vector<stri
 			exit(0);
 		}
 
-		compound->singlebonds[compound->n_singlebonds++] = PairBond(bondtype->b0, bondtype->kb, maps[0].local_id_compound, maps[1].local_id_compound);		
+		compound->singlebonds[compound->n_singlebonds++] = PairBond(bondtype->b0, bondtype->kb, maps[0].local_id_compound, maps[1].local_id_compound, apply_BLJI);		
 	}
 	else {
+
 		// First, we need to make sure all bond particles are added to the bridge.
 		// To create the single-bond we need to access bridge_local_indexes			
 		CompoundBridge* bridge = compound_bridge_bundle->getBelongingBridge(&g_bond);
 		bridge->addBondParticles(&g_bond, molecule);
 		//bridge->addSinglebond(PairBond(bondtype->b0, bondtype->kb, maps[0].global_id, maps[1].global_id));
-		bridge->addGenericBond(PairBond(bondtype->b0, bondtype->kb, maps[0].global_id, maps[1].global_id));
+		bridge->addGenericBond(PairBond(bondtype->b0, bondtype->kb, maps[0].global_id, maps[1].global_id, apply_BLJI));
 	}
 }
 
@@ -258,9 +299,15 @@ void CompoundBuilder::addAngle(Molecule* molecule, ParticleRef* maps, vector<str
 		return;
 
 
+
+
+
 	AngleBond* angletype = FFM->getAngleType(maps[0].global_id, maps[1].global_id, maps[2].global_id);
 
 	distributeLJIgnores(molecule, maps, 3);
+	bool apply_BLJI = checkIfFirstBondedInteraction(molecule, maps, 3);
+
+
 
 	if (!g_bond.spansTwoCompounds()) {
 		Compound* compound = &molecule->compounds[maps[0].compound_id];
@@ -268,12 +315,14 @@ void CompoundBuilder::addAngle(Molecule* molecule, ParticleRef* maps, vector<str
 			printf("Too many angles in compound\n");
 			exit(0);
 		}
-		compound->anglebonds[compound->n_anglebonds++] = AngleBond(maps[0].local_id_compound, maps[1].local_id_compound, maps[2].local_id_compound, angletype->theta_0, angletype->k_theta);
+
+	//	printf("		Adding anglebond %d %d\n", maps[0].local_id_compound, maps[1].local_id_compound, maps[2].local_id_compound);
+		compound->anglebonds[compound->n_anglebonds++] = AngleBond(maps[0].local_id_compound, maps[1].local_id_compound, maps[2].local_id_compound, angletype->theta_0, angletype->k_theta, apply_BLJI);
 	}
 	else {
 		CompoundBridge* bridge = compound_bridge_bundle->getBelongingBridge(&g_bond);
 		bridge->addBondParticles(&g_bond, molecule);
-		bridge->addGenericBond(AngleBond(maps[0].global_id, maps[1].global_id, maps[2].global_id, angletype->theta_0, angletype->k_theta));
+		bridge->addGenericBond(AngleBond(maps[0].global_id, maps[1].global_id, maps[2].global_id, angletype->theta_0, angletype->k_theta, apply_BLJI));
 	}
 }
 
@@ -288,6 +337,8 @@ void CompoundBuilder::addDihedral(Molecule* molecule, ParticleRef* maps, vector<
 	DihedralBond* dihedraltype = FFM->getDihedralType(maps[0].global_id, maps[1].global_id, maps[2].global_id, maps[3].global_id);
 
 	distributeLJIgnores(molecule, maps, 4);
+	bool apply_BLJI = checkIfFirstBondedInteraction(molecule, maps, 4);
+
 
 	if (!g_bond.spansTwoCompounds()) {
 		Compound* compound = &molecule->compounds[maps[0].compound_id];
@@ -295,12 +346,12 @@ void CompoundBuilder::addDihedral(Molecule* molecule, ParticleRef* maps, vector<
 			printf("Too many dihedrals in compound\n");
 			exit(0);
 		}
-		compound->dihedrals[compound->n_dihedrals++] = DihedralBond(maps[0].local_id_compound, maps[1].local_id_compound, maps[2].local_id_compound, maps[3].local_id_compound, dihedraltype->phi_0, dihedraltype->k_phi, dihedraltype->n);
+		compound->dihedrals[compound->n_dihedrals++] = DihedralBond(maps[0].local_id_compound, maps[1].local_id_compound, maps[2].local_id_compound, maps[3].local_id_compound, dihedraltype->phi_0, dihedraltype->k_phi, dihedraltype->n, apply_BLJI);
 	}
 	else {
 		CompoundBridge* bridge = compound_bridge_bundle->getBelongingBridge(&g_bond);
 		bridge->addBondParticles(&g_bond, molecule);
-		bridge->addGenericBond(DihedralBond(maps[0].global_id, maps[1].global_id, maps[2].global_id, maps[3].global_id, dihedraltype->phi_0, dihedraltype->k_phi, dihedraltype->n));
+		bridge->addGenericBond(DihedralBond(maps[0].global_id, maps[1].global_id, maps[2].global_id, maps[3].global_id, dihedraltype->phi_0, dihedraltype->k_phi, dihedraltype->n, apply_BLJI));
 	}
 }
 
@@ -308,6 +359,14 @@ void CompoundBuilder::distributeLJIgnores(Molecule* molecule, ParticleRef* parti
 	// This way only connects the edges of each bond, angle or dihedral
 	// ALWAYS do angles first, or this breaks!
 
+
+	// System 3, bond object based
+
+
+
+
+	/*
+	// System 2, never finished
 	if (n == 4)  {	// First check if connection is already made. I guess i could do this irrelevant of n
 		Compound* compound = &molecule->compounds[particle_refs[0].compound_id];
 		if (compound->lj_ignore_list[particle_refs[0].local_id_compound].checkAlreadyConnected(particle_refs[n-1].global_id)) {
@@ -325,23 +384,45 @@ void CompoundBuilder::distributeLJIgnores(Molecule* molecule, ParticleRef* parti
 
 	compound = &molecule->compounds[particle_refs[n - 1].compound_id];
 	compound->lj_ignore_list[particle_refs[n - 1].local_id_compound].addIgnoreTarget(particle_refs[0].global_id);
-
+	*/
 
 	// This approach connects all elements of the bond, angle or dihedral
-	/*	// OLD system
+		// OLD system
 	for (int id_self = 0; id_self < n; id_self++) {
 		for (int id_other = 0; id_other < n; id_other++) {
-
+	//for (int id_self = 0; id_self < n; id_self+=(n-1)) {
+		//for (int id_other = 0; id_other < n; id_other+=(n-1)) {
 			if (id_self == id_other)
 				continue;
 
 			Compound* compound_self = &molecule->compounds[particle_refs[id_self].compound_id];
 			compound_self->lj_ignore_list[particle_refs[id_self].local_id_compound].addIgnoreTarget(particle_refs[id_other].local_id_compound, particle_refs[id_other].compound_id);
 		}
-	}*/
+	}
 }
 
+bool CompoundBuilder::checkIfFirstBondedInteraction(Molecule* molecule, ParticleRef* particle_maps, int n) {	// Works whether particle spans multiple compounds or not.
+	uint32_t global_id_left = particle_maps[0].global_id;		// left and right is arbitrary.
+	uint32_t global_id_right = particle_maps[n-1].global_id;
+	
+	bool first_connection = !bonded_interactions_list[global_id_left].isAlreadyConnected(global_id_right);
 
+	if (min(global_id_left, global_id_right) == 512 && max(global_id_left, global_id_right) == 515) {
+		//printf("Checking the two, n: %d     ac: %d\n", n, first_connection);
+	}
+
+	if (!first_connection) {
+		//printf("Not first %d\n", n);
+	}
+
+	bonded_interactions_list[global_id_left].addConnection(global_id_right);
+	bonded_interactions_list[global_id_right].addConnection(global_id_left);
+
+
+	//printf("%d %d %d\n", particle_refs[0].compound_id, particle_refs[0].global_id, molecule->n_atoms_total);
+	
+	return first_connection;
+}
 
 
 

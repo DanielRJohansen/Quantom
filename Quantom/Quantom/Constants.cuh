@@ -21,8 +21,7 @@
 // Disable this for faster simulations. 
 #define ENABLE_DISPLAY
 
-
-#define ENABLE_DIHEDRALS
+// DIHEDRALS can no longer be disabled, as they are critical for BLJI
 
 
 // Debugging
@@ -55,7 +54,7 @@ constexpr float CUTOFF = 0.7f;	//nm/
 
 
 // OPTIMIZATION PARAMETERS
-const int MAX_COMPOUND_PARTICLES = 48;
+const int MAX_COMPOUND_PARTICLES = 56;
 
 
 
@@ -63,7 +62,7 @@ const int THREADS_PER_SOLVENTBLOCK = 128;
 const int THREADS_PER_COMPOUNDBLOCK = MAX_COMPOUND_PARTICLES; // Must be >= max comp particles
 
 
-const int SIMULATION_STEPS = 20000;
+const int SIMULATION_STEPS = 10000;
 
 
 
@@ -72,7 +71,7 @@ const int STEPS_PER_NLIST_UPDATE = 200;
 
 
 
-const int STEPS_PER_RENDER = 200;
+const int STEPS_PER_RENDER = 1;
 
 
 

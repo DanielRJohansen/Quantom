@@ -30,6 +30,8 @@ struct Int3 {
 	int x=0, y=0, z = 0;
 };
 
+
+
 struct Float3 {
 	__host__ __device__ Float3() {}
 	__host__ __device__ Float3(float a) : x(a), y(a), z(a) {}
@@ -97,7 +99,13 @@ struct Float3 {
 		); }
 
 
-	__host__ __device__ void print(char c='_') { printf("%c %f %f %f\n", c, x, y, z); }
+	__host__ __device__ void print(char c='_') { 
+		if (len() < 100000)
+			printf("%c %f %f %f\n", c, x, y, z); 
+		else
+			printf("%c %.0f\t\t %.0f\t\t %.0f\n", c, x, y, z);
+	}
+
 
 
 	__host__ __device__ void rotateAroundOrigo(Float3 pitch_yaw_roll) {	//pitch around x, yaw around z, tilt around y
@@ -167,6 +175,29 @@ struct Float3 {
 
 
 	float x = 0, y = 0, z = 0;
+};
+
+
+struct Double3 {
+	__host__ __device__ Double3() {}
+	__host__ __device__ Double3(double a) : x(a), y(a), z(a) {}
+	__host__ __device__ Double3(double x, double y, double z) : x(x), y(y), z(z) {}
+	__host__ __device__ Double3(Float3 a) : x((double)a.x), y((double)a.y), z((double)a.z) {}
+
+	__host__ __device__ inline Double3 operator + (const Float3 a) const {
+		return Double3(x + (double)a.x, y + (double)a.y, z + (double)a.z);
+	}
+	__host__ __device__ inline Double3 operator + (const Double3 a) const { return Double3(x + a.x, y + a.y, z + a.z); }
+	__host__ __device__ inline void operator += (const Float3 a) { x += (double) a.x; y += (double) a.y; z += (double) a.z; }
+
+
+	__host__ __device__ inline float len() { return (float)sqrtf(x * x + y * y + z * z); }
+
+	__host__ __device__ void print(char c = '_') {
+		printf("%c %f %f %f\n", c, x, y, z);
+	}
+
+	double x = 0, y = 0, z = 0;
 };
 
 struct BoundingBox {

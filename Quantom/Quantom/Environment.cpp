@@ -1,15 +1,16 @@
 #include "Environment.h"
 
 
-
 Environment::Environment() {
+}
+Environment::Environment(string conf_filename, string topol_filename) {
 	simulation = new Simulation();
 	verifySimulationParameters();
 
 
 	display = new DisplayV2();
 
-
+	
 	
 
 
@@ -21,7 +22,9 @@ Environment::Environment() {
 	int min_res_id = 0;
 	int max_res_id = 200;
 	bool ignore_hydrogens = true;
-	Molecule mol_6lzm_10 = compoundbuilder->buildMolecule(MOL_FOLDER + "conf.gro", MOL_FOLDER + "topol.top", max_res_id, min_res_id, ignore_hydrogens);
+	Molecule mol_6lzm_10 = compoundbuilder->buildMolecule(MOL_FOLDER + conf_filename, MOL_FOLDER + topol_filename, max_res_id, min_res_id, ignore_hydrogens);
+	//Molecule mol_6lzm_10 = compoundbuilder->buildMolecule(MOL_FOLDER + "conf.gro", MOL_FOLDER + "topol.top", max_res_id, min_res_id, ignore_hydrogens);
+	//Molecule mol_6lzm_10 = compoundbuilder->buildMolecule(MOL_FOLDER + "conf_test.gro", MOL_FOLDER + "topol_test.top", max_res_id, min_res_id, ignore_hydrogens);
 	//vector<Float3> solvent_positions = compoundbuilder->getSolventPositions(MOL_FOLDER + "box7.gro");
 	vector<Float3> solvent_positions = compoundbuilder->getSolventPositions(MOL_FOLDER + "conf.gro");
 
@@ -123,9 +126,12 @@ void Environment::run() {
 
 void Environment::postRunEvents() {
 	simulation->out_dir += "\\Steps_" + to_string(simulation->getStep()) + "\\";
-//	int check = _mkdir(&(simulation->out_dir[0]));		// Not recognized on linux
 
-	
+#ifndef __linux__
+	int check = _mkdir(&(simulation->out_dir[0]));		// Not recognized on linux
+#else
+	// WEhat is the linux equivalent?? TODO: !!
+#endif
 
 	dumpToFile(simulation->logging_data, 10 * simulation->getStep(), simulation->out_dir + "logdata.bin");
 
@@ -202,6 +208,17 @@ bool Environment::handleTermination(Simulation* simulation)
 	return false;
 }
 
+void Environment::prepFF(string conf_path, string topol_path) {
+	string program_command = "C:\\Users\\Daniel\\git_repo\\Quantom\\LIMA_ForcefieldMaker\\Release\\LIMA_ForcefieldMaker.exe "
+		+ (string) "prepsim" + " "
+		+ conf_path + " "
+		+ topol_path + " "
+		;
+
+	cout << program_command << "\n\n";
+	system(&program_command[0]);
+}
+
 void Environment::renderTrajectory(string trj_path)
 {
 	/*
@@ -265,6 +282,8 @@ void Environment::dumpToFile(T* data, uint64_t n_datapoints, string file_path_s)
 #else
 	file = fopen(file_path, "wb");
 #endif
+
+	printf("Check %d %d\n", sizeof(T), n_datapoints);
 
 	fwrite(data, sizeof(T), n_datapoints, file);
 	fclose(file);

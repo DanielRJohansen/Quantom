@@ -60,7 +60,7 @@ struct NBAtomtype {
 
 struct PairBond {	// IDS and indexes are used interchangeably here!
 	PairBond(){}
-	PairBond(int id1, int id2, float b0, float kb) : b0(b0), kb(kb) {
+	PairBond(int id1, int id2, float b0, float kb) : b0(b0), kb(kb), invertLJ(invertLJ) {
 		// This is only for loading the forcefield, so the ID's refers to id's given in .conf file!
 		atom_indexes[0] = id1;
 		atom_indexes[1] = id2;
@@ -70,9 +70,9 @@ struct PairBond {	// IDS and indexes are used interchangeably here!
 		atom_indexes[0] = particleindex_a;
 		atom_indexes[1] = particleindex_b;
 	}
-	PairBond(float ref_dist, float kb, uint32_t particleindex_a, uint32_t particleindex_b) : 
+	PairBond(float ref_dist, float kb, uint32_t particleindex_a, uint32_t particleindex_b, bool invertLJ) :
 		//reference_dist(ref_dist) {
-		b0(ref_dist), kb(kb) {
+		b0(ref_dist), kb(kb), invertLJ(invertLJ) {
 		atom_indexes[0] = particleindex_a;
 		atom_indexes[1] = particleindex_b;
 	}
@@ -88,7 +88,8 @@ struct PairBond {	// IDS and indexes are used interchangeably here!
 
 struct AngleBond {
 	AngleBond() {}
-	AngleBond(int id1, int id2, int id3, float theta_0, float k_theta) : theta_0(theta_0), k_theta(k_theta){
+	AngleBond(int id1, int id2, int id3, float theta_0, float k_theta, bool invertLJ) : 
+		theta_0(theta_0), k_theta(k_theta), invertLJ(invertLJ) {
 		atom_indexes[0] = id1;
 		atom_indexes[1] = id2;
 		atom_indexes[2] = id3;
@@ -104,7 +105,8 @@ struct AngleBond {
 struct DihedralBond {
 	DihedralBond() {}
 	//DihedralBond(float phi_0, float k_phi) : phi_0(phi_0), k_phi(k_phi) {}
-	DihedralBond(int id1, int id2, int id3, int id4, float phi_0, float k_phi, int n) : phi_0(phi_0), k_phi(k_phi), n(n) {
+	DihedralBond(int id1, int id2, int id3, int id4, float phi_0, float k_phi, int n, bool invertLJ) : 
+		phi_0(phi_0), k_phi(k_phi), n(n), invertLJ(invertLJ) {
 		atom_indexes[0] = id1;
 		atom_indexes[1] = id2;
 		atom_indexes[2] = id3;
@@ -118,13 +120,14 @@ struct DihedralBond {
 	bool invertLJ = false;		// When sharing multiple bonded connections
 };
 
-struct GenericBond {					// ONLY used during creation, never on device!
+struct GenericBond {				// ONLY used during creation, never on device!
 	enum BONDTYPES { SINGLE, ANGLE, DIHEDRAL, PAIR };
 
 	GenericBond() {}
 	GenericBond(ParticleRef* particle_refs, int n) {
 		for (int i = 0; i < n; i++) {
 			particles[n_particles++] = particle_refs[i];
+
 
 			if (compound_ids[0] == -1) { 
 				compound_ids[0] = particles[i].compound_id; 
@@ -173,11 +176,16 @@ struct GenericBond {					// ONLY used during creation, never on device!
 
 
 struct LJ_Ignores {	// Each particle is associated with 1 of these.
+	LJ_Ignores() {
+		for (int i = 0; i < max_ids; i++)
+			global_ids[i] = UINT32_MAX;
+	}
+
 	static const int max_ids = 32;
 	uint8_t local_ids[max_ids];
 	uint8_t compound_ids[max_ids];
 
-	int global_ids[max_ids];
+	uint32_t global_ids[max_ids];
 	uint8_t n_ignores = 0;
 
 
@@ -218,6 +226,7 @@ struct LJ_Ignores {	// Each particle is associated with 1 of these.
 		}
 		return false;
 	}
+	
 
 	__host__ void assignDoublyConnectedID(uint16_t id) {
 		doublyconnected_id = id;
@@ -225,6 +234,37 @@ struct LJ_Ignores {	// Each particle is associated with 1 of these.
 
 	__device__ bool doublyConnected(uint16_t dc_id) {
 		return (dc_id == doublyconnected_id && doublyconnected_id != 0);
+	}
+
+
+	// For system 3
+	__host__  void init() {
+		for (int i = 0; i < max_ids; i++)
+			global_ids[i] = UINT32_MAX;
+	}
+	__host__ bool isAlreadyConnected(uint32_t global_id) {
+		for (int i = 0; i < n_ignores; i++) {
+			if (global_ids[i] == global_id)
+				return true;
+		}
+		return false;
+	}
+
+	__host__ void addConnection(uint32_t global_id) {
+		for (int i = 0; i < max_ids; i++) {
+			if (global_ids[i] == global_id) {
+				//printf("MC found!\n");
+				return;
+			}
+				
+			if (global_ids[i] == UINT32_MAX) {
+				global_ids[i] = global_id;
+				n_ignores++;
+				return;
+			}
+		}
+		printf("Out of bounds force LJ ignores!\n");
+		exit(1);
 	}
 };
 
@@ -306,7 +346,7 @@ public:
 		n_solvent_neighbors = nl_ptr->n_solvent_neighbors;
 	}
 	__device__ void loadData(NeighborList* nl_ptr) {
-		if (threadIdx.x < n_compound_neighbors)
+		if (threadIdx.x < n_compound_neighbors)			// DANGER Breaks when threads < mAX_COMPOUND_Ns
 			neighborcompound_ids[threadIdx.x] = nl_ptr->neighborcompound_ids[threadIdx.x];
 		for (int i = threadIdx.x;  i < n_solvent_neighbors; i += blockDim.x) {// Same as THREADS_PER_COMPOUNDBLOCK
 			neighborsolvent_ids[i] = nl_ptr->neighborsolvent_ids[i];

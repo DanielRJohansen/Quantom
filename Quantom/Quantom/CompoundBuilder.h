@@ -52,7 +52,8 @@ private:
 
 	uint16_t unique_doublyconnected_id = 1;
 
-
+	//uint32_t** bonded_interactions_list;	// Contains each particles list of (larger) ids of particles with which it shares a bonded interaction
+	LJ_Ignores* bonded_interactions_list;
 
 
 
@@ -70,7 +71,7 @@ private:
 	void addAngle(Molecule* molecule, ParticleRef* maps, vector<string>* record);
 	void addDihedral(Molecule* molecule, ParticleRef* maps, vector<string>* record);
 	void distributeLJIgnores(Molecule* molecule, ParticleRef* maps, int n);
-
+	bool checkIfFirstBondedInteraction(Molecule* molecule, ParticleRef* maps, int n);
 
 
 	ParsedLine parseLine(int line_index);

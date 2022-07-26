@@ -14,11 +14,11 @@ string mol_path = FileHelpers::pathJoin(sim_path, "Molecule");
 string forcefield_path = FileHelpers::pathJoin(sim_path, "Forcefield");
 
 
+int jkik = 1;
 
-
-vector<NB_Atomtype> makeFilteredNonbondedFF(Map* map) {
+vector<NB_Atomtype> makeFilteredNonbondedFF(Map* map, string conf_path) {
 //	vector<vector<string>> simconf_rows = readFile("C:\\PROJECTS\\Quantom\\Molecules\\t4lys_full\\conf.gro");
-	vector<vector<string>> simconf_rows = Reader::readFile(FileHelpers::pathJoin(mol_path, "conf.gro"));
+	vector<vector<string>> simconf_rows = Reader::readFile(FileHelpers::pathJoin(mol_path, conf_path));
 	vector<string> simconf = FTHelpers::parseConf(simconf_rows);
 
 
@@ -67,12 +67,12 @@ vector<Dihedraltype> makeTopologyDihedrals(vector<vector<string>> ffbonded_rows,
 }
 
 
-void prepareForcefieldForSimulation() {
+void prepareForcefieldForSimulation(string conf_path="conf.gro", string topol_path="topol.top") {
 	// 95% of runtime is spent matching topologies to forcefield. 
 	// To speedup, split the topology_x_types and run multithreaded?
 	
 	Map map;
-	vector<NB_Atomtype> ff_nonbonded_active = makeFilteredNonbondedFF(&map);		// The map is made here, so this function must come first
+	vector<NB_Atomtype> ff_nonbonded_active = makeFilteredNonbondedFF(&map, conf_path);		// The map is made here, so this function must come first
 
 
 
@@ -82,7 +82,7 @@ void prepareForcefieldForSimulation() {
 	vector<vector<string>> ffbonded_rows = Reader::readFile(FileHelpers::pathJoin(forcefield_path, "LIMA_ffbonded.txt"), { '/' }, true);
 	//	vector<vector<string>> topology_rows = readFile("C:\\PROJECTS\\Quantom\\Molecules\\t4lys_full\\topol.top");
 		//vector<vector<string>> topology_rows = readFile(sim_path + "/Molecule/topol.top");
-	vector<vector<string>> topology_rows = Reader::readFile(FileHelpers::pathJoin(mol_path, "topol.top"));
+	vector<vector<string>> topology_rows = Reader::readFile(FileHelpers::pathJoin(mol_path, topol_path));
 
 
 	vector<Atom> atoms = makeTopologyAtoms(topology_rows, &ff_nonbonded_active, &map);
@@ -143,13 +143,34 @@ void mergeForcefieldFiles() {
 
 
 int main(int argc, char* argv[]) {
+	printf("\n// --------------------------------- ForcefieldMaker starting --------------------------------- //\n\n\n\n\n\n\n\n");
 
-	mergeForcefieldFiles();
+	printf("%d argumets\n", argc);
+	cout << ':' << argv[1] << ':' << endl;
+	if (argc < 1 || argc > 4) {
+		printf("Invalid arguments list\n");
+	}
+	else if (argc == 1) {
+		mergeForcefieldFiles();
+		prepareForcefieldForSimulation();
+	}
+	else if ((string)argv[1] == (string)"mergefff") {
+		printf("Merging forcefield files\n");
+		mergeForcefieldFiles();
+	}
+	else if ((string)argv[1] == (string)"prepsim") {
+		printf("Filtering forcefield files for simulation\n");
+		prepareForcefieldForSimulation(argv[2], argv[3]);
+	}
+	else {
+		printf("Bad argument 1\n");
+	}
 
+	
+	
+	
 
-	prepareForcefieldForSimulation();
-
-	printf("\nForcefieldMaker finished\n\n\n\n\n\n\n\n");
+	printf("\n// --------------------------------- ForcefieldMaker finished --------------------------------- //\n\n\n\n\n\n\n\n");
 	
 	return 0;
 }
