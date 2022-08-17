@@ -223,7 +223,7 @@ void Engine::cullDistantNeighbors(Simulation* simulation, NListDataCollection* n
 				}
 					
 
-				//j--;	// Decrement, as the removeId puts the last element at the current and now vacant spot.
+				j--;	// Decrement, as the removeId puts the last element at the current and now vacant spot.
 			}			
 		}
 	}
@@ -572,7 +572,7 @@ __device__ Float3 calcLJForce(Float3* pos0, Float3* pos1, float* data_ptr, float
 	}
 #endif
 	return (*pos1 - *pos0) * force_scalar;										// GN/mol [(kg*nm)/(ns^2*mol)]
-
+	//return Float3(0.);
 }
 
 //constexpr double kb = 17.5 * 1e+6;		//	J/(mol*nm^2)	/ kg/(ns^2 * mol)
@@ -988,6 +988,9 @@ __device__ void integratePosition(Float3* pos, Float3* pos_tsub1, Float3* force,
 
 	Float3 delta_pos = *pos - *pos_tsub1;
 	*pos = *pos_tsub1 + delta_pos * *thermostat_scalar;
+
+	if (delta_pos.len() > 0.1)
+		printf("Distance/step %f\n", delta_pos.len());
 #ifdef LIMA_VERBOSE
 	if ((*pos-*pos_tsub1).len() > 0.1) {
 		printf("\nP_index %d Thread %d blockId %d\tForce %f mass  %f \Dist %f\n", p_index, threadIdx.x, blockIdx.x, force->len(), mass, (*pos - *pos_tsub1).len());
