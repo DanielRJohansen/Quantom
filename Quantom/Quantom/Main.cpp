@@ -9,12 +9,21 @@ struct Test {
 
 	int arr[4];
 	//const static int size = 14;
+	volatile int a = 10;
+	bool redu(int b) {
+		if (b % 2) {
+			printf("Bool %d\n", b % 2);
+			a--;
+			return 1;
+		}
+		return 0;
+	}
+	int get() { return a; }
 };
 
 
 
 int main() {
-
 
 	//Environment::prepFF("conf_test.gro", "topol_test.top");
 

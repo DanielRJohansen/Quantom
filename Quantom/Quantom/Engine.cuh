@@ -33,9 +33,9 @@ public:
 		LIMAENG::applyHyperpos(pos1, pos2);
 
 		if ((*pos1 - *pos2).len() > 1) {
-			printf("KinE Dist over 1 nm!\n");
-			pos1->print('1');
-			pos2->print('2');
+			//printf("KinE Dist over 1 nm!\n");
+			//pos1->print('1');
+			//pos2->print('2');
 		}
 			
 
@@ -148,7 +148,7 @@ private:
 	void offloadPositionDataNLIST(Simulation* simulation);	// all at once
 	void pushNlistsToDevice();
 	static void updateNeighborLists(Simulation* simulation, NListDataCollection* nlist_data_collection, 
-		volatile bool* finished, int* timing);	// thread worker, can't own engine object, thus pass ref
+		volatile bool* finished, int* timing, bool* mutex_lock);	// thread worker, can't own engine object, thus pass ref
 //	static bool neighborWithinCutoff(Float3* pos_a, Float3* pos_b);
 	static bool neighborWithinCutoff(Float3* pos_a, Float3* pos_b, float cutoff_offset);
 	/*static bool removeFromNeighborlists(NeighborList* nlist_self, NeighborList* nlist_neighbor,
@@ -166,6 +166,7 @@ private:
 
 
 	int prev_nlist_update_step = 0;
+	bool updatenlists_mutexlock = 0;
 	volatile bool updated_neighborlists_ready = 0;
 
 	// -------------------------------------- HELPERS -------------------------------------- //

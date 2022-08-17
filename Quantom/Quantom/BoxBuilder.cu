@@ -19,10 +19,12 @@ void BoxBuilder::buildBox(Simulation* simulation) {
 	simulation->box->solvent_neighborlists = new NeighborList[MAX_SOLVENTS];	
 	simulation->box->compound_neighborlists = new NeighborList[MAX_COMPOUNDS];
 	for (int i = 0; i < MAX_COMPOUNDS; i++) {
-		simulation->box->compound_neighborlists->init();
+		//simulation->box->compound_neighborlists->init();
+		//simulation->box->compound_neighborlists->associated_id = i;
 	}
 	for (int i = 0; i < MAX_SOLVENTS; i++) {
-		simulation->box->solvent_neighborlists->init();
+		//simulation->box->solvent_neighborlists->associated_id = i;
+		//simulation->box->solvent_neighborlists->init();
 	}
 
 
@@ -204,7 +206,7 @@ int BoxBuilder::solvateBox(Simulation* simulation, vector<Float3>* solvent_posit
 
 		sol_pos += most_recent_offset_applied;			// So solvents are re-aligned with an offsat molecule.
 
-		if (spaceAvailable(simulation->box, sol_pos)) {						// Should i check? Is this what energy-min is for?
+		if (spaceAvailable(simulation->box, sol_pos) && simulation->box->n_solvents < SOLVENT_TESTLIMIT) {						// Should i check? Is this what energy-min is for?
 			simulation->box->solvents[simulation->box->n_solvents++] = createSolvent(sol_pos, simulation->dt);
 		}
 		//else 
@@ -249,7 +251,7 @@ void BoxBuilder::integrateCompound(Compound* compound, Simulation* simulation)
 {
 	compound->init();
 	CompoundState* state = &simulation->box->compound_state_array[simulation->box->n_compounds];
-	Float3 compound_united_vel = Float3(random(), random(), random()).norm() * v_rms * 0;
+	Float3 compound_united_vel = Float3(random(), random(), random()).norm() * v_rms;
 
 	for (int i = 0; i < compound->n_particles; i++) {
 //		state->positions[i] = compound->particles[i].pos_tsub1;

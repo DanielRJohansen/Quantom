@@ -38,8 +38,8 @@ const int N_SOLVATE_MOLECULES = 2000;
 
 
 const int NEIGHBORLIST_MAX_COMPOUNDS = 64;
-const int NEIGHBORLIST_MAX_SOLVENTS = 2048;
-const int SOLVENTS_BATCHSIZE = 64;
+const int NEIGHBORLIST_MAX_SOLVENTS = 4096;
+//const int SOLVENTS_BATCHSIZE = 64;
 
 
 
@@ -48,7 +48,8 @@ const int SOLVENTS_BATCHSIZE = 64;
 
 
 const int MAX_SOLVENTS = 0xFFFF;
-constexpr float CUTOFF = 0.7f;	//nm/
+const int SOLVENT_TESTLIMIT= MAX_SOLVENTS;
+constexpr float CUTOFF = 0.8f;	//nm/
 //const int MAX_ATOM_TYPES = 16;
 
 
@@ -67,18 +68,18 @@ const int SIMULATION_STEPS = 10000;
 
 
 
-const int STEPS_PER_NLIST_UPDATE = 200;
+const int STEPS_PER_NLIST_UPDATE = 10;
 
 
 
-const int STEPS_PER_RENDER = 1;
+const int STEPS_PER_RENDER = 200;
 
 
 
 // THERMOSTAT PARAMETERS
-const int STEPS_PER_LOGTRANSFER = 40;
+const int STEPS_PER_LOGTRANSFER = 20;		// Must be >= 3
 //const int STEPS_PER_TRAJTRANSFER = 100;
-const int STEPS_PER_THERMOSTAT = 40;
+const int STEPS_PER_THERMOSTAT = STEPS_PER_LOGTRANSFER;			// Must be >= 3
 const bool ENABLE_BOXTEMP = true;
 const bool APPLY_THERMOSTAT = true;										// Switch to using forcefield_host first
 const bool PRINT_TEMP = false;

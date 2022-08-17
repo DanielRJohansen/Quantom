@@ -274,14 +274,7 @@ struct LJ_Ignores {	// Each particle is associated with 1 of these.
 class NeighborList {
 public:
 	enum NEIGHBOR_TYPE {COMPOUND, SOLVENT};
-	__host__ void init() {
-		for (int i = 0; i < NEIGHBORLIST_MAX_COMPOUNDS; i++) {
-			neighborcompound_ids[i] = 0xFFFF;
-		}
-		for (int i = 0; i < NEIGHBORLIST_MAX_SOLVENTS; i++) {
-			neighborsolvent_ids[i] = 0xFFFF;
-		}
-	}
+
 
 	__host__ bool addId(uint16_t new_id, NEIGHBOR_TYPE nt) {
 		switch (nt)
@@ -291,30 +284,29 @@ public:
 				neighborcompound_ids[n_compound_neighbors++] = new_id;
 				return true;
 			}
-#ifdef IGNORE_NEIGHBOR_OVERFLOW
-			return true;
-#else
 			printf("\nFailed to insert compound neighbor id %d!\n", new_id);
+			exit(1);
 			break;
-#endif
+
 		case NeighborList::SOLVENT:
 			if (n_solvent_neighbors < NEIGHBORLIST_MAX_SOLVENTS) {
 				neighborsolvent_ids[n_solvent_neighbors++] = new_id;
+				//if (associated_id==0 || new_id == 0)
+					//printf("%d added id %d\n", associated_id, new_id);
 				return true;
 			}
-#ifdef IGNORE_NEIGHBOR_OVERFLOW
-			return true;
-#else
-			printf("\nFailed to insert solvent neighbor id %d!\n", new_id);
+
+			printf("\nFailed to insert solvent neighbor id %d of %d\n", new_id, n_solvent_neighbors);
+			exit(1);
 			break;
-#endif
+
 		default:
 			break;
 		}
 		exit(1);
 		return false;
 	}
-	__host__ void removeId(uint16_t neighbor_id, NEIGHBOR_TYPE nt) {
+	__host__ bool removeId(uint16_t neighbor_id, NEIGHBOR_TYPE nt) {
 
 		switch (nt) {
 		case NeighborList::SOLVENT:
@@ -322,8 +314,12 @@ public:
 				if (neighborsolvent_ids[i] == neighbor_id) {
 					neighborsolvent_ids[i] = neighborsolvent_ids[n_solvent_neighbors - 1];
 					n_solvent_neighbors--;
-					return;
+					return true;
 				}
+			}
+			printf("\n%d Failed to remove neighbor solvent ID: %d of %d total IDs. max+1: %d\n", associated_id, neighbor_id, n_solvent_neighbors, neighborcompound_ids[n_solvent_neighbors]);
+			for (int i = 0; i < n_solvent_neighbors; i++) {
+				//printf("%d\n", neighborsolvent_ids[i]);
 			}
 			break;
 		case NeighborList::COMPOUND:
@@ -331,14 +327,17 @@ public:
 				if (neighborcompound_ids[i] == neighbor_id) {
 					neighborcompound_ids[i] = neighborcompound_ids[n_compound_neighbors - 1];
 					n_compound_neighbors--;
-					return;
+					return true;
 				}
 			}
-
+			printf("\nFailed to remove neighbor compound %d of %d\n", neighbor_id, n_compound_neighbors);
+			break;
+		default:
+			printf("Faulty neighbortype\n");
 			break;
 		}
-
-		printf("Failed to remove neighbor %d!!!\n", neighbor_id);
+		
+		return false;
 	}
 
 	__device__ void loadMeta(NeighborList* nl_ptr) {	// Called from thread 0
@@ -355,11 +354,12 @@ public:
 	}
 
 
-
 	uint16_t neighborcompound_ids[NEIGHBORLIST_MAX_COMPOUNDS];
 	uint16_t n_compound_neighbors = 0;
 	uint16_t neighborsolvent_ids[NEIGHBORLIST_MAX_SOLVENTS];
 	uint16_t n_solvent_neighbors = 0;
+	int associated_id = -1;
+
 };
 
 
@@ -716,10 +716,13 @@ struct CompoundBridgeBundle {
 
 struct ParticleRefCompact {
 	ParticleRefCompact() {}
-	ParticleRefCompact(ParticleRef pref) : compound_id(pref.compound_id), local_id_compound(pref.local_id_compound) {}
+	ParticleRefCompact(ParticleRef pref) : compound_id(pref.compound_id), local_id_compound(pref.local_id_compound),
+	global_id(pref.global_id) {}
 
 	int compound_id = -1;
 	int local_id_compound = -1;
+
+	int global_id = -1; // temp
 };
 
 struct CompoundBridgeCompact {

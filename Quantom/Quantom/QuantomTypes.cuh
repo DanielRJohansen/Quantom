@@ -189,6 +189,7 @@ struct Double3 {
 	}
 	__host__ __device__ inline Double3 operator + (const Double3 a) const { return Double3(x + a.x, y + a.y, z + a.z); }
 	__host__ __device__ inline void operator += (const Float3 a) { x += (double) a.x; y += (double) a.y; z += (double) a.z; }
+	__host__ __device__ inline void operator += (const Double3 a) { x += a.x; y += a.y; z += a.z; }
 
 
 	__host__ __device__ inline float len() { return (float)sqrtf(x * x + y * y + z * z); }
@@ -359,7 +360,13 @@ public:
 	}
 
 	bool insert(uint16_t key, int offset=1) {			// Returns true for sucessful insertion
-		int hash = (getHash(key) + offset) % table_size;
+		if (offset > 100000) {
+			printf("Hashtable insertion failed\n");
+			exit(1);
+		}
+			
+
+		uint32_t hash = (getHash(key) + offset) % table_size;
 		if (table[hash] == key) {		// Key already exists in table
 			return false;
 		}
@@ -374,10 +381,11 @@ public:
 	~HashTable() {
 		delete[] table;
 	}
+
 private:
 
-	int getHash(uint16_t key) {
-		return (int) floor(table_size*(fmod((double) key * k, 1.f)));
+	uint32_t getHash(uint16_t key) {
+		return (uint32_t) floor(table_size*(fmod((double) key * k, 1.)));
 	}
 
 

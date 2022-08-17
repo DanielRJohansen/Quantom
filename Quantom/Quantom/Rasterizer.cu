@@ -155,7 +155,7 @@ __device__ float getRadius(ATOM_TYPE atom_type) {
     case ATOM_TYPE::O:
         return 0.12;
     case ATOM_TYPE::SOL:
-        return 0.08;
+        return 0.05;
     case ATOM_TYPE::P:
         return 0.15;
     case ATOM_TYPE::NONE:
