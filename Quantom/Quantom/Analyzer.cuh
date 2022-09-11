@@ -45,5 +45,5 @@ private:
 
 
 	Float3* traj_buffer_device;
-	double* potE_buffer_device;
+	float* potE_buffer_device;
 };

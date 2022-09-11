@@ -323,7 +323,7 @@ void Engine::updateNeighborLists(Simulation* simulation, NListDataCollection* nl
 void Engine::offloadLoggingData() {
 	uint64_t step_offset = (simulation->getStep() - STEPS_PER_LOGTRANSFER) ;	// Tongue in cheek here, i think this is correct...
 
-	cudaMemcpy(&simulation->potE_buffer[step_offset * simulation->total_particles_upperbound], simulation->box->potE_buffer, sizeof(double) * simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER, cudaMemcpyDeviceToHost);
+	cudaMemcpy(&simulation->potE_buffer[step_offset * simulation->total_particles_upperbound], simulation->box->potE_buffer, sizeof(float) * simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER, cudaMemcpyDeviceToHost);
 	
 	cudaMemcpy(&simulation->traj_buffer[step_offset * simulation->total_particles_upperbound], simulation->box->traj_buffer, sizeof(Float3) * simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER, cudaMemcpyDeviceToHost);
 
@@ -403,8 +403,8 @@ void Engine::handleBoxtemp() {
 
 	float temp_scalar = target_temp / temp;
 		// I just added this to not change any temperatures too rapidly
-	temp_scalar = min(temp_scalar, 1.1f);
-	temp_scalar = max(temp_scalar, 0.9f);
+	temp_scalar = min(temp_scalar, 1.01f);
+	temp_scalar = max(temp_scalar, 0.99f);
 
 	if (PRINT_TEMP || temp > 500.f || temp < 100.f) { printf("\n %d Temperature: %.1f Biggest contrib: %.0f avg kinE %.0f\n", (simulation->getStep() - 1) / STEPS_PER_THERMOSTAT, temp, biggest_contribution, temp_package.z); }
 		
@@ -965,38 +965,63 @@ __device__ Float3 computeDihedralForces(T* entity, Float3* positions, Float3* ut
 	return utility_buffer[threadIdx.x];
 }
 
-__device__ void integratePosition(Float3* pos, Float3* pos_tsub1, Float3* force, const double mass, const double dt, float* thermostat_scalar, int p_index, bool verbose=false) {
+__device__ void integratePosition(Float3* pos, Float3* pos_tsub1, Float3* force, const double mass, const double dt, float* thermostat_scalar, int p_index, bool issolvent =false) {
 	// Force is in ??Newton, [kg * nm /(mol*ns^2)] //
 
-	
+	float prev_vel = (*pos - *pos_tsub1).len();
 		
 	Float3 temp = *pos;
 	LIMAENG::applyHyperpos(pos, pos_tsub1);
 	//printf("dt %.08f\n", dt);
 	//*pos = *pos * 2 - *pos_tsub1 + *force * (1.f / mass) * dt * dt;	// no *0.5?	// [nm] - [nm] + [kg*m*s^-2]/[kg] * [ns]^2
-	double magnitude_equalizer = 1e+4;		// Due to force being very large and dt being very small
-	double masstime_scaling = ((dt*magnitude_equalizer)*(dt * magnitude_equalizer)) / mass;
-	if (blockIdx.x == 13 && threadIdx.x == 18 ) {
-		//printf("\nP 0 vel: %f    scaling: %f\n", (*pos - *pos_tsub1).len(), masstime_scaling);
-		//force->print('f');
-	}
+	//double magnitude_equalizer = 1e+4;		// Due to force being very large and dt being very small
+	//double masstime_scaling = ((dt*magnitude_equalizer)*(dt * magnitude_equalizer)) / mass;
+
 	//*pos = *pos * 2 - *pos_tsub1 + *force * masstime_scaling;		// [nm] - [nm] + [kg/mol*m*/s^2]/[kg/mol] * [s]^2 * (1e-9)^2	=> [nm]-[nm]+[]
-	*pos = *pos * 2 - *pos_tsub1 + (*force * (1.0/(magnitude_equalizer * magnitude_equalizer))) * masstime_scaling;		// [nm] - [nm] + [kg/mol*m*/s^2]/[kg/mol] * [s]^2 * (1e-9)^2	=> [nm]-[nm]+[]
+	//pos = *pos * 2 - *pos_tsub1 + (*force * (1./(magnitude_equalizer * magnitude_equalizer))) * masstime_scaling;		// [nm] - [nm] + [kg/mol*m * /s^2]/[kg/mol] * [s]^2 * (1e-9)^2	=> [nm]-[nm]+[]
+	*pos = *pos * 2 - *pos_tsub1 + *force * (dt / mass) * dt;		// [nm] - [nm] + [kg/mol*m*/s ^ 2] / [kg / mol] * [s] ^ 2 * (1e-9) ^ 2 = > [nm] - [nm] + []
 	*pos_tsub1 = temp;
 
 	
-
+	return;
 	Float3 delta_pos = *pos - *pos_tsub1;
 	*pos = *pos_tsub1 + delta_pos * *thermostat_scalar;
 
-	if (delta_pos.len() > 0.1)
-		printf("Distance/step %f\n", delta_pos.len());
+	if (delta_pos.len() > 0.05)
+		printf("\nSol: %d b %d t %d.      Distance/step: %f prev: %f    Force: %f\n", issolvent, blockIdx.x, threadIdx.x, delta_pos.len(), prev_vel, force->len());
 #ifdef LIMA_VERBOSE
 	if ((*pos-*pos_tsub1).len() > 0.1) {
 		printf("\nP_index %d Thread %d blockId %d\tForce %f mass  %f \Dist %f\n", p_index, threadIdx.x, blockIdx.x, force->len(), mass, (*pos - *pos_tsub1).len());
 		//printf("\nP_index %d Thread %d blockId %d\tForce %f mass  %f \tFrom %f %f %f\tTo %f %f %f\n", p_index, threadIdx.x, blockIdx.x, force->len(), mass, pos_tsub1->x, pos_tsub1->y, pos_tsub1->z, pos->x, pos->y, pos->z);		
 	}
 #endif
+}
+
+__device__ void integratePositionRampUp(Float3* pos, Float3* pos_tsub1, Float3* force, const double mass, const double dt, float rampup_scalar) {
+	// Force is in ??Newton, [kg * nm /(mol*ns^2)] //
+
+	//float prev_vel = (*pos - *pos_tsub1).len();
+
+	Float3 temp = *pos;
+	LIMAENG::applyHyperpos(pos, pos_tsub1);
+	//printf("dt %.08f\n", dt);
+	//*pos = *pos * 2 - *pos_tsub1 + *force * (1.f / mass) * dt * dt;	// no *0.5?	// [nm] - [nm] + [kg*m*s^-2]/[kg] * [ns]^2
+	double magnitude_equalizer = 1e+4;		// Due to force being very large and dt being very small
+	double masstime_scaling = ((dt * magnitude_equalizer) * (dt * magnitude_equalizer)) / mass;
+
+	//Float3 vel_scaled = (*pos - *pos_tsub1) * (1. / rampup_scalar);
+	//Float3 acc_scaled = (*force * (1. / (magnitude_equalizer * magnitude_equalizer))) * masstime_scaling * (1./rampup_scalar);
+
+	//*pos = *pos + vel_scaled + acc_scaled;
+	//*pos = *pos * 2 - *pos_tsub1 + *force * masstime_scaling;		// [nm] - [nm] + [kg/mol*m*/s^2]/[kg/mol] * [s]^2 * (1e-9)^2	=> [nm]-[nm]+[]
+	*pos = *pos * 2 - *pos_tsub1 + (*force * (1. / (magnitude_equalizer * magnitude_equalizer))) * masstime_scaling;		// [nm] - [nm] + [kg/mol*m*/s^2]/[kg/mol] * [s]^2 * (1e-9)^2	=> [nm]-[nm]+[]
+	*pos_tsub1 = temp;
+
+	float vel_scalar = log2f(force->len()/1000.);
+	vel_scalar = max(vel_scalar, 1.f);
+//	rampup_scalar = min(rampup_scalar, 2.f);
+	Float3 delta_pos = *pos - *pos_tsub1;
+	*pos = *pos_tsub1 + delta_pos * (1. / vel_scalar);
 }
 
 
@@ -1132,12 +1157,21 @@ __global__ void compoundKernel(Box* box) {
 	// ------------------------------------------------------------------------------------------------------------------------------------------------ //
 
 
+	box->potE_buffer[threadIdx.x + blockIdx.x * MAX_COMPOUND_PARTICLES * N_DATAGAN_VALUES + (box->step % STEPS_PER_TRAINDATATRANSFER) * gridDim.x * MAX_COMPOUND_PARTICLES * N_DATAGAN_VALUES] = force.len();
+	box->traj_buffer[threadIdx.x + blockIdx.x * MAX_COMPOUND_PARTICLES * N_DATAGAN_VALUES + (box->step % STEPS_PER_TRAINDATATRANSFER) * gridDim.x * MAX_COMPOUND_PARTICLES * N_DATAGAN_VALUES] = Float3(0.);// compound_state.positions[threadIdx.x];
 
 
 	// ------------------------------------------------------------ Integration ------------------------------------------------------------ //
 	if (threadIdx.x < compound.n_particles) {
-		Float3 force_(force.x, force.y, force.z);
-		integratePosition(&compound_state.positions[threadIdx.x], &compound.prev_positions[threadIdx.x], &force_, forcefield_device.particle_parameters[compound.atom_types[threadIdx.x]].mass, box->dt, &box->thermostat_scalar, threadIdx.x);		
+		//Float3 force_(force.x, force.y, force.z);
+		//integratePosition(&compound_state.positions[threadIdx.x], &compound.prev_positions[threadIdx.x], &force_, forcefield_device.particle_parameters[compound.atom_types[threadIdx.x]].mass, box->dt, &box->thermostat_scalar, threadIdx.x, false);		
+		if (box->step >= RAMPUP_STEPS || 1) {
+			integratePosition(&compound_state.positions[threadIdx.x], &compound.prev_positions[threadIdx.x], &force, forcefield_device.particle_parameters[compound.atom_types[threadIdx.x]].mass, box->dt, &box->thermostat_scalar, threadIdx.x, false);
+		}
+		else {
+			integratePositionRampUp(&compound_state.positions[threadIdx.x], &compound.prev_positions[threadIdx.x], &force, forcefield_device.particle_parameters[compound.atom_types[threadIdx.x]].mass, box->dt, RAMPUP_STEPS-box->step);
+		}
+		
 		box->compounds[blockIdx.x].prev_positions[threadIdx.x] = compound.prev_positions[threadIdx.x];
 	}
 	__syncthreads();
@@ -1167,8 +1201,8 @@ __global__ void compoundKernel(Box* box) {
 		if (threadIdx.x < compound.n_particles || 1) {																							// TODO: Remove || 1
 			int step_offset = (box->step % STEPS_PER_LOGTRANSFER) * box->total_particles_upperbound;
 			int compound_offset = blockIdx.x * MAX_COMPOUND_PARTICLES;
-			box->potE_buffer[threadIdx.x + compound_offset + step_offset] = potE_sum;			// TODO: Should be += since bridge sets value first
-			box->traj_buffer[threadIdx.x + compound_offset + step_offset] = compound_state.positions[threadIdx.x];
+			//box->potE_buffer[threadIdx.x + compound_offset + step_offset] = potE_sum;			// TODO: Should be += since bridge sets value first
+
 		}		
 		__syncthreads();
 
@@ -1196,12 +1230,14 @@ __global__ void compoundKernel(Box* box) {
 		int particle_offset = threadIdx.x * N_DATAGAN_VALUES;
 		box->data_GAN[0 + particle_offset + compound_offset + step_offset] = compound_state.positions[threadIdx.x];
 		box->data_GAN[1 + particle_offset + compound_offset + step_offset] = force_LJ_sol;
+		box->data_GAN[2 + particle_offset + compound_offset + step_offset] = force;
 
 		if (threadIdx.x >= compound.n_particles)
 			box->data_GAN[0 + particle_offset + compound_offset + step_offset] = Float3(-1.f);
 //		box->data_GAN[1 + threadIdx.x * 6 + step_offset] = force_bond + force_angle;
 //		box->data_GAN[2 + threadIdx.x * 6 + step_offset] = force_LJ_com;
 //		box->data_GAN[3 + threadIdx.x * 6 + step_offset] = force_LJ_sol;
+		//box->outdata[0 + threadIdx.x * 10]
 	}
 	// ----------------------------------------------------------------------------- //
 
@@ -1212,7 +1248,6 @@ __global__ void compoundKernel(Box* box) {
 		
 	
 	box->compound_state_array_next[blockIdx.x].loadData(&compound_state);
-
 }
 
 
@@ -1246,14 +1281,8 @@ __global__ void solventForceKernel(Box* box) {
 	//Float3 solvent_pos;
 	if (thread_active) {
 		solvent = box->solvents[solvent_index];
-		//solvent_pos = solvent.pos;									// Use this when applying hyperpos, NOT SOLVENT.POS as others acess this concurrently on other kernels!
 	}	
-	
-	//data_ptr[0] = solvent.pos_tsub1.x;
-	//data_ptr[1] = solvent.pos_tsub1.y;
-	//data_ptr[2] = solvent.pos_tsub1.z;
 
-	
 	// --------------------------------------------------------------- Molecule Interactions --------------------------------------------------------------- //
 	for (int i = 0; i < box->n_compounds; i++) {
 		//continue;		 // DANGER
@@ -1275,36 +1304,52 @@ __global__ void solventForceKernel(Box* box) {
 
 	}
 	// ----------------------------------------------------------------------------------------------------------------------------------------------------- //
-	//utility_buffer[threadIdx.x] = Float3(0.f);
 
+
+
+	// --------------------------------------------------------------- Solvent Interactions --------------------------------------------------------------- //
 	if (thread_active) {
 		// DANGER
-		//force += computeSolventToSolventLJForces(&solvent.pos, &box->solvent_neighborlists[solvent_index], box->solvents, data_ptr, &potE_sum);
+		force += computeSolventToSolventLJForces(&solvent.pos, &box->solvent_neighborlists[solvent_index], box->solvents, data_ptr, &potE_sum);
 	}
+	// ----------------------------------------------------------------------------------------------------------------------------------------------------- //
 
 
 
-
-
-	if (thread_active) {
-		int p_index = MAX_COMPOUND_PARTICLES + solvent_index;
-		integratePosition(&solvent.pos, &solvent.pos_tsub1, &force, forcefield_device.particle_parameters[ATOMTYPE_SOL].mass, box->dt, &box->thermostat_scalar, p_index);
-		applyPBC(&solvent.pos);	// forcePositionToInsideBox	// This break the integration, as that doesn't accound for PBC in the vel conservation
-	}
-
+	box->traj_buffer[box->n_compounds * MAX_COMPOUND_PARTICLES + solvent_index + (box->step % STEPS_PER_LOGTRANSFER) * box->total_particles_upperbound] = Float3(0.);
 
 	// ------------------------------------ DATA LOG ------------------------------- //
 	if (thread_active) {
 		int compounds_offset = box->n_compounds * MAX_COMPOUND_PARTICLES;
 		int step_offset = (box->step % STEPS_PER_LOGTRANSFER) * box->total_particles_upperbound;
 
-		box->potE_buffer[compounds_offset + solvent_index + step_offset] = (double) potE_sum;	//  data_ptr[0];
+		//box->potE_buffer[compounds_offset + solvent_index + step_offset] = (double) potE_sum;	//  data_ptr[0];
 		//box->potE_buffer[compounds_offset + solvent_index + step_offset] = 0;
 		//printf("pot: %f\n", box->potE_buffer[compounds_offset + solvent_index + (box->step) * box->total_particles]);
+		box->potE_buffer[compounds_offset + solvent_index + step_offset] = force.len();
 		box->traj_buffer[compounds_offset + solvent_index + step_offset] = solvent.pos;
+		if ((solvent.pos.x > 7 || solvent.pos.y > 7 || solvent.pos.z > 7) && box->step == 0)
+			solvent.pos.print();
+		//box->traj_buffer[compounds_offset + solvent_index + step_offset] = Float3();
 	}
 
 	// ----------------------------------------------------------------------------- //
+
+	if (thread_active) {
+//		printf("%f\n", (solvent.pos - box->solvents[solvent_index].pos).len());
+
+		int p_index = MAX_COMPOUND_PARTICLES + solvent_index;
+		if (box->step >= RAMPUP_STEPS || 1) {
+			//integratePosition(&solvent.pos, &solvent.pos_tsub1, &force, forcefield_device.particle_parameters[ATOMTYPE_SOL].mass, box->dt, &box->thermostat_scalar, p_index, true);
+		}
+		else {
+			integratePositionRampUp(&solvent.pos, &solvent.pos_tsub1, &force, forcefield_device.particle_parameters[ATOMTYPE_SOL].mass, box->dt, RAMPUP_STEPS - box->step);
+		}
+		applyPBC(&solvent.pos);	// forcePositionToInsideBox	// This break the integration, as that doesn't accound for PBC in the vel conservation
+
+		//printf("%f\n", (solvent.pos - solvent.pos_tsub1).len());
+	}
+
 
 
 	if (thread_active) {

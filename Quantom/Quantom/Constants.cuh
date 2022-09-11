@@ -64,23 +64,23 @@ const int THREADS_PER_SOLVENTBLOCK = 128;
 const int THREADS_PER_COMPOUNDBLOCK = MAX_COMPOUND_PARTICLES; // Must be >= max comp particles
 
 
-const int SIMULATION_STEPS = 10000;
+const int SIMULATION_STEPS = 200;
 
-
+const int RAMPUP_STEPS = 1000;
 
 
 const int STEPS_PER_NLIST_UPDATE = 4;
 
 
 
-const int STEPS_PER_RENDER = 200;
+const int STEPS_PER_RENDER = 10;
 
 
 
 // THERMOSTAT PARAMETERS
-const int STEPS_PER_LOGTRANSFER = 20;		// Must be >= 3
+const int STEPS_PER_LOGTRANSFER = 2;		// Must be >= 3
 //const int STEPS_PER_TRAJTRANSFER = 100;
-const int STEPS_PER_THERMOSTAT = STEPS_PER_LOGTRANSFER;			// Must be >= 3
+const int STEPS_PER_THERMOSTAT = 20;			// Must be >= 3
 const bool ENABLE_BOXTEMP = true;
 const bool APPLY_THERMOSTAT = true;										// Switch to using forcefield_host first
 const bool PRINT_TEMP = false;

@@ -78,7 +78,7 @@ void BoxBuilder::finishBox(Simulation* simulation) {
 
 	// Need this variable both on host and device
 	simulation->total_particles_upperbound = simulation->box->n_compounds * MAX_COMPOUND_PARTICLES + simulation->box->n_solvents;											// BAD AMBIGUOUS AND WRONG CONSTANTS
-	printf("%d\n", simulation->total_particles_upperbound);
+	printf("Total particles upperbound: %d\n", simulation->total_particles_upperbound);
 	simulation->box->total_particles_upperbound = simulation->total_particles_upperbound;											// BAD AMBIGUOUS AND WRONG CONSTANTS
 
 
@@ -98,8 +98,8 @@ void BoxBuilder::finishBox(Simulation* simulation) {
 	printf("n points %d\n", n_points);
 	printf("Malloc %.2f KB on device for data buffers\n",(float) ((sizeof(double) * simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER + sizeof(Float3) * simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER) * 1e-3));
 	printf("Malloc %.2f MB on host for data buffers\n", (float) ((sizeof(double) * simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER + sizeof(Float3) * simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER) * 1e-6));
-	cudaMallocManaged(&simulation->box->potE_buffer, sizeof(double) * simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER);	// Can only log molecules of size 3 for now...
-	simulation->potE_buffer = new double[simulation->total_particles_upperbound * simulation->n_steps];
+	cudaMallocManaged(&simulation->box->potE_buffer, sizeof(float) * simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER);	// Can only log molecules of size 3 for now...
+	simulation->potE_buffer = new float[simulation->total_particles_upperbound * simulation->n_steps];
 
 	cudaMallocManaged(&simulation->box->traj_buffer, sizeof(Float3) * simulation->total_particles_upperbound * STEPS_PER_LOGTRANSFER);
 	simulation->traj_buffer = new Float3[simulation->total_particles_upperbound * simulation->n_steps];
@@ -195,9 +195,6 @@ int BoxBuilder::solvateBox(Simulation* simulation)
 
 int BoxBuilder::solvateBox(Simulation* simulation, vector<Float3>* solvent_positions)	// Accepts the position of the center or Oxygen of a solvate molecule. No checks are made wh
 {
-
-
-
 	for (Float3 sol_pos : *solvent_positions) {
 		if (simulation->box->n_solvents == MAX_SOLVENTS) {
 			printf("Too many solvents added!\n\n\n\n");
@@ -213,45 +210,16 @@ int BoxBuilder::solvateBox(Simulation* simulation, vector<Float3>* solvent_posit
 			//printf("no room\n");
 	}
 
-
 	simulation->total_particles += simulation->box->n_solvents;
 	printf("%d of %d solvents added to box\n", simulation->box->n_solvents, solvent_positions->size());
 	return simulation->box->n_solvents;
 }
 
-
-
-
-
-/*
-void BoxBuilder::integrateCompound(Float3 com, int compound_index, CompoundState* statebuffer_node, double dt, Simulation* simulation) {
-
-	int n_atoms = PARTICLES_PER_COMPOUND;
-	Float3 offsets[3] = { Float3(0,0,0), Float3(0.13, 0, 0), Float3(0, 0, -0.13) };
-	for (int i = 0; i < n_atoms; i++) {
-		statebuffer_node->positions[i] = com + offsets[i];	// PLACE EACH PARTICLE IN COMPOUNDS STATE, BEFORE CREATING COMPOUNDS, LETS US IMMEDIATELY CALCULATE THE COMPOUNDS CENTER OF MASS.
-		statebuffer_node->n_particles++;
-	}
-	
-	//double vrms = 250;
-
-	Float3 compound_united_vel = Float3(random(), random(), random()).norm() * v_rms * 0.1;
-	Compound compound(compound_index, statebuffer_node);
-	for (int i = 0; i < n_atoms; i++) {
-		Float3 atom_pos_sub1 = statebuffer_node->positions[i] - compound_united_vel * dt;
-		compound.particles[i] = CompactParticle(COMPOUNDPARTICLE_MASS, atom_pos_sub1);
-		compound.n_particles++;
-	}
-	simulation->box->compounds[simulation->box->n_compounds++] = compound;
-
-	//return compound;
-}
-*/
 void BoxBuilder::integrateCompound(Compound* compound, Simulation* simulation)
 {
 	compound->init();
 	CompoundState* state = &simulation->box->compound_state_array[simulation->box->n_compounds];
-	Float3 compound_united_vel = Float3(random(), random(), random()).norm() * v_rms;
+	Float3 compound_united_vel = Float3(random(), random(), random()).norm() * v_rms * 0.;			// Giving individual comp in molecule different uniform vels is sub-optimal...
 
 	for (int i = 0; i < compound->n_particles; i++) {
 //		state->positions[i] = compound->particles[i].pos_tsub1;
@@ -273,7 +241,7 @@ void BoxBuilder::integrateCompound(Compound* compound, Simulation* simulation)
 
 
 Solvent BoxBuilder::createSolvent(Float3 com, double dt) {
-	Float3 solvent_vel = Float3(random(), random(), random()).norm() * v_rms;
+	Float3 solvent_vel = Float3(random(), random(), random()).norm() * v_rms;		// TODO: I dont know, but i think we need to freeze solvents to avoid unrealisticly large forces at step 1
 	return Solvent(com, com - solvent_vel * dt);
 }
 

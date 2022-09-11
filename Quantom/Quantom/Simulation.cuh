@@ -60,7 +60,7 @@ public:
 	double dt;
 	bool critical_error_encountered = 0;
 
-	double* potE_buffer;		// For total energy summation
+	float* potE_buffer;		// For total energy summation
 	Float3* traj_buffer;
 
 	float* outdata;			// Temp, for longging values to whatever
@@ -136,7 +136,7 @@ public:
 	//int step = 0;
 
 
-	double* potE_buffer;	// Not really a buffer yet, just one large array that holds full simulation data
+	float* potE_buffer;	// Not really a buffer yet, just one large array that holds full simulation data
 	Float3* traj_buffer;
 	float* temperature_buffer;
 	int n_temp_values = 0;

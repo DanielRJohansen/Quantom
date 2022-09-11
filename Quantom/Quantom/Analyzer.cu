@@ -30,7 +30,7 @@ double __device__ calcKineticEnergy(Float3* pos1, Float3* pos2, double mass, dou
 */
 
 
-void __global__ monitorCompoundEnergyKernel(Box* box, Float3* traj_buffer, double* potE_buffer, Float3* data_out) {		// everything here breaks if not all compounds are identical in particle count and particle mass!!!!!!!
+void __global__ monitorCompoundEnergyKernel(Box* box, Float3* traj_buffer, float* potE_buffer, Float3* data_out) {		// everything here breaks if not all compounds are identical in particle count and particle mass!!!!!!!
 	__shared__ Float3 energy[MAX_COMPOUND_PARTICLES];
 	__shared__ Compound compound;
 
@@ -61,7 +61,7 @@ void __global__ monitorCompoundEnergyKernel(Box* box, Float3* traj_buffer, doubl
 	__syncthreads();
 
 
-	double potE = potE_buffer[threadIdx.x + compound_index * MAX_COMPOUND_PARTICLES + step * box->total_particles_upperbound];
+	float potE = potE_buffer[threadIdx.x + compound_index * MAX_COMPOUND_PARTICLES + step * box->total_particles_upperbound];
 
 	Float3 pos_tsub1 = traj_buffer[threadIdx.x + compound_index * MAX_COMPOUND_PARTICLES + (step - 1) * box->total_particles_upperbound];
 	Float3 pos_tadd1 = traj_buffer[threadIdx.x + compound_index * MAX_COMPOUND_PARTICLES + (step + 1) * box->total_particles_upperbound];
@@ -93,7 +93,7 @@ void __global__ monitorCompoundEnergyKernel(Box* box, Float3* traj_buffer, doubl
 
 
 
-void __global__ monitorSolventEnergyKernel(Box* box, Float3* traj_buffer, double* potE_buffer, Float3* data_out) {
+void __global__ monitorSolventEnergyKernel(Box* box, Float3* traj_buffer, float* potE_buffer, Float3* data_out) {
 	__shared__ Float3 energy[THREADS_PER_SOLVENTBLOCK];
 
 
@@ -116,7 +116,7 @@ void __global__ monitorSolventEnergyKernel(Box* box, Float3* traj_buffer, double
 
 	float kinE = LIMAENG::calcKineticEnergy(&pos_tadd1, &pos_tsub1, SOLVENT_MASS, box->dt);
 
-	double potE = potE_buffer[compounds_offset + solvent_index + step * box->total_particles_upperbound];
+	float potE = potE_buffer[compounds_offset + solvent_index + step * box->total_particles_upperbound];
 
 	if (potE != 0.f) {
 		//printf("step %04d solvate %04d pot %f, compound_offset %d, step_offset  %d\n", step, solvent_index, potE, compounds_offset, step*box->total_particles_upperbound);
@@ -171,7 +171,7 @@ Analyzer::AnalyzedPackage Analyzer::analyzeEnergy(Simulation* simulation) {	// C
 	uint64_t max_values_per_kernel = (max_steps_per_kernel +2) * particles_per_step;							// Pad steps with 2 for vel calculation
 	printf("Analyzer malloc %.2f MB on device\n", (sizeof(Float3) + sizeof(double)) * (max_values_per_kernel) * 1e-6);
 	cudaMalloc(&traj_buffer_device, sizeof(Float3) * max_values_per_kernel);
-	cudaMalloc(&potE_buffer_device, sizeof(double) * max_values_per_kernel);
+	cudaMalloc(&potE_buffer_device, sizeof(float) * max_values_per_kernel);
 
 	for (int i = 0; i < ceil((double)analysable_steps / (double)max_steps_per_kernel); i++) {
 		uint64_t step_offset = i * max_steps_per_kernel + 1;												// offset one since we can't analyse step 1
@@ -179,7 +179,7 @@ Analyzer::AnalyzedPackage Analyzer::analyzeEnergy(Simulation* simulation) {	// C
 		uint64_t values_in_kernel = (steps_in_kernel + 2) * particles_per_step;
 
 		cudaMemcpy(traj_buffer_device, &simulation->traj_buffer[(step_offset-1) * particles_per_step], sizeof(Float3) * values_in_kernel, cudaMemcpyHostToDevice);		// -1 to additional datap for vel calculation. +2 for -1 and -1 for vel calculation
-		cudaMemcpy(potE_buffer_device, &simulation->potE_buffer[(step_offset-1) * particles_per_step], sizeof(double) * values_in_kernel, cudaMemcpyHostToDevice);
+		cudaMemcpy(potE_buffer_device, &simulation->potE_buffer[(step_offset-1) * particles_per_step], sizeof(float) * values_in_kernel, cudaMemcpyHostToDevice);
 
 
 

@@ -124,6 +124,8 @@ void Environment::run() {
 	}
 }
 
+
+
 void Environment::postRunEvents() {
 	simulation->out_dir += "\\Steps_" + to_string(simulation->getStep()) + "\\";
 
@@ -140,12 +142,14 @@ void Environment::postRunEvents() {
 		//simulation->traindata_buffer[0 + i * N_DATAGAN_VALUES * MAX_COMPOUND_PARTICLES * simulation->n_compounds].print();
 	}
 
-	if (!simulation->box->critical_error_encountered) {
+	if (simulation->box->critical_error_encountered) {
 		dumpToFile(simulation->traindata_buffer,
 			(uint64_t) N_DATAGAN_VALUES * MAX_COMPOUND_PARTICLES * simulation->n_compounds * simulation->getStep(),
 			simulation->out_dir + "sim_traindata.bin");
 	}
 	
+
+	dumpToFile(simulation->traj_buffer, simulation->getStep() * simulation->total_particles_upperbound, simulation->out_dir + "trajectory.bin");
 
 	printf("temp %f \n", simulation->temperature_buffer[0]);
 
@@ -155,19 +159,23 @@ void Environment::postRunEvents() {
 	printf("temp %f \n", simulation->temperature_buffer[0]);
 	printf("temp %f %f\n", analyzed_package.temperature_data[0], analyzed_package.temperature_data[analyzed_package.n_temperature_values - 1]);
 
+	dumpToFile(simulation->potE_buffer, simulation->getStep() * simulation->total_particles_upperbound, simulation->out_dir + "potE.bin");
+
 #ifndef __linux__
-	if (simulation->box->critical_error_encountered) return;
+	if (!simulation->box->critical_error_encountered && 0) {	// Skipping for now
+		string data_processing_command = "C:\\Users\\Daniel\\git_repo\\Quantom\\LIMA_services\\x64\\Release\\LIMA_services.exe "
+			+ simulation->out_dir + " "
+			+ to_string(simulation->getStep()) + " "
+			+ "0" + " "											// do_shuffle
+			+ to_string(simulation->n_compounds) + " "
+			+ to_string(MAX_COMPOUND_PARTICLES)
+			;
 
-	string data_processing_command = "C:\\Users\\Daniel\\git_repo\\Quantom\\LIMA_services\\x64\\Release\\LIMA_services.exe "
-		+ simulation->out_dir + " "
-		+ to_string(simulation->getStep()) + " "
-		+ "0" + " "											// do_shuffle
-		+ to_string(simulation->n_compounds) + " "
-		+ to_string(MAX_COMPOUND_PARTICLES)		
-		;											
+		cout << data_processing_command << "\n\n";
+		system(&data_processing_command[0]);
+	}
 
-	cout << data_processing_command << "\n\n";
-	system(&data_processing_command[0]);		
+	
 #endif
 }
 
