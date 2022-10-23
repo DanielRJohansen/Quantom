@@ -122,7 +122,7 @@ xlabel("time [fs]")
 
 
 %% PotE as force.len()
-steps = 200;
+steps = 850;
 workdir = "C:\\PROJECTS\\Quantom\\Simulation\\Steps_" + string(steps)
 file = fopen(strcat(workdir, "\\potE.bin"), "rb");
 data = fread(file, 'single');
@@ -137,7 +137,7 @@ force = reshape(data, [total_p_upperbound, steps]);
 %force = force(1:compound_p_upperbound, :);    % compounds only
 
 n = 2
-final = 50
+final = 0
 tiledlayout(n,1)
 for i = 0:n-1
     nexttile
@@ -158,7 +158,7 @@ end
 clc
 clear
 
-steps = 200;
+steps = 850;
 workdir = "C:\\PROJECTS\\Quantom\\Simulation\\Steps_" + string(steps)
 file = fopen(strcat(workdir, "\\trajectory.bin"), "rb");
 data = fread(file, 'single');
@@ -171,27 +171,37 @@ stride = total_p_upperbound * 3;
 
 traj = reshape(data, [3, total_p_upperbound, steps]);
 
+%Compund only
+%traj = traj(:, 1:compound_p_upperbound, :);
 
+%Solvent only
+traj = traj(:, compound_p_upperbound:end, :);
 
-dif2 = (traj(:,:, 2:end) - traj(:,:, 1:steps-1) ).^2;
-%a = sqrt(sum(dif2, 1));
+t = traj(:,:, 2:end);
+tsub1 = traj(:,:, 1:steps-1);
+dif = abs(t - tsub1);
+%t(dif > 6) = tsub1(dif > 6);
+dif = abs(t - tsub1);
 
-%a(:,:,1)
+dif2 = dif.^2;
+
  
 dist = squeeze(sqrt(sum(dif2, 1)));
-dist = dist(compound_p_upperbound:end, :);
+dist(dist>4) = NaN;
 
-n = 8;
+%dist = dist(compound_p_upperbound:end, :);
+
+n = 12;
 %final = size(dist,2);
-final = 15;
+final = 849;
 
 % avg vel's
 data = dist(:, 1:final);
 %data = data(data<6.);
-data(data > 6.) = 0;
-s = size(data);
 
-avg_vel = mean(data, 1);
+
+
+avg_vel = mean(data, 1)
 max_vel = max(data, [], 1);
 
 
@@ -201,7 +211,7 @@ for i = 0:n-1
     t_index = round ( 1 + final/n * i );
     
     data = dist(:,t_index);
-    h = histogram(data, 30, 'BinLimits', [0 30])    
+    h = histogram(data, 40, 'BinLimits', [0 0.015])    
     ylim([0.1, 2000])
     Max = max(data(data<6.))
     %bar(h.center, h.counts);

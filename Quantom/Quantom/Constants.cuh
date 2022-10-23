@@ -64,16 +64,16 @@ const int THREADS_PER_SOLVENTBLOCK = 128;
 const int THREADS_PER_COMPOUNDBLOCK = MAX_COMPOUND_PARTICLES; // Must be >= max comp particles
 
 
-const int SIMULATION_STEPS = 200;
+const int SIMULATION_STEPS = 20000;
 
-const int RAMPUP_STEPS = 1000;
+const int RAMPUP_STEPS = 1;
 
 
 const int STEPS_PER_NLIST_UPDATE = 4;
 
 
 
-const int STEPS_PER_RENDER = 10;
+const int STEPS_PER_RENDER = 1;
 
 
 

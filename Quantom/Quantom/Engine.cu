@@ -493,7 +493,7 @@ void Engine::step() {
 
 __device__ void applyPBC(Float3* current_position) {	// Only changes position if position is outside of box;
 	for (int dim = 0; dim < 3; dim++) {
-		*current_position->placeAt(dim) += BOX_LEN * (current_position->at(dim) < 0);
+		*current_position->placeAt(dim) += BOX_LEN * (current_position->at(dim) < 0.f);
 		*current_position->placeAt(dim) -= BOX_LEN * (current_position->at(dim) > BOX_LEN);
 	}
 }
@@ -1006,16 +1006,21 @@ __device__ void integratePositionRampUp(Float3* pos, Float3* pos_tsub1, Float3* 
 	LIMAENG::applyHyperpos(pos, pos_tsub1);
 	//printf("dt %.08f\n", dt);
 	//*pos = *pos * 2 - *pos_tsub1 + *force * (1.f / mass) * dt * dt;	// no *0.5?	// [nm] - [nm] + [kg*m*s^-2]/[kg] * [ns]^2
-	double magnitude_equalizer = 1e+4;		// Due to force being very large and dt being very small
-	double masstime_scaling = ((dt * magnitude_equalizer) * (dt * magnitude_equalizer)) / mass;
+	//double magnitude_equalizer = 1e+4;		// Due to force being very large and dt being very small
+	//double masstime_scaling = ((dt * magnitude_equalizer) * (dt * magnitude_equalizer)) / mass;
 
 	//Float3 vel_scaled = (*pos - *pos_tsub1) * (1. / rampup_scalar);
 	//Float3 acc_scaled = (*force * (1. / (magnitude_equalizer * magnitude_equalizer))) * masstime_scaling * (1./rampup_scalar);
 
 	//*pos = *pos + vel_scaled + acc_scaled;
 	//*pos = *pos * 2 - *pos_tsub1 + *force * masstime_scaling;		// [nm] - [nm] + [kg/mol*m*/s^2]/[kg/mol] * [s]^2 * (1e-9)^2	=> [nm]-[nm]+[]
-	*pos = *pos * 2 - *pos_tsub1 + (*force * (1. / (magnitude_equalizer * magnitude_equalizer))) * masstime_scaling;		// [nm] - [nm] + [kg/mol*m*/s^2]/[kg/mol] * [s]^2 * (1e-9)^2	=> [nm]-[nm]+[]
+	//*pos = *pos * 2 - *pos_tsub1 + (*force * (1. / (magnitude_equalizer * magnitude_equalizer))) * masstime_scaling;		// [nm] - [nm] + [kg/mol*m*/s^2]/[kg/mol] * [s]^2 * (1e-9)^2	=> [nm]-[nm]+[]
+
+
+	*pos = *pos * 2. - *pos_tsub1 + *force * (dt / mass) * dt * 0.f;		// [nm] - [nm] + [kg/mol*m*/s ^ 2] / [kg / mol] * [s] ^ 2 * (1e-9) ^ 2 = > [nm] - [nm] + []
 	*pos_tsub1 = temp;
+
+	return;
 
 	float vel_scalar = log2f(force->len()/1000.);
 	vel_scalar = max(vel_scalar, 1.f);
@@ -1157,8 +1162,8 @@ __global__ void compoundKernel(Box* box) {
 	// ------------------------------------------------------------------------------------------------------------------------------------------------ //
 
 
-	box->potE_buffer[threadIdx.x + blockIdx.x * MAX_COMPOUND_PARTICLES * N_DATAGAN_VALUES + (box->step % STEPS_PER_TRAINDATATRANSFER) * gridDim.x * MAX_COMPOUND_PARTICLES * N_DATAGAN_VALUES] = force.len();
-	box->traj_buffer[threadIdx.x + blockIdx.x * MAX_COMPOUND_PARTICLES * N_DATAGAN_VALUES + (box->step % STEPS_PER_TRAINDATATRANSFER) * gridDim.x * MAX_COMPOUND_PARTICLES * N_DATAGAN_VALUES] = Float3(0.);// compound_state.positions[threadIdx.x];
+	//box->potE_buffer[threadIdx.x + blockIdx.x * MAX_COMPOUND_PARTICLES * N_DATAGAN_VALUES + (box->step % STEPS_PER_TRAINDATATRANSFER) * gridDim.x * MAX_COMPOUND_PARTICLES * N_DATAGAN_VALUES] = force.len();
+	box->traj_buffer[threadIdx.x + blockIdx.x * MAX_COMPOUND_PARTICLES * N_DATAGAN_VALUES + (box->step % STEPS_PER_TRAINDATATRANSFER) * gridDim.x * MAX_COMPOUND_PARTICLES * N_DATAGAN_VALUES] = Float3(0.);// compound_state.positions[threadIdx.x];	// N DATAGAN???!?!
 
 
 	// ------------------------------------------------------------ Integration ------------------------------------------------------------ //
@@ -1315,9 +1320,9 @@ __global__ void solventForceKernel(Box* box) {
 	// ----------------------------------------------------------------------------------------------------------------------------------------------------- //
 
 
-
-	box->traj_buffer[box->n_compounds * MAX_COMPOUND_PARTICLES + solvent_index + (box->step % STEPS_PER_LOGTRANSFER) * box->total_particles_upperbound] = Float3(0.);
-
+	if (solvent_index < box->n_solvents)
+		box->traj_buffer[box->n_compounds * MAX_COMPOUND_PARTICLES + solvent_index + (box->step % STEPS_PER_LOGTRANSFER) * box->total_particles_upperbound] = Float3(0.);
+	//__syncthreads();
 	// ------------------------------------ DATA LOG ------------------------------- //
 	if (thread_active) {
 		int compounds_offset = box->n_compounds * MAX_COMPOUND_PARTICLES;
@@ -1330,7 +1335,7 @@ __global__ void solventForceKernel(Box* box) {
 		box->traj_buffer[compounds_offset + solvent_index + step_offset] = solvent.pos;
 		if ((solvent.pos.x > 7 || solvent.pos.y > 7 || solvent.pos.z > 7) && box->step == 0)
 			solvent.pos.print();
-		//box->traj_buffer[compounds_offset + solvent_index + step_offset] = Float3();
+		box->traj_buffer[compounds_offset + solvent_index + step_offset] = solvent.pos;
 	}
 
 	// ----------------------------------------------------------------------------- //
@@ -1340,14 +1345,20 @@ __global__ void solventForceKernel(Box* box) {
 
 		int p_index = MAX_COMPOUND_PARTICLES + solvent_index;
 		if (box->step >= RAMPUP_STEPS || 1) {
-			//integratePosition(&solvent.pos, &solvent.pos_tsub1, &force, forcefield_device.particle_parameters[ATOMTYPE_SOL].mass, box->dt, &box->thermostat_scalar, p_index, true);
+			integratePosition(&solvent.pos, &solvent.pos_tsub1, &force, forcefield_device.particle_parameters[ATOMTYPE_SOL].mass, box->dt, &box->thermostat_scalar, p_index, true);
 		}
 		else {
 			integratePositionRampUp(&solvent.pos, &solvent.pos_tsub1, &force, forcefield_device.particle_parameters[ATOMTYPE_SOL].mass, box->dt, RAMPUP_STEPS - box->step);
-		}
-		applyPBC(&solvent.pos);	// forcePositionToInsideBox	// This break the integration, as that doesn't accound for PBC in the vel conservation
 
-		//printf("%f\n", (solvent.pos - solvent.pos_tsub1).len());
+		}
+		float len = (solvent.pos - solvent.pos_tsub1).len();
+		/*if ( len < 0.0004)
+			printf("%f\n", len);*/
+
+		applyPBC(&solvent.pos);	
+
+
+		
 	}
 
 
